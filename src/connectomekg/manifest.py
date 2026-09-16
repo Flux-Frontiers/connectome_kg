@@ -16,6 +16,8 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from connectomekg.readers.codex import find_connections_file
+
 
 @dataclass(frozen=True)
 class ReleaseFile:
@@ -127,6 +129,14 @@ def sha256_of(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def _connections_present(data_dir: Path) -> str | None:
+    """Name of the connections table found, whatever Codex called it."""
+    try:
+        return find_connections_file(data_dir).name
+    except FileNotFoundError:
+        return None
+
+
 def verify_dir(
     data_dir: Path,
     files: tuple[ReleaseFile, ...] = FAFB_783_FILES,
@@ -145,10 +155,16 @@ def verify_dir(
     :raises ValueError: In strict mode when a checksum mismatches.
     """
     data_dir = Path(data_dir)
+    found_con = _connections_present(data_dir)
     present, missing, mismatched = [], [], []
     for f in files:
         p = data_dir / f.name
         if not p.is_file():
+            # Codex renames the connections table between exports; any variant
+            # satisfies the requirement, and the report names the one found.
+            if f.name == "connections_princeton.csv.gz" and found_con:
+                present.append(found_con)
+                continue
             missing.append(f.name)
             continue
         if checksums and f.sha256 and sha256_of(p) != f.sha256:

@@ -35,6 +35,7 @@ def _module(a: argparse.Namespace) -> ConnectomeKG:
         seed=getattr(a, "seed", 1),
         embed_neurons=getattr(a, "embed_neurons", False),
         min_syn=getattr(a, "min_syn", 1),
+        connections_file=getattr(a, "connections_file", None),
     )
 
 
@@ -127,6 +128,11 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--n", type=int, default=1000)
         sp.add_argument("--seed", type=int, default=1)
         sp.add_argument("--min-syn", type=int, default=1)
+        sp.add_argument(
+            "--connections-file",
+            default=None,
+            help="connections table inside --data-dir (default: auto-detect)",
+        )
         sp.add_argument("--embed-neurons", action="store_true")
 
     s = sub.add_parser("build", help="extract into SQLite (and the vector index)")

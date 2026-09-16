@@ -39,6 +39,8 @@ class ConnectomeKG(KGModule):
     :param seed: Synthetic seed.
     :param embed_neurons: Also embed neuron nodes (off by default, see plan 4.3).
     :param min_syn: Drop connections below this synapse count at extraction.
+    :param connections_file: Name of the connections table inside ``data_dir``;
+        omit it to auto-detect whichever one the download contains.
     :param tables: Pre-loaded tables; overrides ``source`` and ``data_dir``.
     """
 
@@ -55,6 +57,7 @@ class ConnectomeKG(KGModule):
         seed: int = 1,
         embed_neurons: bool = False,
         min_syn: int = 1,
+        connections_file: str | None = None,
         tables: ConnectomeTables | None = None,
         **kwargs: Any,
     ) -> None:
@@ -66,6 +69,7 @@ class ConnectomeKG(KGModule):
         self.seed = seed
         self.embed_neurons = embed_neurons
         self.min_syn = min_syn
+        self.connections_file = connections_file
         self._tables = tables
         self._graph: SynapseGraph | None = None
 
@@ -81,7 +85,11 @@ class ConnectomeKG(KGModule):
             elif self.source == "codex":
                 if self.data_dir is None:
                     raise ValueError("source='codex' needs data_dir")
-                self._tables = read_codex(self.data_dir, self.dataset or FAFB_783)
+                self._tables = read_codex(
+                    self.data_dir,
+                    self.dataset or FAFB_783,
+                    connections_file=self.connections_file,
+                )
             else:
                 raise ValueError(f"unknown source {self.source!r}")
             if self.dataset is not None and self._tables.dataset != self.dataset:

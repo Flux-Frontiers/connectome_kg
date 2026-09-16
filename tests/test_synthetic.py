@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from connectomekg.readers.codex import read_codex
+from connectomekg.manifest import verify_dir
+from connectomekg.readers.codex import find_connections_file, read_codex
 from connectomekg.readers.synthetic import min_neurons, synthetic_tables, write_codex_dir
 
 
@@ -62,3 +63,19 @@ def test_too_few_neurons_is_refused_not_silently_shrunk():
     smallest = synthetic_tables(floor, seed=1)
     counts = smallest.neurons["cell_type"].value_counts()
     assert counts["LPLC2"] == 10 and counts["MN9"] == 2
+
+
+def test_connections_file_is_auto_detected_under_any_name(tables, tmp_path):
+    """Codex renames the connections table between exports; any name must work."""
+    d = write_codex_dir(tables, tmp_path / "codex")
+    (d / "connections_princeton.csv.gz").rename(d / "connections.csv.gz")
+    assert find_connections_file(d).name == "connections.csv.gz"
+    back = read_codex(d, tables.dataset)
+    assert len(back.connections) == len(tables.connections)
+    assert verify_dir(d, checksums=False).ok
+
+
+def test_a_directory_without_connections_says_what_it_found(tmp_path):
+    (tmp_path / "neurons.csv.gz").write_text("")
+    with pytest.raises(FileNotFoundError, match="no connections table"):
+        find_connections_file(tmp_path)

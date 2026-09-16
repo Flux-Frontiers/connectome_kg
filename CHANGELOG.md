@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Codex reader no longer hard-codes the connections file name.** Codex
+  has shipped that table as both `connections_princeton.csv.gz` and
+  `connections.csv.gz`, so a hard-coded name made a perfectly good download
+  unreadable. `find_connections_file()` picks whichever variant is present,
+  preferring the thresholded Princeton table, `--connections-file` overrides
+  it, and the reader resolves column aliases (`pre_root_id` / `pre_pt_root_id`
+  / `pre`, `syn_count` / `weight`, and so on) reporting exactly which column
+  it could not find. `verify` accepts any connections variant and names the
+  one it found.
+
 ### Fixed
 
 - **The synthetic fixture crashed below 361 neurons.** The planted circuits
