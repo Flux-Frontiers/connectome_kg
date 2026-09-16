@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("fixture", help="write a synthetic Codex-format release")
     s.add_argument("--out", required=True)
-    s.add_argument("--n", type=int, default=1000)
+    s.add_argument("--n", type=int, default=1000, help="neurons; at least min_neurons()")
     s.add_argument("--seed", type=int, default=1)
     s.set_defaults(fn=cmd_fixture)
 

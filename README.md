@@ -21,6 +21,8 @@ lives in the private `kgrag_priv` repo as `docs/CONNECTOME_KG_PLAN.md`.
   (population shares, degree tail, synapse histogram, transmitter shares,
   reciprocity) with planted feeding, escape and grooming circuits, and a
   writer that emits it in Codex format so the reader is tested end to end.
+  At least 361 neurons, so every planted circuit fits its super class;
+  `min_neurons()` derives that floor and a smaller size is refused.
 - `extractor.py`: the plan's section 4 graph. Node kinds dataset, taxon,
   hemilineage, neuropil, cell_type, neuron, label. Edge kinds CONTAINS,
   MEMBER_OF, INNERVATES, INSTANCE_OF, IN_NEUROPIL, LABELED, SYNAPSES_TO,
@@ -41,7 +43,7 @@ reader, the LIF what-if, fleet wiring.
 
 ```bash
 poetry install --with dev          # or: pip install -e . pytest
-pytest                             # 19 pass with the semantic extra installed;
+pytest                             # 20 pass with the semantic extra installed;
                                    # the semantic query test skips without it
 
 connectome-kg fixture --out /tmp/synth1k --n 1000 --seed 1

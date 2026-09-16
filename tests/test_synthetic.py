@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from connectomekg.readers.codex import read_codex
-from connectomekg.readers.synthetic import synthetic_tables, write_codex_dir
+from connectomekg.readers.synthetic import min_neurons, synthetic_tables, write_codex_dir
 
 
 def test_tables_validate_and_are_deterministic(tables):
@@ -50,3 +52,13 @@ def test_codex_round_trip(tables, tmp_path):
     assert list(back.neurons["cell_type"]) == list(tables.neurons["cell_type"])
     assert back.connections["syn_count"].sum() == tables.connections["syn_count"].sum()
     assert back.neurons["x"].notna().all()
+
+
+def test_too_few_neurons_is_refused_not_silently_shrunk():
+    floor = min_neurons()
+    assert 300 < floor < 600
+    with pytest.raises(ValueError, match="too small for the planted circuits"):
+        synthetic_tables(floor - 1, seed=1)
+    smallest = synthetic_tables(floor, seed=1)
+    counts = smallest.neurons["cell_type"].value_counts()
+    assert counts["LPLC2"] == 10 and counts["MN9"] == 2

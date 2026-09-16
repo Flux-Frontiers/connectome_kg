@@ -140,6 +140,39 @@ _NEUROPIL_CENTER_UM = {
 }
 
 
+#: Planted circuits: (super class, cell type, count, home neuropil, transmitter, label).
+#: These overwrite sampled neurons so the classic queries have something to find.
+PLANTS: tuple[tuple[str, str, int, str, str, str], ...] = (
+    ("sensory", "GRN_sugar", 6, "GNG", "ACH", "sugar gustatory receptor neuron"),
+    ("sensory", "GRN_bitter", 4, "GNG", "ACH", "bitter gustatory receptor neuron"),
+    ("sensory", "JO-CE", 10, "AMMC", "ACH", "Johnston's organ neuron JO-C/E"),
+    ("central", "SEZ_IN1", 3, "GNG", "ACH", "second-order sugar interneuron"),
+    ("central", "SEZ_INb", 1, "GNG", "GABA", "second-order bitter neuron"),
+    ("central", "AMMC_IN", 3, "AMMC", "ACH", "antennal grooming interneuron"),
+    ("motor", "MN9", 2, "GNG", "ACH", "proboscis motor neuron MN9"),
+    ("visual_projection", "LC4", 8, "LO", "ACH", "lobula columnar LC4, looming"),
+    ("visual_projection", "LPLC2", 10, "LO", "ACH", "lobula plate lobula columnar LPLC2"),
+    ("descending", "DNp01", 2, "GNG", "ACH", "giant fibre descending neuron"),
+    ("descending", "aDN1", 2, "GNG", "ACH", "antennal grooming descending neuron aDN1"),
+)
+
+
+def min_neurons() -> int:
+    """Smallest ``n_neurons`` whose super-class shares fit every planted circuit.
+
+    A super class gets ``share * n`` neurons, and the planted circuits claim a
+    fixed number from each, so a small ``n`` would silently shrink a circuit and
+    make the fixture's tests meaningless.
+
+    :return: The minimum neuron count :func:`synthetic_tables` accepts.
+    """
+    need: dict[str, int] = {}
+    for sc, _, k, _, _, _ in PLANTS:
+        need[sc] = need.get(sc, 0) + k
+    # +1 guards the rounding in the share-to-count conversion.
+    return max(int(np.ceil(k / _SUPER[sc][0])) + 1 for sc, k in need.items())
+
+
 def _draw_syn_counts(rng: np.random.Generator, n: int) -> np.ndarray:
     p = np.append(_SYN_HIST, 1.0 - _SYN_HIST.sum())
     k = rng.choice(len(p), size=n, p=p) + 1
@@ -155,10 +188,17 @@ def _neuropil(base: str, side: str) -> str:
 def synthetic_tables(n_neurons: int = 1000, seed: int = 1) -> ConnectomeTables:
     """Generate a synthetic connectome.
 
-    :param n_neurons: Number of neurons, including the planted circuits.
+    :param n_neurons: Number of neurons, including the planted circuits. Must be
+        at least :func:`min_neurons` so every planted circuit fits its super class.
     :param seed: Random seed; the output is a deterministic function of it.
     :return: Validated :class:`ConnectomeTables`.
+    :raises ValueError: When ``n_neurons`` is below :func:`min_neurons`.
     """
+    floor = min_neurons()
+    if n_neurons < floor:
+        raise ValueError(
+            f"n_neurons={n_neurons} is too small for the planted circuits; the minimum is {floor}"
+        )
     rng = np.random.default_rng(seed)
     supers = list(_SUPER)
     shares = np.array([_SUPER[s][0] for s in supers])
@@ -199,28 +239,18 @@ def synthetic_tables(n_neurons: int = 1000, seed: int = 1) -> ConnectomeTables:
             )
     df = pd.DataFrame(rows)
 
-    # Planted circuits overwrite the first neurons of the fitting super class.
-    plants = [
-        ("sensory", "GRN_sugar", 6, "GNG", "ACH", "sugar gustatory receptor neuron"),
-        ("sensory", "GRN_bitter", 4, "GNG", "ACH", "bitter gustatory receptor neuron"),
-        ("central", "SEZ_IN1", 3, "GNG", "ACH", "second-order sugar interneuron"),
-        ("central", "SEZ_INb", 1, "GNG", "GABA", "second-order bitter neuron"),
-        ("motor", "MN9", 2, "GNG", "ACH", "proboscis motor neuron MN9"),
-        ("visual_projection", "LC4", 8, "LO", "ACH", "lobula columnar LC4, looming"),
-        ("visual_projection", "LPLC2", 10, "LO", "ACH", "lobula plate lobula columnar LPLC2"),
-        ("descending", "DNp01", 2, "GNG", "ACH", "giant fibre descending neuron"),
-        ("sensory", "JO-CE", 10, "AMMC", "ACH", "Johnston's organ neuron JO-C/E"),
-        ("central", "AMMC_IN", 3, "AMMC", "ACH", "antennal grooming interneuron"),
-        ("descending", "aDN1", 2, "GNG", "ACH", "antennal grooming descending neuron aDN1"),
-    ]
     used: dict[str, int] = {}
     planted: dict[str, list[int]] = {}
     labels: list[dict] = []
-    for sc, ctype, n, home, nt, label in plants:
+    for sc, ctype, n, home, nt, label in PLANTS:
         idx = df.index[df["super_class"] == sc][used.get(sc, 0) : used.get(sc, 0) + n]
         used[sc] = used.get(sc, 0) + n
+        if len(idx) != n:  # min_neurons() should make this unreachable
+            raise ValueError(
+                f"only {len(idx)} of {n} {sc} neurons left for {ctype}; raise n_neurons"
+            )
         df.loc[idx, ["cell_type", "_home", "nt_type", "class"]] = [ctype, home, nt, f"{sc}_{home}"]
-        df.loc[idx, "side"] = ["L", "R"] * (n // 2) + ["L"] * (n % 2)
+        df.loc[idx, "side"] = [("L", "R")[i % 2] for i in range(n)]
         planted[ctype] = df.loc[idx, "root_id"].tolist()
         for rid in planted[ctype]:
             labels.append(

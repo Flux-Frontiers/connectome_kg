@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The synthetic fixture crashed below 361 neurons.** The planted circuits
+  claim a fixed number of neurons from each super class, so a small
+  `n_neurons` ran the visual projection population out and pandas raised an
+  opaque length error. `synthetic_tables()` now refuses a too-small size and
+  names the minimum, which `min_neurons()` derives from the plant table
+  rather than hard-coding.
+
 ## [0.1.0] - 2026-09-16
 
 ### Added
