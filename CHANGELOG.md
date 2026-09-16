@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`python -m connectomekg`** runs the CLI from a clone with nothing
+  installed. The `connectome-kg` script only exists after an install, so the
+  first thing anyone tries returned "command not found".
 - **`connectome-kg files`**, and the portal labels in the manifest. The Codex
   download page lists display names, not file names: `neurons.csv.gz` appears
   as "Neurotransmitter Type Predictions" and `connections_princeton.csv.gz` as

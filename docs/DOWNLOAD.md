@@ -82,7 +82,10 @@ used on the dataset node.
 4. Tick the agreement checkbox, then download at least the three required
    files from the table above, into one directory.
 
-5. Verify the directory against the manifest, then build:
+5. Verify the directory against the manifest, then build. The `connectome-kg`
+   script exists only after `pip install -e .`; from a bare clone use
+   `PYTHONPATH=src python -m connectomekg` instead, and with Poetry prefix
+   `poetry run`.
 
    ```bash
    connectome-kg verify --data-dir /path/to/fafb_v783

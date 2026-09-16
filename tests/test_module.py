@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from connectomekg.cli import main
@@ -100,3 +105,18 @@ def test_files_command_maps_portal_labels_to_file_names(capsys):
     assert "Neurotransmitter Type Predictions" in out and "neurons.csv.gz" in out
     assert "Connections (Filtered)" in out
     assert "zenodo.org/records/10676866" in out
+
+
+def test_package_is_runnable_without_installing(tmp_path):
+    """`python -m connectomekg` must work from a clone; the script needs an install."""
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    env = {**os.environ, "PYTHONPATH": src}
+    out = subprocess.run(
+        [sys.executable, "-m", "connectomekg", "files"],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=tmp_path,
+        check=True,
+    )
+    assert "neurons.csv.gz" in out.stdout

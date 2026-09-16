@@ -44,9 +44,13 @@ reader, the LIF what-if, fleet wiring.
 ## Try it
 
 ```bash
-poetry install --with dev          # or: pip install -e . pytest
+pip install -e .                   # or: poetry install --with dev
 pytest                             # 24 pass with the semantic extra installed;
                                    # the semantic query test skips without it
+
+# Without installing anything, from the clone root:
+#   PYTHONPATH=src python -m connectomekg <same arguments>
+# With Poetry, prefix with `poetry run`.
 
 connectome-kg fixture --out /tmp/synth1k --n 1000 --seed 1
 connectome-kg --root /tmp/kg build --data-dir /tmp/synth1k \
