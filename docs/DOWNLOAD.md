@@ -4,45 +4,84 @@ The build reads the Codex export files. They are free for non-commercial use
 under CC BY-NC-SA 4.0 and Codex requires a **Google** sign-in to fetch them,
 so this is a manual step. Under 100 MB for the files the build reads.
 
-## What the build actually needs
+## The portal lists labels, not file names
 
-Only three tables are required. Everything else enriches the graph:
+This is the thing that trips everyone. The download page shows friendly labels;
+what lands on disk is a different name, and that name is what the reader looks
+for. The file you most need, `neurons.csv.gz`, is listed as "Neurotransmitter
+Type Predictions".
 
-| our name for it | required | what it gives the graph |
+`connectome-kg files` prints this table at any time.
+
+| portal label | downloads as | size | needed |
+|---|---|---|---|
+| Neurotransmitter Type Predictions | `neurons.csv.gz` | 1,680 KB | **required** |
+| Classification / Hierarchical Annotations | `classification.csv.gz` | 934 KB | **required** |
+| Connections (Filtered) | `connections_princeton.csv.gz` | 68 MB | **required** |
+| Cell Types | `consolidated_cell_types.csv.gz` | 902 KB | optional |
+| Marked Neuron Coordinates | `coordinates.csv.gz` | 5,315 KB | optional |
+| Community Labels (Raw) | `labels.csv.gz` | 4,771 KB | optional |
+| Cell Size Measurements | `cell_stats.csv.gz` | 2,527 KB | optional |
+
+Three required files, about 71 MB. The optional ones add cell type names,
+3D positions, community annotations with attribution, and morphometrics.
+
+Deliberately not downloaded:
+
+| portal label | size | why not |
 |---|---|---|
-| neurons | yes | root ids, neurotransmitter prediction and score |
-| classification | yes | super class, class, cell type, side, hemilineage, nerve |
-| connections | yes | the edges: pre, post, neuropil, synapse count |
-| consolidated cell types | no | better cell type names |
-| coordinates | no | 3D position per neuron |
-| labels | no | community annotations with attribution |
-| cell stats | no | cable length, area, volume (reference only) |
+| Connections (Unfiltered) | 277 MB | millions of single-synapse rows, mostly detection noise |
+| Synapse Table | 2,695 MB | the graph is at neuron resolution, it uses synapse counts |
+| Neuron Skeletons | 13 GB | coordinates give one position per neuron instead |
+| Proofread Cell Names And Groups | 1,182 KB | cell types carry the identity the graph uses |
+| Community Labels (Refined) | 1,018 KB | the raw labels carry the attribution the graph records |
+| Visual Neuron Annotations / Columns | 1,095 KB | not yet wired in |
+| Connectivity Tags | 638 KB | not yet wired in |
+| Anything marked "prior to July 2025" | varies | superseded; mixing detectors is not valid |
 
-**The file names vary between Codex exports.** The connections table has
-shipped as `connections_princeton.csv.gz` and as `connections.csv.gz`;
-`find_connections_file()` takes whichever one your directory holds, preferring
-the 5-synapse thresholded Princeton table, and `--connections-file` overrides
-it. The reader also accepts several column spellings (`pre_root_id` or
-`pre_pt_root_id` or `pre`, `syn_count` or `weight`, and so on) and tells you
-exactly which column it could not find if the file is not what it expects.
+The connections table has also shipped as `connections.csv.gz` in other
+exports. `find_connections_file()` takes whichever variant is present,
+preferring the filtered Princeton table, and `--connections-file` overrides it.
+The reader accepts column-name variants too (`pre_root_id` or `pre_pt_root_id`
+or `pre`, `syn_count` or `weight`) and names the column it could not find when
+a file is not what it expects.
 
-Skip any file with `no_threshold` in the name (hundreds of MB of
-single-synapse edges that are mostly detection noise), the per-synapse table
-(gigabytes) and the skeleton archive (tens of gigabytes). The graph is at
-neuron resolution and reads none of them.
+## The portal is live, not a snapshot
+
+Codex says its downloads are "synchronized with the live Codex database",
+continually updated, and "may differ from the static snapshot released at the
+time of the FlyWire package publication in October 2024". Two consequences:
+
+**Checksums drift, and that is not corruption.** The digests in
+`connectomekg/manifest.py` fingerprint one August 2026 download. `verify`
+reports a difference as drift and still says "ready to build"; only a missing
+required file is a hard failure. The real check is the counts the build prints:
+139,255 neurons and 3,732,460 connected pairs.
+
+**A reproducible build wants the published snapshot**, which the portal itself
+points at:
+
+| what | where |
+|---|---|
+| connectivity, Dorkenwald et al. 2024 | https://zenodo.org/records/10676866 |
+| annotations, Schlegel et al. 2024 | https://github.com/flyconnectome/flywire_annotations |
+| supplemental, Schlegel et al. 2024 | https://zenodo.org/records/10877326 |
+| visual system cell types, Matsliah et al. 2024 | https://github.com/murthylab/visual-system-parts-list |
+
+Those need no sign-in. A dated KG index built from a moving target cannot be
+reproduced later, so for anything citable, prefer them and record which you
+used on the dataset node.
 
 ## Steps
 
 1. Go to https://codex.flywire.ai and sign in with a Google account. The first
-   visit asks you to accept the FlyWire data terms.
-2. Make sure the selected dataset is **FAFB v783**, the public release
-   (the dataset picker is at the top of the app).
-3. Open the "Download Data" app, or go straight to
+   visit asks you to accept the FlyWire citation guidelines and principles.
+2. Check the dataset selector reads **FAFB v783**.
+3. Open "Download Data", or go to
    https://codex.flywire.ai/api/download?dataset=fafb
-4. Download the tables above into one directory, keeping whatever names Codex
-   gives them. If the list you see does not match the names above, download the
-   neurons, classification and connections tables and let the reader work out
-   the rest; it reports what it found.
+4. Tick the agreement checkbox, then download at least the three required
+   files from the table above, into one directory.
+
 5. Verify the directory against the manifest, then build:
 
    ```bash

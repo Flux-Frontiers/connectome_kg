@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`connectome-kg files`**, and the portal labels in the manifest. The Codex
+  download page lists display names, not file names: `neurons.csv.gz` appears
+  as "Neurotransmitter Type Predictions" and `connections_princeton.csv.gz` as
+  "Connections (Filtered)", which makes a download impossible to match against
+  a manifest by eye. Every manifest entry now carries the portal's own label
+  and size, `verify` prints the mapping when a required file is missing, and
+  `FAFB_783_UNUSED` records the assets the build deliberately skips with the
+  reason for each.
+
 ### Changed
+
+- **Checksum differences are reported as drift, not failure.** Codex states
+  that its downloads are synchronised with the live database and may differ
+  from the October 2024 published snapshot, so a digest that does not match
+  the August 2026 download this manifest fingerprints is expected rather than
+  corrupt. `ManifestReport.ok` now depends only on the required files being
+  present, drift is listed separately with the counts to check instead, and
+  `STATIC_ARCHIVES` records the no-login Zenodo and GitHub snapshots to use
+  when a build has to be reproducible.
 
 - **The Codex reader no longer hard-codes the connections file name.** Codex
   has shipped that table as both `connections_princeton.csv.gz` and

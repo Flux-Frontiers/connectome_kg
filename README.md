@@ -14,8 +14,10 @@ lives in the private `kgrag_priv` repo as `docs/CONNECTOME_KG_PLAN.md`.
 - `schema.py`: the normalised tables every reader produces (neurons,
   connections, labels, dataset provenance) with validation and the Shiu
   sign convention.
-- `manifest.py`: the v783 Codex file list with expected SHA-256 values and
-  `verify_dir()`.
+- `manifest.py`: the v783 Codex file list with the portal's display labels
+  (it lists no file names), expected SHA-256 values treated as drift-tolerant
+  because the portal is live, and the static no-login archives to prefer when
+  a build must be reproducible.
 - `readers/codex.py`: a Codex release directory to tables.
 - `readers/synthetic.py`: a seeded synthetic connectome shaped like v783
   (population shares, degree tail, synapse histogram, transmitter shares,
@@ -33,8 +35,8 @@ lives in the private `kgrag_priv` repo as `docs/CONNECTOME_KG_PLAN.md`.
   Markdown `analyze()`.
 - `paths.py`: strongest signed path (Dijkstra on minus log input fraction)
   and up/down cones over the neuron-level wiring.
-- `cli.py`: `fixture`, `verify`, `build`, `stats`, `analyze`, `query`,
-  `path`, `cone`.
+- `cli.py`: `files`, `fixture`, `verify`, `build`, `stats`, `analyze`,
+  `query`, `path`, `cone`.
 
 Not done: a real v783 build (needs the download), snapshots, the neuprint
 reader, the LIF what-if, fleet wiring.
@@ -43,7 +45,7 @@ reader, the LIF what-if, fleet wiring.
 
 ```bash
 poetry install --with dev          # or: pip install -e . pytest
-pytest                             # 20 pass with the semantic extra installed;
+pytest                             # 24 pass with the semantic extra installed;
                                    # the semantic query test skips without it
 
 connectome-kg fixture --out /tmp/synth1k --n 1000 --seed 1
@@ -54,10 +56,12 @@ connectome-kg --root /tmp/kg cone --dataset-id synthetic1k LC4 --min-syn 5
 connectome-kg --root /tmp/kg analyze --dataset-id synthetic1k
 ```
 
-Against a real download, after fetching the v783 files from
-https://codex.flywire.ai/api/download:
+Against a real download. The portal lists display labels rather than file
+names, so `connectome-kg files` prints the mapping; see
+[`docs/DOWNLOAD.md`](docs/DOWNLOAD.md):
 
 ```bash
+connectome-kg files
 connectome-kg verify --data-dir /path/to/fafb_v783
 connectome-kg --root . build --data-dir /path/to/fafb_v783 --dataset-id fafb783
 ```

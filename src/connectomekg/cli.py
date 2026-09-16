@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from connectomekg.manifest import verify_dir
+from connectomekg.manifest import STATIC_ARCHIVES, portal_guide, verify_dir
 from connectomekg.module import ConnectomeKG
 from connectomekg.readers.synthetic import synthetic_tables, write_codex_dir
 from connectomekg.schema import FAFB_783, DatasetInfo
@@ -48,7 +48,22 @@ def cmd_fixture(a: argparse.Namespace) -> int:
 def cmd_verify(a: argparse.Namespace) -> int:
     report = verify_dir(Path(a.data_dir), checksums=not a.no_checksums)
     print(report)
+    if report.missing_required:
+        print("\nThe portal lists display names, not file names:\n")
+        print(portal_guide())
     return 0 if report.ok else 1
+
+
+def cmd_files(a: argparse.Namespace) -> int:
+    """Print the portal's labels beside the file names they download as."""
+    print("FlyWire Codex FAFB v783, https://codex.flywire.ai/api/download?dataset=fafb")
+    print("(sign in with a Google account; the portal lists labels, not file names)\n")
+    print(portal_guide())
+    print("\nThe portal is live and updated continually. For a reproducible build")
+    print("use the October 2024 published snapshot instead:\n")
+    for what, url in STATIC_ARCHIVES.items():
+        print(f"  {what}: {url}")
+    return 0
 
 
 def cmd_build(a: argparse.Namespace) -> int:
@@ -115,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--n", type=int, default=1000, help="neurons; at least min_neurons()")
     s.add_argument("--seed", type=int, default=1)
     s.set_defaults(fn=cmd_fixture)
+
+    s = sub.add_parser("files", help="portal labels beside the file names they download as")
+    s.set_defaults(fn=cmd_files)
 
     s = sub.add_parser("verify", help="check a Codex download against the v783 manifest")
     s.add_argument("--data-dir", required=True)
