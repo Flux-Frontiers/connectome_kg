@@ -1,0 +1,61 @@
+# connectome-kg -- connectomes as fleet knowledge graphs.
+#
+# Setup (from this directory)
+# ---------------------------
+#   poetry install --with dev
+#   pytest
+#
+# Build a graph from the synthetic fixture
+# ----------------------------------------
+#   connectome-kg fixture --out /tmp/synth1k --n 1000 --seed 1
+#   connectome-kg build --data-dir /tmp/synth1k --dataset-id synthetic1k --no-index
+#   connectome-kg path --from GRN_sugar --to MN9
+#
+# Author: Eric G. Suchanek, PhD
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "connectome-kg"
+version = "0.1.0"
+description = "Connectomes (FlyWire, hemibrain, MaleCNS) as KGModule knowledge graphs"
+readme = "README.md"
+license = "Elastic-2.0"
+authors = [{ name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }]
+keywords = ["knowledge-graph", "kgmodule", "connectome", "flywire", "drosophila"]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    # Floor is the release this prototype was written against.
+    "kgmodule-utils>=0.21.0",
+    "numpy>=1.24.0",
+    "pandas>=2.2.0",
+    "pyarrow>=15.0.0",
+    "scipy>=1.12.0",
+]
+
+[project.optional-dependencies]
+semantic = ["kgmodule-utils[semantic]>=0.21.0"]
+
+[project.scripts]
+connectome-kg = "connectomekg.cli:main"
+
+[tool.poetry]
+packages = [{ include = "connectomekg", from = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=9.0.3"
+ruff = ">=0.6"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B023", "BLE001", "PLC0415"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

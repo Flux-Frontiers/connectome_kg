@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# built graphs and vector stores are derived data, never committed
+.connectomekg/
+# real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
+data/
