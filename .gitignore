@@ -12,3 +12,5 @@ htmlcov/
 .connectomekg/
 # real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
 data/
+fafb_v783/
+.DS_Store
