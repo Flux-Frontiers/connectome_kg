@@ -388,6 +388,8 @@ def write_codex_dir(tables: ConnectomeTables, out_dir: str | Path) -> Path:
             "nt_type_score": n["nt_score"],
         }
     ).to_csv(d / "neurons.csv.gz", index=False)
+    # Codex classification carries no cell_type column: consolidated_cell_types
+    # below is where the type lives. Keep the fixture faithful to that.
     n[
         [
             "root_id",
@@ -395,7 +397,6 @@ def write_codex_dir(tables: ConnectomeTables, out_dir: str | Path) -> Path:
             "super_class",
             "class",
             "sub_class",
-            "cell_type",
             "hemilineage",
             "side",
             "nerve",

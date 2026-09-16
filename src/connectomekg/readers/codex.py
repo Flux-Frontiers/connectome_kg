@@ -150,21 +150,31 @@ def read_codex(
         ["root_id", "nt_type", "nt_type_score"],
         dtype={"root_id": np.int64, "nt_type": _STR, "nt_type_score": float},
     )
+    # Codex dropped cell_type from classification; consolidated_cell_types now
+    # carries it. Ask only for the columns this download actually has.
+    cls_path = d / "classification.csv.gz"
+    cls_have = set(pd.read_csv(cls_path, nrows=0).columns)
     cls = _read(
-        d / "classification.csv.gz",
+        cls_path,
         [
-            "root_id",
-            "flow",
-            "super_class",
-            "class",
-            "sub_class",
-            "cell_type",
-            "hemilineage",
-            "side",
-            "nerve",
+            c
+            for c in (
+                "root_id",
+                "flow",
+                "super_class",
+                "class",
+                "sub_class",
+                "cell_type",
+                "hemilineage",
+                "side",
+                "nerve",
+            )
+            if c in cls_have
         ],
         dtype={"root_id": np.int64},
     )
+    if "cell_type" not in cls_have:
+        cls["cell_type"] = pd.NA
     df = neurons.merge(cls, on="root_id", how="left")
 
     ctypes = d / "consolidated_cell_types.csv.gz"
