@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`kgmodule-utils` floor raised to `>=0.22.0`** (was `>=0.21.0`), across the
+  base dependency and the `semantic`, `viz` and `viz3d` extras. 0.22.0 makes
+  the Cast button sweep quiltwright's standard 35-degree view cone instead of
+  the preset's full cone, which for the 16" landscape is 50 -- wider than
+  reliably fuses, so hard edges ghosted where a quilt rendered by `connkg`
+  itself held. Nothing in this repo changes; the fix arrives through
+  `kg_utils.viz3d.qt.cast_scene_to_looking_glass`, which `connectomekg.viz3d`
+  calls.
+
+  The `viz3d` extra already declared `quiltwright>=0.14.1`, which is what
+  0.22.0 requires transitively, so no pin moves here.
+
 ## [0.2.0] - 2026-09-17
 
 ### Added
