@@ -14,6 +14,7 @@
 # -------------------
 #   pip install -e "."                  core runtime only
 #   pip install -e ".[semantic]"        + embedding model for semantic query
+#   pip install -e ".[viz]"             + pyvis/plotly for connkg viz
 #
 # Quick install (poetry)
 # ----------------------
@@ -78,6 +79,14 @@ dependencies = [
 
 [project.optional-dependencies]
 semantic = ["kgmodule-utils[semantic]>=0.21.0"]
+# 2-D views of a cell type (connkg viz): src/connectomekg/viz.py, imported only
+# inside cli/cmd_viz.py. pyvis is not hand-listed: the network renderer is
+# kg_utils.viz.build_graph_html, so this extra asks the SDK for it by name, as
+# FLEET_STANDARDS.md requires. plotly draws the partners chart.
+viz = [
+    "kgmodule-utils[viz]>=0.21.0",
+    "plotly>=5.14.0",
+]
 
 [project.urls]
 Homepage   = "https://github.com/Flux-Frontiers/connectome_kg"

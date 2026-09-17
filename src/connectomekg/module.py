@@ -271,6 +271,25 @@ class ConnectomeKG(KGModule):
         """
         return self.store.node(normalize_node_id(node_id))
 
+    def cell_type_node(self, name: str) -> dict[str, Any]:
+        """The node for a cell type, by exact name.
+
+        :param name: Cell type name, e.g. ``"LC4"``.
+        :return: The node dict.
+        :raises ValueError: If there is no such type; the message names types
+            whose names contain it, so a near miss is one step from fixed.
+        """
+        name = normalize_spec(name)
+        row = self.store.con.execute(
+            "SELECT id FROM nodes WHERE kind='cell_type' AND name=?", (name,)
+        ).fetchone()
+        node = self.store.node(row[0]) if row else None
+        if node is not None:
+            return node
+        near = [n["name"] for n in self.find_nodes(name, kind="cell_type", limit=8)]
+        hint = f"; types containing it: {', '.join(near)}" if near else ""
+        raise ValueError(f"no cell type named {name!r}{hint}")
+
     def type_partners(
         self, cell_type: str, *, direction: str = "down", limit: int = 20
     ) -> list[dict[str, Any]]:

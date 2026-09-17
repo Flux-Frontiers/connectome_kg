@@ -10,6 +10,7 @@ from connectomekg.cli import (  # noqa: F401
     cmd_data,
     cmd_query,
     cmd_snapshot,
+    cmd_viz,
 )
 from connectomekg.cli.group import cli
 

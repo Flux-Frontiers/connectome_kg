@@ -58,6 +58,7 @@ few thousand neurons means a synthetic fixture was built there instead.
 | a type's partner types, types in a neuropil, column, family or nerve, ontology terms, who labelled a neuron | SQL: read [references/sql-recipes.md](references/sql-recipes.md) |
 | fuzzy concept ("giant fibre escape") | `connkg query`, only if the vector index exists; see below |
 | overall counts, hubs, coverage | `connkg --root . stats`, `connkg --root . analyze` |
+| a picture of a type's local circuit | `connkg --root . viz LC4 --view network\|partners -o out.html` (needs the `viz` extra; about a second on FAFB) |
 
 **Specs** (the `--from`, `--to` and `SPEC` arguments) accept a cell type name
 (exact, case-sensitive: `LC4`, `KCg-m`, `DA1_lPN`), a root id

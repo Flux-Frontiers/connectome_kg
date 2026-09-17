@@ -141,6 +141,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
+| **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR` |
 

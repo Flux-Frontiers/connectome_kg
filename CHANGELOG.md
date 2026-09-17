@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg viz`, 2-D views of a cell type's local circuit** (the new `viz`
+  extra). `--view network` draws the type with its strongest input and output
+  partner types through the shared `kg_utils.viz` renderer: nodes coloured by
+  super class, edges labelled with synapse count and transmitter
+  (`28,530 ACH`) and coloured by sign, and partner-to-partner edges drawn only
+  when at least as strong as the weakest edge to the centre. `--view partners`
+  draws the same partners as a plotly diverging bar chart. Both write one
+  self-contained HTML file. `ConnectomeKG.cell_type_node` resolves a type by
+  exact name and, when there is none, names the types containing it.
+
 - **`connkg-mcp`, an MCP server for the graph.** Fourteen tools over stdio or
   SSE: `graph_stats`, `find_nodes`, `get_node`, `node_edges`, `neurons_of`,
   `type_partners`, `strongest_path`, `cone`, `query_connectome`,
