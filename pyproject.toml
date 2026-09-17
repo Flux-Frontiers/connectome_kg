@@ -1,32 +1,75 @@
-# connectome-kg -- connectomes as fleet knowledge graphs.
+# pyproject.toml -- connectome-kg package configuration (PEP 621)
 #
-# Setup (from this directory)
-# ---------------------------
-#   poetry install --with dev
+# Connectomes as fleet knowledge graphs.
+#
+# Author: Eric G. Suchanek, PhD
+#
+# Build system : Poetry 2.x with PEP 621 [project] table
+#
+# Extras are user-facing features; dev tooling is a Poetry group, so it never
+# ships in the wheel and cannot be pip-installed.
+#
+# Quick install (pip)
+# -------------------
+#   pip install -e "."                  core runtime only
+#   pip install -e ".[semantic]"        + embedding model for semantic query
+#   pip install -e ".[viz]"             + pyvis/plotly for connkg viz
+#   pip install -e ".[viz3d]"           + real-geometry 3-D views and quilts
+#
+# Quick install (poetry)
+# ----------------------
+#   poetry install                      core runtime only
+#   poetry install --with dev           + pytest, ruff, ty, pre-commit
+#   poetry install --with kg            + the dockg/pycodekg CLIs (maintainer tooling)
+#   poetry install --with docs          + mkdocs, to build the docs site
+#   poetry install --all-extras --with dev,kg,docs   full maintainer environment
+#
+# Run tests
+# ---------
 #   pytest
 #
 # Build a graph from the synthetic fixture
 # ----------------------------------------
-#   connectome-kg fixture --out /tmp/synth1k --n 1000 --seed 1
-#   connectome-kg build --data-dir /tmp/synth1k --dataset-id synthetic1k --no-index
-#   connectome-kg path --from GRN_sugar --to MN9
-#
-# Author: Eric G. Suchanek, PhD
+#   connkg fixture --out /tmp/synth1k --n 1000 --seed 1
+#   connkg build --data-dir /tmp/synth1k --dataset-id synthetic1k --no-index
+#   connkg path --from GRN_sugar --to MN9
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry]
+packages = [{ include = "connectomekg", from = "src" }]
+
+# ---------------------------------------------------------------------------
+# PEP 621 project metadata
+# ---------------------------------------------------------------------------
 [project]
 name = "connectome-kg"
 version = "0.1.0"
 description = "Connectomes (FlyWire, hemibrain, MaleCNS) as KGModule knowledge graphs"
 readme = "README.md"
 license = "Elastic-2.0"
-authors = [{ name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }]
+authors = [
+    { name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }
+]
 keywords = ["knowledge-graph", "kgmodule", "connectome", "flywire", "drosophila"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "click>=8.1.0,<9",
+    # Upper-bounded: mcp 2.0 removed the bundled `mcp.server.fastmcp` module (it
+    # became the standalone fastmcp package). mcp_server.py imports FastMCP from
+    # mcp, so an unbounded floor would let a clean install break `connkg-mcp` at
+    # import time. Lift only alongside a port to fastmcp.
+    "mcp>=1.0.0,<2",
     # Floor is the release this prototype was written against.
     "kgmodule-utils>=0.21.0",
     "numpy>=1.24.0",
@@ -37,25 +80,123 @@ dependencies = [
 
 [project.optional-dependencies]
 semantic = ["kgmodule-utils[semantic]>=0.21.0"]
+# 2-D views of a cell type (connkg viz): src/connectomekg/viz.py, imported only
+# inside cli/cmd_viz.py. pyvis is not hand-listed: the network renderer is
+# kg_utils.viz.build_graph_html, so this extra asks the SDK for it by name, as
+# FLEET_STANDARDS.md requires. plotly draws the partners chart.
+viz = [
+    "kgmodule-utils[viz]>=0.21.0",
+    "plotly>=5.14.0",
+]
+# Real-geometry 3-D views (connkg quilt / connkg viz3d): src/connectomekg/
+# skeletons.py (SWC parsing, NumPy only), scene.py (Qt-free scene composition,
+# needs PyVista) and viz3d.py (the Qt viewer). Pulled via
+# kgmodule-utils[viz3d-render,viz3d-qt] rather than hand-listing pyvista/PyQt5,
+# so the render stack stays pinned where the SDK that uses it pins it (a repo
+# that hand-lists it drifts from the SDK extra that actually holds it).
+#
+# pyvistaqt IS hand-listed, deliberately: checked against 0.21.0's own wheel
+# metadata, kgmodule-utils[viz3d-qt] pulls PyQt5 and pyvista but not
+# pyvistaqt, so a bare [viz3d-render,viz3d-qt] install leaves the viewer's
+# QtInteractor missing. genealogy_kg's viz3d extra carries the same explicit
+# line for the same reason.
+viz3d = [
+    "kgmodule-utils[viz3d-render,viz3d-qt]>=0.21.0",
+    "pyvistaqt>=0.11.0",
+    "quiltwright>=0.10.0",
+]
+
+[project.urls]
+Homepage   = "https://github.com/Flux-Frontiers/connectome_kg"
+Repository = "https://github.com/Flux-Frontiers/connectome_kg"
 
 [project.scripts]
-connectome-kg = "connectomekg.cli:main"
+connkg     = "connectomekg.cli:cli"
+connkg-mcp = "connectomekg.mcp_server:main"
 
-[tool.poetry]
-packages = [{ include = "connectomekg", from = "src" }]
+# ---------------------------------------------------------------------------
+# Dev tooling (Poetry group, not a PEP 621 extra)
+# ---------------------------------------------------------------------------
+# `optional = true` keeps it out of a bare `poetry install`.
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
+detect-secrets = ">=1.5.0"
+pre-commit = ">=4.5.1"
+# >=9.0.3 is a security floor, not a preference: GHSA-6w46-j5rx-g56g.
 pytest = ">=9.0.3"
-ruff = ">=0.6"
+pytest-cov = ">=5.0.0"
+# Capped below 0.16 to match the rest of the fleet.
+ruff = ">=0.6,<0.16"
+ty = ">=0.0.44"
 
+# ---------------------------------------------------------------------------
+# Maintainer tooling (Poetry group, not a PEP 621 extra)
+# ---------------------------------------------------------------------------
+# doc-kg and pycode-kg are tools this repo *runs*, not libraries it imports.
+# Nothing under src/ imports either one. They live here rather than in `dev`
+# so CI's lint and test jobs never install them.
+#
+#   poetry install --with kg      # get the dockg / pycodekg CLIs into .venv/bin
+[tool.poetry.group.kg]
+optional = true
+
+[tool.poetry.group.kg.dependencies]
+# Fleet floors: the releases that moved both packages onto the shared
+# kgmodule-utils snapshot extension points.
+doc-kg = ">=0.26.0"
+pycode-kg = ">=0.27.0"
+
+# ---------------------------------------------------------------------------
+# Docs site (Poetry group, not a PEP 621 extra)
+# ---------------------------------------------------------------------------
+# mkdocs-material renders docs/*.md as-is, and mkdocstrings adds an API
+# reference generated from the package's own docstrings so it cannot drift
+# from the code. Same setup as quiltwright.
+#
+#   poetry install --with docs && poetry run mkdocs serve
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+# mkdocs is capped below 2: 2.0 removes the plugin system, and this site
+# depends on two plugins (search, mkdocstrings).
+mkdocs = ">=1.6,<2"
+mkdocs-material = ">=9.5"
+mkdocstrings = { version = ">=0.26", extras = ["python"] }
+
+# ---------------------------------------------------------------------------
+# Tool configuration
+# ---------------------------------------------------------------------------
 [tool.ruff]
-line-length = 100
+line-length    = 100
 target-version = "py312"
+# Keep prose docs out of ruff 0.16's Markdown code-block formatting.
+exclude = [".claude", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B023", "BLE001", "PLC0415"]
 ignore = ["E501"]
 
+[tool.ty.environment]
+python-version = "3.12"
+root = ["src"]
+
+[tool.ty.rules]
+# Be lenient about third-party stubs (mirrors mypy's ignore_missing_imports).
+unresolved-import = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts   = "-v --tb=short"
+
+[tool.pycodekg]
+# Tests skew architectural metrics (fan-in, public API surface, docstring coverage).
+exclude = ["tests"]
+include = ["src"]
+
+[tool.dockg]
+# fafb_v783/ and data/ hold connectome downloads, not documentation. site/ is
+# the gitignored mkdocs build: it would index every page twice.
+exclude = ["__pycache__", "dist", "src", "tests", "data", "fafb_v783", "site"]

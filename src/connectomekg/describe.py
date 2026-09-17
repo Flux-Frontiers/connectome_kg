@@ -65,6 +65,14 @@ def neuron_docstring(
     hl = _clean(row.get("hemilineage"))
     if hl:
         parts.append(f"hemilineage {hl}")
+    flow, nerve = _clean(row.get("flow")), _clean(row.get("nerve"))
+    if nerve:
+        parts.append(f"{flow or 'runs'} through nerve {nerve}")
+    elif flow and flow != "intrinsic":
+        parts.append(flow)
+    vfam = _clean(row.get("visual_family"))
+    if vfam:
+        parts.append(f"visual family {vfam}")
     parts.append(f"{n_in} input and {n_out} output synapses")
     if top_neuropils:
         parts.append("mainly in " + ", ".join(neuropil_full_name(x) for x in top_neuropils))
@@ -87,6 +95,11 @@ def cell_type_docstring(
     top_in: list[tuple[str, int]],
     neuropils: list[str],
     labels: list[str],
+    sub_class: str = "",
+    flow: str = "",
+    visual_family: str = "",
+    visual_subsystem: str = "",
+    ontology: list[str] | None = None,
 ) -> str:
     """A cell type, described from its members.
 
@@ -101,12 +114,28 @@ def cell_type_docstring(
     :param top_in: Strongest upstream types as (type, synapses).
     :param neuropils: Neuropils it innervates most.
     :param labels: Distinct community labels over its members.
+    :param sub_class: Majority sub class.
+    :param flow: Majority flow: afferent, intrinsic or efferent.
+    :param visual_family: Visual neuron family, for optic lobe types.
+    :param visual_subsystem: Visual subsystem, such as Motion or Color.
+    :param ontology: Fly Anatomy Ontology ids its members are labelled with.
     :return: Docstring text.
     """
     n = n_left + n_right
     parts = [f"Cell type {name}: {n} neurons ({n_left} left, {n_right} right)"]
     if super_class:
-        parts.append(super_class.replace("_", " ") + (f", class {cls}" if cls else ""))
+        parts.append(
+            super_class.replace("_", " ")
+            + (f", class {cls}" if cls else "")
+            + (f", sub class {sub_class.replace('_', ' ')}" if sub_class else "")
+        )
+    if flow and flow != "intrinsic":
+        parts.append(flow)
+    if visual_family:
+        parts.append(
+            f"visual family {visual_family}"
+            + (f" in the {visual_subsystem} subsystem" if visual_subsystem else "")
+        )
     if nt:
         parts.append(nt_word(nt))
     if hemilineage:
@@ -120,6 +149,8 @@ def cell_type_docstring(
         text += " Inputs from " + ", ".join(f"{t} ({s})" for t, s in top_in) + "."
     if labels:
         text += " Labels: " + "; ".join(labels[:8]) + "."
+    if ontology:
+        text += " Ontology: " + ", ".join(ontology[:4]) + "."
     return text
 
 

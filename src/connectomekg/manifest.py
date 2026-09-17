@@ -118,6 +118,39 @@ FAFB_783_FILES: tuple[ReleaseFile, ...] = (
         "2,527 KB",
         "bd5879e1b5df964bea2f3ca5316348d4276ce2ccaac283f0e36583c04fbd3d8e",
     ),
+    ReleaseFile(
+        "visual_neuron_types.csv.gz",
+        "Visual Neuron Annotations",
+        "visual families and subsystems (Motion, Color, ...) for optic lobe types",
+        False,
+        "632 KB",
+        "4bcc6a2f98b86e6c3fb7eaddb49736f3d81ab65bda35da8f740641201a1e379f",
+    ),
+    ReleaseFile(
+        "column_assignment.csv.gz",
+        "Visual Neuron Columns",
+        "retinotopic column and hex position per columnar neuron",
+        False,
+        "463 KB",
+        "bdf4ce7f62cc63493d53eefad3816ff2dfd08b190e97b35a492e0e453df2f0f6",
+    ),
+    ReleaseFile(
+        "connectivity_tags.csv.gz",
+        "Connectivity Tags",
+        "network-analysis tags such as broadcaster and integrator",
+        False,
+        "638 KB",
+        "68c69cec13810fa543c600a5b9973d10718b449740e010834662be1dc1b8696c",
+    ),
+    # No digest: the September 2026 copy was re-compressed locally, so its
+    # bytes are not the portal's.
+    ReleaseFile(
+        "processed_labels.csv.gz",
+        "Community Labels (Refined)",
+        "cleaned labels, carrying the Fly Anatomy Ontology (FBbt) ids",
+        False,
+        "1,018 KB",
+    ),
 )
 
 #: Portal assets the build does not read, recorded so a report can say why.
@@ -149,34 +182,6 @@ FAFB_783_UNUSED: tuple[ReleaseFile, ...] = (
         "display names; cell types carry the identity the graph uses",
         False,
         "1,182 KB",
-    ),
-    ReleaseFile(
-        "processed_labels.csv.gz",
-        "Community Labels (Refined)",
-        "refined labels; the raw labels carry attribution the graph records",
-        False,
-        "1,018 KB",
-    ),
-    ReleaseFile(
-        "visual_neuron_types.csv.gz",
-        "Visual Neuron Annotations",
-        "visual system typing; not yet wired in",
-        False,
-        "632 KB",
-    ),
-    ReleaseFile(
-        "column_assignment.csv.gz",
-        "Visual Neuron Columns",
-        "retinotopic columns; not yet wired in",
-        False,
-        "463 KB",
-    ),
-    ReleaseFile(
-        "connectivity_tags.csv.gz",
-        "Connectivity Tags",
-        "curated tags such as rich club; not yet wired in",
-        False,
-        "638 KB",
     ),
 )
 

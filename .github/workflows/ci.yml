@@ -7,39 +7,282 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: snok/install-poetry@v1
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
-      - run: poetry install --with dev --no-interaction
-      - run: poetry run ruff format --check .
-      - run: poetry run ruff check .
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: lint-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dev dependencies
+        run: poetry install --no-interaction --with dev
+
+      - name: Check formatting
+        run: poetry run ruff format --check .
+
+      - name: Lint
+        run: poetry run ruff check .
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      # The viz and viz3d extras, so ty checks the render code against the
+      # same PyVista and plotly types a developer's environment has. Without
+      # them those imports are unresolved, and suppressions that PyVista's
+      # decorated methods need locally are reported as unused here.
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev --extras "viz viz3d"
+
+      - name: Run ty
+        run: poetry run ty check src/
 
   test:
-    name: Tests
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: snok/install-poetry@v1
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
-      - run: poetry install --with dev --no-interaction
-      # The semantic query test skips without the semantic extra; CI runs
-      # the structural suite only, which needs no model download.
-      - run: poetry run pytest
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: test-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        # No semantic extra: the semantic query test skips without it, and the
+        # structural suite needs no model download.
+        run: poetry install --no-interaction --with dev
+
+      - name: Run tests
+        run: poetry run pytest
+
+  viz:
+    name: Test viz extras (Python 3.12)
+    runs-on: ubuntu-latest
+    # The test jobs above install no extras, so every test that needs plotly,
+    # PyVista, quiltwright or PyQt5 skips there: the 2-D charts, scene
+    # composition (circuit, flow, floor, camera) and the quilt/still CLI paths
+    # would never run in CI. This job installs the viz and viz3d extras,
+    # renders off-screen on a virtual display, and fails if any of those
+    # packages is missing rather than letting the tests skip.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # VTK needs an OpenGL context: this starts Xvfb with Mesa and exports
+      # DISPLAY for the steps that follow.
+      - name: Set up a headless display
+        uses: pyvista/setup-headless-display-action@v4
+
+      # Libraries PyQt5's QtWidgets links against, for the viewer import test.
+      - name: Install Qt runtime libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libdbus-1-3
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: viz-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev --extras "viz viz3d"
+
+      # importorskip turns a missing package into a skip; here that would be
+      # a silent pass, so check every package the gated tests need first.
+      - name: Check the extras import
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          poetry run python -c "import plotly, pyvis, pyvista, pyvistaqt, PyQt5.QtWidgets, quiltwright; print('viz and viz3d extras import')"
+
+      - name: Run the extra-gated tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -o pipefail  # the default bash -e would let tee hide a pytest failure
+          poetry run pytest tests/test_viz.py tests/test_scene.py tests/test_cli_viz3d.py \
+            tests/test_viz3d.py -rs | tee /tmp/viz-tests.out
+          if grep -q "SKIPPED" /tmp/viz-tests.out; then
+            echo "a test skipped although the extras are installed"; exit 1
+          fi
+
+  wheel:
+    name: Installed CLI
+    runs-on: ubuntu-latest
+    # Guards what the other jobs cannot see: they run against the source tree,
+    # so they pass even when the built wheel is missing modules the CLI imports
+    # or declares a dependency in a form PyPI strips from wheel metadata.
+    #
+    # This builds the artifact users actually receive, installs it core-only
+    # somewhere with no source tree in sight, and puts it through three gates:
+    #
+    #   1. every console-script entry point loads. entry_point.load() imports
+    #      the module and resolves the attribute without calling it.
+    #   2. a synthetic connectome builds and answers a path query. Gate 1
+    #      proves the code imports; only this proves it runs. --no-index keeps
+    #      it free of the semantic extra and any model download.
+    #   3. every packaged submodule imports, including ones no entry point or
+    #      build path reaches. The two modules that exist only to serve an
+    #      extra (viz, viz3d) may fail on a missing third-party module and
+    #      nothing else; scene.py and skeletons.py must import core-only.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Build wheel
+        run: poetry build
+
+      - name: Install the wheel into a clean venv
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+
+      - name: Load every console-script entry point
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib.metadata as md
+          import sys
+
+          eps = [e for e in md.distribution("connectome-kg").entry_points
+                 if e.group == "console_scripts"]
+          if not eps:
+              sys.exit("no console scripts found in the installed distribution")
+
+          failed = []
+          for e in sorted(eps, key=lambda e: e.name):
+              try:
+                  e.load()
+                  print(f"  ok    {e.name} -> {e.value}")
+              except Exception as exc:
+                  failed.append(e.name)
+                  print(f"  FAIL  {e.name} -> {e.value}\n        {type(exc).__name__}: {exc}")
+          if failed:
+              sys.exit(f"\n{len(failed)} console script(s) unusable when installed: "
+                       + ", ".join(failed))
+          print(f"\nall {len(eps)} console scripts load from a clean install")
+          PY
+
+      - name: Build a synthetic connectome and query it end to end
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/connkg fixture --out /tmp/synth --n 1000 --seed 1
+          /tmp/smoke/bin/connkg --root /tmp/kg build --data-dir /tmp/synth \
+            --dataset-id synthetic1k --no-index --wipe
+          test -f /tmp/kg/.connectomekg/graph.sqlite || { echo "no graph.sqlite"; exit 1; }
+          /tmp/smoke/bin/connkg --root /tmp/kg path --dataset-id synthetic1k \
+            --from GRN_sugar --to MN9 | tee /tmp/path.out
+          grep -q "MN9/" /tmp/path.out \
+            || { echo "path query did not reach the planted motor neuron"; exit 1; }
+          echo "end-to-end build + path query OK"
+
+      - name: Import every packaged submodule
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib
+          import pkgutil
+          import sys
+
+          import connectomekg
+
+          names = [m.name for m in pkgutil.walk_packages(connectomekg.__path__, "connectomekg.")]
+          if not names:
+              sys.exit("connectomekg has no submodules -- the wheel is missing its package body")
+
+          # Modules that import their extra at module scope, and the extra.
+          extra_only = {"connectomekg.viz": "viz", "connectomekg.viz3d": "viz3d"}
+
+          failed = []
+          for name in sorted(names):
+              try:
+                  importlib.import_module(name)
+              except ModuleNotFoundError as exc:
+                  if name in extra_only and not (exc.name or "").startswith("connectomekg"):
+                      print(f"  skip  {name} (needs the {extra_only[name]} extra: {exc.name})")
+                      continue
+                  failed.append(name)
+                  print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
+              except Exception as exc:
+                  failed.append(name)
+                  print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
+          if failed:
+              sys.exit(f"\n{len(failed)} of {len(names)} submodule(s) fail to import "
+                       "from the installed wheel: " + ", ".join(failed))
+          print(f"all {len(names)} packaged submodules import from a clean install")
+          PY

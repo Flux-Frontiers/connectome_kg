@@ -11,33 +11,93 @@ what lands on disk is a different name, and that name is what the reader looks
 for. The file you most need, `neurons.csv.gz`, is listed as "Neurotransmitter
 Type Predictions".
 
-`connectome-kg files` prints this table at any time.
+`connkg files` prints this table, less the last column, at any time.
 
-| portal label | downloads as | size | needed |
-|---|---|---|---|
-| Neurotransmitter Type Predictions | `neurons.csv.gz` | 1,680 KB | **required** |
-| Classification / Hierarchical Annotations | `classification.csv.gz` | 934 KB | **required** |
-| Connections (Filtered) | `connections_princeton.csv.gz` | 68 MB | **required** |
-| Cell Types | `consolidated_cell_types.csv.gz` | 902 KB | optional |
-| Marked Neuron Coordinates | `coordinates.csv.gz` | 5,315 KB | optional |
-| Community Labels (Raw) | `labels.csv.gz` | 4,771 KB | optional |
-| Cell Size Measurements | `cell_stats.csv.gz` | 2,527 KB | optional |
+The last column records what the reference download holds: the September
+2026 `fafb_v783/` in which every file below was checked against the portal.
+
+| portal label | downloads as | size | needed | reference download |
+|---|---|---|---|---|
+| Neurotransmitter Type Predictions | `neurons.csv.gz` | 1,680 KB | **required** | yes |
+| Classification / Hierarchical Annotations | `classification.csv.gz` | 934 KB | **required** | yes |
+| Connections (Filtered) | `connections_princeton.csv.gz` | 68 MB | **required** | yes |
+| Cell Types | `consolidated_cell_types.csv.gz` | 902 KB | optional | yes |
+| Marked Neuron Coordinates | `coordinates.csv.gz` | 5,315 KB | optional | yes |
+| Community Labels (Raw) | `labels.csv.gz` | 4,771 KB | optional | yes |
+| Cell Size Measurements | `cell_stats.csv.gz` | 2,527 KB | optional | yes |
+| Visual Neuron Annotations | `visual_neuron_types.csv.gz` | 632 KB | optional | yes |
+| Visual Neuron Columns | `column_assignment.csv.gz` | 463 KB | optional | yes |
+| Connectivity Tags | `connectivity_tags.csv.gz` | 638 KB | optional | yes |
+| Community Labels (Refined) | `processed_labels.csv.gz` | 1,018 KB | optional | yes |
 
 Three required files, about 71 MB. The optional ones add cell type names,
-3D positions, community annotations with attribution, and morphometrics.
+3D positions, community annotations with attribution, cable length, area and
+volume, visual families and subsystems, retinotopic columns, connectivity
+tags, and Fly Anatomy Ontology (FBbt) ids from the refined labels. Each is
+read when present and skipped when not.
 
-Deliberately not downloaded:
+Two things about the optional files that are easy to get wrong:
 
-| portal label | size | why not |
-|---|---|---|
-| Connections (Unfiltered) | 277 MB | millions of single-synapse rows, mostly detection noise |
-| Synapse Table | 2,695 MB | the graph is at neuron resolution, it uses synapse counts |
-| Neuron Skeletons | 13 GB | coordinates give one position per neuron instead |
-| Proofread Cell Names And Groups | 1,182 KB | cell types carry the identity the graph uses |
-| Community Labels (Refined) | 1,018 KB | the raw labels carry the attribution the graph records |
-| Visual Neuron Annotations / Columns | 1,095 KB | not yet wired in |
-| Connectivity Tags | 638 KB | not yet wired in |
-| Anything marked "prior to July 2025" | varies | superseded; mixing detectors is not valid |
+- `column_assignment.csv.gz` numbers columns separately in each optic lobe,
+  so a column is a hemisphere plus an id: 796 ids, 1,581 columns.
+- `connectivity_tags.csv.gz` holds comma-separated tags. The portal's
+  "28 unique values" counts combinations of 8 tags. Four of the 8 are on 44%
+  to 95% of all neurons, so only `broadcaster`, `integrator`, `nsrn` and
+  `highly_reciprocal_neuron` get graph nodes; every tag stays in neuron
+  metadata.
+
+### Safari strips the `.gz` without decompressing
+
+The portal serves gzip, but Safari saves these as `neurons.csv`,
+`labels.csv` and so on: it drops the `.gz` and leaves the bytes compressed.
+Download a second copy and you get `labels.csv.csv`. Either way the reader
+will not find the file, because it looks for `labels.csv.gz`.
+
+Check what you actually have before renaming anything:
+
+```bash
+file *.csv*          # "gzip compressed data" means it is still compressed
+gzip -t *.csv.gz     # silence means every archive is intact
+```
+
+The name recorded inside the gzip header is the real one, and `file` prints
+it (`was "labels.csv"`). Rename to that plus `.gz`:
+
+```bash
+mv labels.csv.csv labels.csv.gz
+```
+
+Do not gunzip them. The reader hands the `.csv.gz` path to pandas, which
+decompresses on the fly, and unpacking these costs about 340 MB and loses
+the checksums `verify` matches against.
+
+Not read by the build. Downloading any of these is harmless; the build
+ignores them. "not checked" means nobody has downloaded that one to confirm
+the name it lands under, and the manifest's names are not a reliable guide:
+it lists the Synapse Table as `synapse_table.csv.gz`.
+
+| portal label | lands as | size | why the build skips it | reference download |
+|---|---|---|---|---|
+| Synapse Table | `fafb_v783_princeton_synapse_table.csv.gz` | 2,695 MB | the graph is at neuron resolution, it uses synapse counts | yes |
+| Neuron Skeletons | `sk_lod1_783_healed/` | 13 GB zipped, 31 GB unpacked | coordinates give one position per neuron instead | yes |
+| Connections (Unfiltered) | not checked | 277 MB | millions of single-synapse rows, mostly detection noise | no |
+| Proofread Cell Names And Groups | not checked | 1,182 KB | cell types carry the identity the graph uses | no |
+| Synapse Coordinates / Attachment Rates | not checked | varies | per-synapse detail the neuron-level graph does not use | no |
+| Anything marked "prior to July 2025" | not checked | varies | superseded; mixing detectors is not valid | no |
+
+The skeleton archive unpacks to 139,273 `.swc` files, one per neuron, named by
+root id. The Synapse Table and Neuron Skeletons are the two downloads that
+time out: Safari reports `NSURLErrorDomain -1001` and leaves a `.download`
+bundle that does not resume. Restart the download rather than waiting.
+
+### Classification no longer carries `cell_type`
+
+Current exports of `classification.csv.gz` have no `cell_type` column; the
+type moved to `consolidated_cell_types.csv.gz` as `primary_type`. The reader
+asks only for the columns a download actually has, so both old and new
+exports load. The practical consequence is that `consolidated_cell_types.csv.gz`
+is optional only in the sense that a build succeeds without it: skip it on a
+current export and every neuron's cell type is empty. Download it.
 
 The connections table has also shipped as `connections.csv.gz` in other
 exports. `find_connections_file()` takes whichever variant is present,
@@ -82,15 +142,15 @@ used on the dataset node.
 4. Tick the agreement checkbox, then download at least the three required
    files from the table above, into one directory.
 
-5. Verify the directory against the manifest, then build. The `connectome-kg`
+5. Verify the directory against the manifest, then build. The `connkg`
    script exists only after `pip install -e .`; from a bare clone use
    `PYTHONPATH=src python -m connectomekg` instead, and with Poetry prefix
    `poetry run`.
 
    ```bash
-   connectome-kg verify --data-dir /path/to/fafb_v783
-   connectome-kg --root . build --data-dir /path/to/fafb_v783 --dataset-id fafb783 --no-index
-   connectome-kg --root . analyze --dataset-id fafb783
+   connkg verify --data-dir /path/to/fafb_v783
+   connkg --root . build --data-dir /path/to/fafb_v783 --dataset-id fafb783 --no-index
+   connkg --root . analyze --dataset-id fafb783
    ```
 
    `verify` hashes every file against the SHA-256 values recorded in
@@ -101,13 +161,33 @@ used on the dataset node.
    update the manifest. `--no-checksums` skips the hashing while you sort names
    out.
 
+   `build` reports each extraction stage on stderr, and a running count every
+   250,000 synaptic pairs, then ends with "writing to SQLite". The write that
+   follows has no progress of its own and is most of the run; to watch it,
+   follow the write-ahead log in another shell with
+   `while sleep 2; do ls -lh .connectomekg/graph.sqlite-wal; done`. Use
+   `--wipe` when restarting after an interrupted build, or the new graph is
+   written on top of the partial one.
+
    `--no-index` builds the SQLite graph only. Drop it (with the `semantic`
    extra installed) to also embed the cell types, neuropils, labels and taxa;
    that is about 20k short texts and takes a few minutes on CPU.
 
-6. Expected footprint: about 4 minutes and 2 GB of SQLite for the graph. That
-   is extrapolated from a 2.5 M edge synthetic build, not measured on the real
-   release; time the first real build and correct this number.
+6. Measured footprint, `--no-index` on the real v783 release with every
+   optional file present (Apple silicon, September 2026): **3 minutes 57
+   seconds and 2.1 GB** of SQLite for 157,698 nodes and 5,072,285 edges.
+
+   Keep about 4 GB free rather than 2. The whole build lands in one
+   transaction, so `graph.sqlite` stays near 100 MB while the write-ahead log
+   grows to roughly 2 GB, and both exist at once during the checkpoint that
+   ends the build.
+
+   Every build writes `reports/build_<timestamp>.md`: versions and git commit,
+   the options, each input file's SHA-256 against the manifest, time per
+   extraction stage, the counts written, and peak resident memory. The reports
+   are gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
+   records the built graph's metrics in `.connectomekg/snapshots/`, which is
+   tracked.
 
 ## If Codex offers something other than what you expected
 
@@ -116,7 +196,7 @@ the same v783 release that need no sign-in (a Zenodo record accompanies the
 annotation paper, and `flyconnectome/flywire_annotations` on GitHub carries the
 annotation tables). Any of them work as long as the directory ends up with a
 neurons table, a classification table and a connections table whose columns the
-reader recognises. Run `connectome-kg verify --data-dir <dir> --no-checksums`
+reader recognises. Run `connkg verify --data-dir <dir> --no-checksums`
 to see what it detects before building.
 
 ## Licence reminder

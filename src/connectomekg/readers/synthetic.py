@@ -1,8 +1,7 @@
 """A seeded synthetic connectome shaped like FlyWire, for tests and demos.
 
 Population shares, degree tails, synapse-count histogram, transmitter shares and
-reciprocity follow the statistics measured on the real v783 connectivity in
-``docs/FLY_CONNECTOME_MODEL_PLAN.md`` section 4. On top of the sampled wiring a
+reciprocity follow statistics measured on the real v783 connectivity. On top of the sampled wiring a
 few named circuits are planted with the real cell-type names, so the classic
 queries have something to find:
 
@@ -25,8 +24,10 @@ from connectomekg.schema import (
     CONNECTION_COLUMNS,
     LABEL_COLUMNS,
     NEURON_COLUMNS,
+    NT_SCORE_COLUMNS,
     ConnectomeTables,
     DatasetInfo,
+    fbbt_ids,
 )
 
 SYNTHETIC = DatasetInfo(
@@ -278,7 +279,7 @@ def synthetic_tables(n_neurons: int = 1000, seed: int = 1) -> ConnectomeTables:
     out_deg = rng.lognormal(np.log(k_mean) - sigma**2 / 2, sigma, size=n)
     out_deg = np.clip(np.round(out_deg), 0, n // 4).astype(int)
     by_np: dict[str, np.ndarray] = {
-        k: g.index.to_numpy() for k, g in df.groupby("neuropil", sort=False)
+        str(k): g.index.to_numpy() for k, g in df.groupby("neuropil", sort=False)
     }
     homes = df["_home"].to_numpy()
     sides = df["side"].to_numpy()
@@ -363,11 +364,91 @@ def synthetic_tables(n_neurons: int = 1000, seed: int = 1) -> ConnectomeTables:
                 }
             )
 
+    df = _annotate(df, [p[1] for p in PLANTS])
     neurons = df.drop(columns=["_home", "neuropil"]).reindex(columns=list(NEURON_COLUMNS))
     lab = pd.DataFrame(labels, columns=list(LABEL_COLUMNS))
     tables = ConnectomeTables(dataset=SYNTHETIC, neurons=neurons, connections=con, labels=lab)
     tables.validate()
     return tables
+
+
+#: Visual system annotation by super class: (family, subsystem, category). The
+#: centrifugal family has no subsystem, as 36 real v783 families do not.
+_VISUAL = {
+    "optic": ("Medulla Intrinsic", "Motion", "intrinsic"),
+    "visual_projection": ("Lobula Columnar", "Object", "boundary"),
+    "visual_centrifugal": ("Visual Centrifugal", None, "boundary"),
+}
+
+
+def _annotate(df: pd.DataFrame, planted: list[str]) -> pd.DataFrame:
+    """Fill the optional annotation columns from values already in ``df``.
+
+    Nothing here draws from the random generator, so adding annotations cannot
+    move the sampled wiring or the planted circuits.
+
+    :param df: Neurons with types, classes, sides and transmitters assigned.
+    :param planted: Planted cell type names, in :data:`PLANTS` order.
+    :return: A copy with every optional :data:`NEURON_COLUMNS` entry filled.
+    """
+    df = df.copy()
+    rid = df["root_id"].astype("int64")
+    tnum = df["cell_type"].str.extract(r"(\d+)$")[0].fillna("0").astype(int)
+    df["sub_class"] = [
+        f"{cls}_{t % 3}" if sc in ("optic", "central") else ""
+        for sc, cls, t in zip(df["super_class"], df["class"], tnum, strict=True)
+    ]
+    for col in NT_SCORE_COLUMNS:
+        nt = col.removeprefix("score_").upper()
+        df[col] = np.where(df["nt_type"] == nt, df["nt_score"], ((1 - df["nt_score"]) / 5).round(3))
+    df["length_nm"] = (200_000 + (rid % 997) * 1_000).astype(float)
+    df["area_nm2"] = df["length_nm"] * 2_000
+    df["volume_nm3"] = df["length_nm"] * 150_000
+
+    vis = df["super_class"].map(_VISUAL)
+    for i, col in enumerate(("visual_family", "visual_subsystem", "visual_category")):
+        df[col] = [v[i] if isinstance(v, tuple) else None for v in vis]
+
+    # Optic neurons sit in one of 20 columns per hemisphere; column ids repeat
+    # across hemispheres, as they do in v783.
+    optic = df["super_class"] == "optic"
+    cid = (rid % 20 + 1).astype(float)
+    df["column_hemisphere"] = np.where(df["side"] == "R", "right", "left")
+    df["column_hemisphere"] = df["column_hemisphere"].where(optic)
+    df["column_id"] = cid.where(optic)
+    df["column_x"] = (cid % 5 - 2).where(optic)
+    df["column_y"] = (cid // 5 - 2).where(optic)
+    df["column_p"] = df["column_x"] + df["column_y"]
+    df["column_q"] = df["column_y"] - df["column_x"]
+
+    tags = []
+    for r, ct in zip(rid, df["cell_type"], strict=True):
+        t = {"feedforward_loop_participant"}
+        if r % 2:
+            t.add("reciprocal")
+        if r % 50 == 0:
+            t.add("nsrn")
+        if ct == "LC4":
+            t.add("broadcaster")
+        if ct == "DNp01":
+            t.add("integrator")
+        tags.append(tuple(sorted(t)))
+    df["connectivity_tags"] = tags
+
+    # FBbt-shaped ids outside the real ontology's range. The first is spelled
+    # "Fbbt_" because Codex spells the prefix both ways.
+    ids = {ct: f"{'Fbbt' if k == 0 else 'FBbt'}_99{k:06d}" for k, ct in enumerate(planted)}
+    refined = []
+    for ct in df["cell_type"]:
+        if ct in ids:
+            refined.append((f"{ct}; synthetic {ct} neuron; {ids[ct]}",))
+        elif ct.startswith("Mi"):
+            refined.append((ct,))
+        else:
+            refined.append(())
+    df["refined_labels"] = refined
+    df["fbbt"] = [fbbt_ids(r) for r in refined]
+    return df
 
 
 def write_codex_dir(tables: ConnectomeTables, out_dir: str | Path) -> Path:
@@ -386,6 +467,7 @@ def write_codex_dir(tables: ConnectomeTables, out_dir: str | Path) -> Path:
             "group": "",
             "nt_type": n["nt_type"],
             "nt_type_score": n["nt_score"],
+            **{f"{c.removeprefix('score_')}_avg": n[c] for c in NT_SCORE_COLUMNS},
         }
     ).to_csv(d / "neurons.csv.gz", index=False)
     # Codex classification carries no cell_type column: consolidated_cell_types
@@ -419,6 +501,48 @@ def write_codex_dir(tables: ConnectomeTables, out_dir: str | Path) -> Path:
             "nt_type": c["nt_type"],
         }
     ).to_csv(d / "connections_princeton.csv.gz", index=False)
+    pd.DataFrame(
+        {
+            "root_id": n["root_id"],
+            "length_nm": n["length_nm"],
+            "area_nm": n["area_nm2"],
+            "size_nm": n["volume_nm3"],
+        }
+    ).to_csv(d / "cell_stats.csv.gz", index=False)
+    v = n[n["visual_family"].notna()]
+    pd.DataFrame(
+        {
+            "root_id": v["root_id"],
+            "type": v["cell_type"],
+            "family": v["visual_family"],
+            "subsystem": v["visual_subsystem"],
+            "category": v["visual_category"],
+            "side": v["side"].map({"L": "left", "R": "right"}),
+        }
+    ).to_csv(d / "visual_neuron_types.csv.gz", index=False)
+    cols = n[n["column_id"].notna()]
+    pd.DataFrame(
+        {
+            "root_id": cols["root_id"],
+            "hemisphere": cols["column_hemisphere"],
+            "type": cols["cell_type"],
+            **{k: cols[f"column_{k}"].astype(int) for k in ("id", "x", "y", "p", "q")},
+        }
+    ).rename(columns={"id": "column_id"}).to_csv(d / "column_assignment.csv.gz", index=False)
+    tagged = n[n["connectivity_tags"].map(len) > 0]
+    pd.DataFrame(
+        {
+            "root_id": tagged["root_id"],
+            "connectivity_tag": tagged["connectivity_tags"].map(",".join),
+        }
+    ).to_csv(d / "connectivity_tags.csv.gz", index=False)
+    refined = n[n["refined_labels"].map(len) > 0]
+    pd.DataFrame(
+        {
+            "root_id": refined["root_id"],
+            "processed_labels": refined["refined_labels"].map(list).map(str),
+        }
+    ).to_csv(d / "processed_labels.csv.gz", index=False)
     lab = tables.labels
     pd.DataFrame(
         {

@@ -3,14 +3,69 @@ __pycache__/
 .venv/
 dist/
 build/
+# mkdocs build output (`poetry run mkdocs build`)
+site/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
 .coverage
 htmlcov/
-# built graphs and vector stores are derived data, never committed
-.connectomekg/
+# Build reports -- one is written per `connkg build` run, so routine rebuilds
+# would otherwise pile up in the diff. They are good provenance (host, versions,
+# input digests, stage timings, peak memory), so keep the ones worth keeping
+# deliberately:  git add -f reports/build_<date>.md
+reports/build_*.md
 # real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
 data/
 fafb_v783/
 .DS_Store
+uv.lock
+
+# === Rendered output (renders/), following quiltwright's layout -- see
+# renders/README.md and docs/rendering.md.
+# stills/ and views/ are local scratch (a working --preview PNG, per-view
+# captures); quilts/ holds Looking Glass quilts (tens of MB each); reports/
+# is reserved for future per-render provenance records and stays tracked --
+# the only account of how a gitignored quilt was made.
+renders/*
+!renders/README.md
+!renders/reports/
+# Quilts are never committed regardless of where they land -- these two
+# patterns have no slash, so git applies them at every depth, matching
+# quiltwright's own .gitignore.
+*_qs[0-9]*x[0-9]*a*.png
+*_qs[0-9]*x[0-9]*a*.mp4
+# === end rendered output ===
+
+# === KG generated artifacts (normalized across the fleet) ===
+# Databases, vector indexes and model caches are transient and
+# reproducible. snapshots/ is TRACKED and must never be ignored --
+# never use a bare `**/.<ns>/` pattern here, it swallows snapshots too.
+
+**/.pycodekg/*.sqlite
+**/.pycodekg/*.sqlite-shm
+**/.pycodekg/*.sqlite-wal
+**/.pycodekg/*.db
+**/.pycodekg/models
+
+**/.dockg/*.sqlite
+**/.dockg/*.sqlite-shm
+**/.dockg/*.sqlite-wal
+**/.dockg/*.db
+**/.dockg/models
+**/.dockg/embeddings.json
+
+**/.connectomekg/*.sqlite
+**/.connectomekg/*.sqlite-shm
+**/.connectomekg/*.sqlite-wal
+**/.connectomekg/*.db
+**/.connectomekg/models
+
+# Agent scratch dirs (Claude Code / Codex)
+.agents/
+.codex/
+
+# MCP server config -- machine-specific, contains absolute paths
+.mcp.json
+.mcp.json.sav
+# === end KG generated artifacts ===

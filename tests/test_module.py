@@ -8,8 +8,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
-from connectomekg.cli import main
+from connectomekg.cli import cli
 from connectomekg.manifest import FAFB_783_FILES, verify_dir
 from connectomekg.readers.synthetic import write_codex_dir
 
@@ -26,48 +27,51 @@ def test_analyze_is_markdown(kg):
     assert "SYNAPSES_TO" in md and "Coverage" in md and "100.0%" in md
 
 
-def test_cli_fixture_build_path(tmp_path, capsys):
+def run(*args: str) -> str:
+    """Invoke connkg in-process and return its output, failing on a non-zero exit."""
+    res = CliRunner().invoke(cli, list(args))
+    assert res.exit_code == 0, f"{res.output}\n{res.exception!r}"
+    return res.output
+
+
+def test_cli_fixture_build_path(tmp_path):
     data = tmp_path / "codex"
-    assert main(["fixture", "--out", str(data), "--n", "400", "--seed", "3"]) == 0
+    run("fixture", "--out", str(data), "--n", "400", "--seed", "3")
     root = tmp_path / "root"
     root.mkdir()
-    assert (
-        main(
-            [
-                "--root",
-                str(root),
-                "build",
-                "--data-dir",
-                str(data),
-                "--source",
-                "codex",
-                "--dataset-id",
-                "synthetic400",
-                "--no-index",
-                "--wipe",
-            ]
-        )
-        == 0
+    built = run(
+        "--root",
+        str(root),
+        "build",
+        "--data-dir",
+        str(data),
+        "--source",
+        "codex",
+        "--dataset-id",
+        "synthetic400",
+        "--no-index",
+        "--wipe",
     )
-    assert (
-        main(
-            [
-                "--root",
-                str(root),
-                "path",
-                "--dataset-id",
-                "synthetic400",
-                "--from",
-                "GRN_sugar",
-                "--to",
-                "MN9",
-            ]
-        )
-        == 0
+    # A build reports its stages rather than sitting silent.
+    assert "synaptic pairs" in built and "extraction done" in built
+    out = run(
+        "--root",
+        str(root),
+        "path",
+        "--dataset-id",
+        "synthetic400",
+        "--from",
+        "GRN_sugar",
+        "--to",
+        "MN9",
     )
-    out = capsys.readouterr().out
     assert "SEZ_IN1" in out and "MN9" in out
-    assert main(["--root", str(root), "stats", "--dataset-id", "synthetic400"]) == 0
+    run("--root", str(root), "stats", "--dataset-id", "synthetic400")
+
+
+def test_cli_rejects_out_of_range_options():
+    res = CliRunner().invoke(cli, ["query", "anything", "--k", "0"])
+    assert res.exit_code == 2 and "--k" in res.output
 
 
 def test_query_needs_semantic_extra(kg):
@@ -98,9 +102,8 @@ def test_verify_reports_drift_without_calling_it_a_failure(tables, tmp_path, cap
     assert all(f.display for f in FAFB_783_FILES), "every file needs its portal label"
 
 
-def test_files_command_maps_portal_labels_to_file_names(capsys):
-    assert main(["files"]) == 0
-    out = capsys.readouterr().out
+def test_files_command_maps_portal_labels_to_file_names():
+    out = run("files")
     # The label that sent us looking for a file called "neurons".
     assert "Neurotransmitter Type Predictions" in out and "neurons.csv.gz" in out
     assert "Connections (Filtered)" in out
