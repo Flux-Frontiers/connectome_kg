@@ -279,13 +279,7 @@ def quilt(
     if still:
         spec_obj = spec_obj.still(height=STILL_HEIGHT)
 
-    # Frame at the aspect render_quilt captures views at (the display's), not
-    # the tile's: frame_and_focus fits to the window, and a 16-landscape tile
-    # is 4:3 while its views are 16:9.
-    plotter = pv.Plotter(
-        off_screen=True,
-        window_size=[round(spec_obj.tile_height * spec_obj.aspect), spec_obj.tile_height],
-    )
+    plotter = pv.Plotter(off_screen=True)
     with open_kg(ctx.obj["root"], dataset_id=dataset_id) as kg, usage_errors():
         info = render3d.build_brain_scene(
             plotter,
@@ -309,7 +303,11 @@ def quilt(
         click.echo(f"Scene: {info.title}")
 
     render3d.aim_camera(
-        plotter, info.points, fov=fov, elevation=resolve_elevation(floor, elevation)
+        plotter,
+        info.points,
+        fov=fov,
+        elevation=resolve_elevation(floor, elevation),
+        spec=spec_obj,
     )
     # The camera is locked now, so the report and the render both take
     # fov=None. The report comes before the floor, which reaches past the

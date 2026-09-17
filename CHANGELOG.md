@@ -164,6 +164,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`quiltwright>=0.14.1` in the `viz3d` extra** (was `>=0.10.0`).
+  `scene.aim_camera` takes `spec=` and passes it to quiltwright's
+  `frame_and_focus`, which from 0.14.1 sizes the window to the aspect
+  `render_quilt` captures views at. That replaces the manual window sizing in
+  `connkg quilt` and `docs/scripts/render_images.py`; framing is unchanged,
+  and the doc images re-render byte-identical.
+
 - **Colour-blind-safe colours in the 3-D views, with no pastels.** Neuropil
   spheres and flow tubes are coloured by brain region (`scene.region_color`)
   instead of a 15-colour hash of the neuropil name, which had given unrelated

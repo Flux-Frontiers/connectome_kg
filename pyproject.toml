@@ -103,7 +103,9 @@ viz = [
 viz3d = [
     "kgmodule-utils[viz3d-render,viz3d-qt]>=0.21.0",
     "pyvistaqt>=0.11.0",
-    "quiltwright>=0.10.0",
+    # 0.14.1: frame_and_focus(spec=) frames at the display aspect render_quilt
+    # captures views at, not whatever the window was sized to.
+    "quiltwright>=0.14.1",
 ]
 
 [project.urls]
