@@ -1,0 +1,10 @@
+/* Colour swatches in the image keys (docs/rendering.md). */
+.swatch {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.3em;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  vertical-align: text-bottom;
+}

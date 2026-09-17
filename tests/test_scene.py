@@ -12,6 +12,8 @@ import numpy as np
 import pytest
 
 from connectomekg import scene
+from connectomekg.colors import REGION_COLOR, UNKNOWN_COLOR
+from connectomekg.neuropils import NEUROPIL_NAMES, NEUROPIL_REGION, REGION_NAMES
 from connectomekg.skeletons import Skeleton, write_swc
 
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -94,6 +96,19 @@ def test_circuit_neurons_raises_over_the_cap(monkeypatch):
     fake = _FakeKG({"big": [f"connectome:x:n:{i}" for i in range(10)]})
     with pytest.raises(ValueError, match="10 neurons.*over the cap of 3"):
         scene.circuit_neurons(fake, ["big"])
+
+
+def test_every_neuropil_has_a_region_and_every_region_a_colour():
+    assert set(NEUROPIL_NAMES) <= set(NEUROPIL_REGION)
+    assert set(NEUROPIL_REGION.values()) == set(REGION_NAMES) == set(REGION_COLOR)
+    assert all(_HEX.match(c) for c in REGION_COLOR.values())
+
+
+def test_region_color_ignores_side_and_falls_back_to_grey():
+    assert scene.region_color("LO_L") == scene.region_color("LO_R") == REGION_COLOR["OL"]
+    assert scene.region_color("ME_R") == REGION_COLOR["OL"]
+    assert scene.region_color("FB") == REGION_COLOR["CX"]
+    assert scene.region_color("NOT_A_NEUROPIL") == UNKNOWN_COLOR
 
 
 def test_type_color_is_deterministic_and_valid_hex():
@@ -380,3 +395,14 @@ def test_add_floor_adds_a_floor_below_the_scene_with_shadows(kg):
     assert shadow_pass is not None
     assert shadow_pass.GetShadowMapBakerPass().GetResolution() == scene._SHADOW_MAP_RESOLUTION
     assert any(light.positional for light in plotter.renderer.lights)
+
+
+def test_flow_view_thins_the_context_cloud_to_one_neutral_grey(kg):
+    ids, points, colors = scene.context_points(kg.store)
+    f_ids, f_points, f_colors, f_radius = scene._context_for_view("flow", ids, points, colors)
+    assert f_ids == ids[:: scene._FLOW_CONTEXT_STRIDE]
+    assert len(f_points) == len(f_ids) == len(f_colors)
+    assert set(f_colors) == {scene._FLOW_CONTEXT_COLOR}
+    assert f_radius == scene._FLOW_CONTEXT_RADIUS
+    c_ids, _, c_colors, _ = scene._context_for_view("circuit", ids, points, colors)
+    assert c_ids == ids and c_colors == colors

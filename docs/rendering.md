@@ -18,11 +18,13 @@ both render either as a Looking Glass quilt or in an interactive viewer.
 ![The two DNp01 descending neurons inside the whole-brain context cloud](images/circuit_dnp01.png)
 
 *Circuit view: the two DNp01 giant fiber neurons, drawn from their traced
-skeletons, inside the FAFB v783 context cloud.*
+skeletons, inside the FAFB v783 context cloud. See
+[Reading the images](#reading-the-images).*
 
 ![Neuropil flow across the whole brain, strongest 100 pairs](images/flow_all.png)
 
-*Flow view: the strongest 100 of 5,786 directed neuropil pairs.*
+*Flow view: the strongest 100 of 5,786 directed neuropil pairs, with each
+neuropil labelled. See [Reading the images](#reading-the-images).*
 
 !!! note "Data credit and licence"
     The images on this page are renders of the
@@ -32,6 +34,139 @@ skeletons, inside the FAFB v783 context cloud.*
     [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
     The renders are adaptations of it, shared under the same licence, not
     under the software's Elastic License 2.0.
+
+## Reading the images
+
+Every image on this page has the same three layers: a grey background, the
+context cloud, and the subject of the view. The keys below give what each
+colour, shape and size means.
+
+Region and cell-type colours are the saturated Okabe-Ito colours, which stay
+distinguishable under the common forms of colour blindness. The context cloud
+uses saturated colours too (Okabe-Ito for most super classes, with a wine,
+indigo and olive for the three smallest), muted part of the way toward the
+grey background, so the subject of each view stands out from it. No colour is
+a pastel, and shapes and labels back up colour wherever the distinction
+matters.
+
+### Background and context cloud
+
+The background is a flat grey, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`. It carries no data.
+
+Each small dot is one neuron at its marked point.
+
+In the **circuit view**, all 139,255 neurons are drawn, and a dot's colour is
+the neuron's super class, muted toward the background (the swatches show the
+colours as drawn):
+
+| colour | super class | neurons in FAFB v783 |
+|---|---|---|
+| <span class="swatch" style="background:#28688E"></span> `#28688E` | `central` | 32,381 |
+| <span class="swatch" style="background:#28806B"></span> `#28806B` | `optic` | 77,873 |
+| <span class="swatch" style="background:#578CAC"></span> `#578CAC` | `visual_projection` | 7,684 |
+| <span class="swatch" style="background:#986C87"></span> `#986C87` | `visual_centrifugal` | 522 |
+| <span class="swatch" style="background:#A7812C"></span> `#A7812C` | `sensory` | 16,938 |
+| <span class="swatch" style="background:#ACA750"></span> `#ACA750` | `sensory_ascending` | 612 |
+| <span class="swatch" style="background:#9D5D2C"></span> `#9D5D2C` | `ascending` | 1,750 |
+| <span class="swatch" style="background:#733C5A"></span> `#733C5A` | `descending` | 1,305 |
+| <span class="swatch" style="background:#443C76"></span> `#443C76` | `motor` | 110 |
+| <span class="swatch" style="background:#7C7E48"></span> `#7C7E48` | `endocrine` | 80 |
+
+The broad regions of the brain follow from these colours. The two large
+green masses are the optic lobes. The orange arcs outside them are sensory
+neurons, which are mostly visual: 11,426 of the 16,938 sensory neurons. The
+blue mass between the optic lobes is the central brain.
+
+With `--color-by sign`, the dots are coloured by transmitter sign instead:
+<span class="swatch" style="background:#96584D"></span> `#96584D` excitatory, <span class="swatch" style="background:#416683"></span> `#416683` inhibitory, and
+<span class="swatch" style="background:#7D838A"></span> `#7D838A` unknown.
+
+In the **flow view**, every 10th neuron is drawn and every dot is the same
+grey, <span class="swatch" style="background:#74787E"></span> `#74787E`, whatever `--color-by` says. The cloud there
+only outlines the brain, so that colour in the flow view means one thing: a
+neuropil's brain region.
+
+### Circuit view
+
+| what you see | what it means |
+|---|---|
+| Branching lines in one colour | The traced skeleton of each neuron of one cell type. Every cell type has its own colour. |
+| A sphere in the same colour, on the skeleton | That neuron's soma (cell body), or the skeleton's root point if the skeleton has no soma. |
+| A larger sphere in the same colour, away from any skeleton | A neuron with no skeleton file, drawn at its marked point. |
+| Tubes instead of lines | The same skeletons, drawn with `--tubes`. |
+| A floor and a shadow under the brain | `--floor`. The shadow shows depth. It carries no data. |
+
+A cell type's colour is one of the seven non-black Okabe-Ito colours, fixed by
+its name, so it is the same in every render. The colour identifies the type
+within one image; it does not encode a category, and it can match a super
+class colour in the cloud. In the images on this page, DNp01 is
+<span class="swatch" style="background:#0072B2"></span> `#0072B2` and LPLC2 is <span class="swatch" style="background:#CC79A7"></span> `#CC79A7`.
+
+### Flow view
+
+| what you see | what it means |
+|---|---|
+| A large sphere with a label | A neuropil, placed at the synapse-weighted centre of its neurons. `_L` and `_R` mark the left and right hemisphere; a name with no suffix spans the midline. |
+| Sphere colour | The neuropil's brain region (table below). |
+| Sphere size | The neuropil's synapse count. Radius grows with the cube root, so a sphere twice as wide holds about eight times the synapses. |
+| A tube between two spheres | Signal flow from one neuropil to the other, carried by neurons that take input in the first and make output in the second. See [What flow measures](#what-flow-measures). |
+| Tube thickness | The amount of flow, relative to the strongest drawn tube. Radius grows with the square root, so a tube twice as thick carries about four times the flow. |
+| Tube colour | The brain region of the source neuropil: the flow leaves a neuropil of that region. |
+| Which way a tube curves | The direction of flow. Seen from above, every tube bows to the right of its direction of travel. In the front view, a tube running left to right bulges toward you and one running right to left bulges away. |
+| A small, darker sphere with no label | A neuropil with no drawn tube, shown for context. |
+
+Neuropils are grouped into brain regions after the systematic nomenclature
+FlyWire's neuropils follow (Ito et al. 2014). There are 13 regions and 8
+colours, so regions that neighbour each other in the brain share a colour:
+
+| colour | regions and their neuropils |
+|---|---|
+| <span class="swatch" style="background:#E69F00"></span> `#E69F00` orange | optic lobe: `LA`, `ME`, `AME`, `LO`, `LOP` |
+| <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` sky blue | ventrolateral neuropils: `AOTU`, `AVLP`, `PVLP`, `PLP`, `WED` |
+| <span class="swatch" style="background:#D55E00"></span> `#D55E00` vermillion | mushroom body: `MB_CA`, `MB_PED`, `MB_VL`, `MB_ML` |
+| <span class="swatch" style="background:#CC79A7"></span> `#CC79A7` reddish purple | central complex: `FB`, `EB`, `PB`, `NO`; lateral complex: `BU`, `LAL`, `GA` |
+| <span class="swatch" style="background:#F0E442"></span> `#F0E442` yellow | lateral horn: `LH`; superior neuropils: `SLP`, `SIP`, `SMP` |
+| <span class="swatch" style="background:#0072B2"></span> `#0072B2` blue | inferior neuropils: `CRE`, `SCL`, `ICL`, `IB`, `ATL`; ventromedial neuropils: `VES`, `EPA`, `GOR`, `SPS`, `IPS` |
+| <span class="swatch" style="background:#009E73"></span> `#009E73` bluish green | antennal lobe: `AL`; periesophageal neuropils: `SAD`, `AMMC`, `FLA`, `CAN`, `PRW`; gnathal ganglia: `GNG` |
+| <span class="swatch" style="background:#000000"></span> `#000000` black | ocellar ganglion: `OCG`; unassigned: `UNASGD` |
+
+`connkg quilt` and the viewer draw the spheres without labels, so use the
+region colours there. The images on this page add labels, which tell apart
+neuropils that share a colour.
+
+??? note "Neuropil abbreviations in the images on this page"
+
+    | label | neuropil | region | colour |
+    |---|---|---|---|
+    | `AL` | antennal lobe | antennal lobe | <span class="swatch" style="background:#009E73"></span> `#009E73` |
+    | `AMMC` | antennal mechanosensory and motor center | periesophageal neuropils | <span class="swatch" style="background:#009E73"></span> `#009E73` |
+    | `AOTU` | anterior optic tubercle | ventrolateral neuropils | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` |
+    | `AVLP` | anterior ventrolateral protocerebrum | ventrolateral neuropils | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` |
+    | `CRE` | crepine | inferior neuropils | <span class="swatch" style="background:#0072B2"></span> `#0072B2` |
+    | `FB` | fan-shaped body | central complex | <span class="swatch" style="background:#CC79A7"></span> `#CC79A7` |
+    | `GNG` | gnathal ganglia (subesophageal zone) | gnathal ganglia | <span class="swatch" style="background:#009E73"></span> `#009E73` |
+    | `ICL` | inferior clamp | inferior neuropils | <span class="swatch" style="background:#0072B2"></span> `#0072B2` |
+    | `IPS` | inferior posterior slope | ventromedial neuropils | <span class="swatch" style="background:#0072B2"></span> `#0072B2` |
+    | `LA` | lamina | optic lobe | <span class="swatch" style="background:#E69F00"></span> `#E69F00` |
+    | `LAL` | lateral accessory lobe | lateral complex | <span class="swatch" style="background:#CC79A7"></span> `#CC79A7` |
+    | `LH` | lateral horn | lateral horn | <span class="swatch" style="background:#F0E442"></span> `#F0E442` |
+    | `LO` | lobula | optic lobe | <span class="swatch" style="background:#E69F00"></span> `#E69F00` |
+    | `LOP` | lobula plate | optic lobe | <span class="swatch" style="background:#E69F00"></span> `#E69F00` |
+    | `MB_CA` | mushroom body calyx | mushroom body | <span class="swatch" style="background:#D55E00"></span> `#D55E00` |
+    | `MB_ML` | mushroom body medial lobe | mushroom body | <span class="swatch" style="background:#D55E00"></span> `#D55E00` |
+    | `MB_PED` | mushroom body pedunculus | mushroom body | <span class="swatch" style="background:#D55E00"></span> `#D55E00` |
+    | `ME` | medulla | optic lobe | <span class="swatch" style="background:#E69F00"></span> `#E69F00` |
+    | `NO` | noduli | central complex | <span class="swatch" style="background:#CC79A7"></span> `#CC79A7` |
+    | `PLP` | posterior lateral protocerebrum | ventrolateral neuropils | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` |
+    | `PRW` | prow | periesophageal neuropils | <span class="swatch" style="background:#009E73"></span> `#009E73` |
+    | `PVLP` | posterior ventrolateral protocerebrum | ventrolateral neuropils | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` |
+    | `SAD` | saddle | periesophageal neuropils | <span class="swatch" style="background:#009E73"></span> `#009E73` |
+    | `SIP` | superior intermediate protocerebrum | superior neuropils | <span class="swatch" style="background:#F0E442"></span> `#F0E442` |
+    | `SLP` | superior lateral protocerebrum | superior neuropils | <span class="swatch" style="background:#F0E442"></span> `#F0E442` |
+    | `SMP` | superior medial protocerebrum | superior neuropils | <span class="swatch" style="background:#F0E442"></span> `#F0E442` |
+    | `SPS` | superior posterior slope | ventromedial neuropils | <span class="swatch" style="background:#0072B2"></span> `#0072B2` |
+    | `VES` | vest | ventromedial neuropils | <span class="swatch" style="background:#0072B2"></span> `#0072B2` |
+    | `WED` | wedge | ventrolateral neuropils | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` |
 
 ## Quilts and Looking Glass displays
 
@@ -239,18 +374,22 @@ Three choices keep it visible without covering the subject:
   the camera like the rest of the scene. Each sphere is a low-poly glyph (6 x
   4 facets), so the full 139,255-neuron cloud is about 3.3 million triangles
   and composes in under a second.
-- **Lightened colours, not transparency.** Each colour moves 35% toward
-  white so that it stands out from the grey background. Transparency is
-  avoided because alpha blending ghosts between views in a light-field
+- **Muted, opaque colours.** Each dot's colour from `connectomekg.colors`
+  is blended 45% toward the grey background (`_CONTEXT_MUTE`). The hue stays,
+  but the skeletons and neuropils drawn at full saturation stand out, even
+  where a cell type shares a hue with the dots around it. The blend goes
+  toward the background, not toward white, because lightened colours turn
+  pastel and colour-blind readers cannot tell pastels apart. The dots are
+  opaque, because alpha blending ghosts between views in a light-field
   render.
-- **Thinner in the flow view.** The flow view draws every 10th neuron with
-  larger spheres (radius 0.014 world units, against 0.005 in the circuit
-  view). At full density, the cloud hides the neuropil spheres inside it.
+- **Thinner and grey in the flow view.** The flow view draws every 10th
+  neuron, with larger spheres (radius 0.014 world units, against 0.005 in the
+  circuit view), all in one neutral grey. At full density, the cloud hides
+  the neuropil spheres inside it, and super-class colours would compete with
+  the region colours.
 
-With `--color-by super_class`, the colours follow `connectomekg.colors`:
-central neurons blue, optic neurons green, sensory neurons orange, and so on.
-With `--color-by sign`, excitatory neurons are warm, inhibitory neurons cool,
-and unknown neurons grey.
+[Background and context cloud](#background-and-context-cloud) lists every
+colour.
 
 A marked point is not a cell body. It can be tens of microns from the
 soma. The cloud shows where neurons are, not where their
@@ -278,9 +417,9 @@ brightness:
    (`skeleton:<type>`), so a 100-neuron type costs one draw call. A sphere
    marks each soma (`soma:<type>`).
 
-Each cell type's colour comes from a fixed palette, indexed by
-`seed_from_key(type name)`. The same type has the same colour in every
-render and every session. The colour identifies the type; it does not
+Each cell type's colour comes from the seven non-black Okabe-Ito colours,
+indexed by `seed_from_key(type name)`. The same type has the same colour in
+every render and every session. The colour identifies the type; it does not
 encode a category.
 
 Two fallbacks keep a neuron visible when data is missing, and the command
@@ -300,7 +439,8 @@ neurons.
 ![Neuropil flow carried by the 104 LC4 neurons](images/flow_lc4.png)
 
 *Flow carried by LC4 only. About 90% of it runs from the lobula (LO) to the
-posterior ventrolateral protocerebrum (PVLP) on each side.*
+posterior ventrolateral protocerebrum (PVLP) on each side. See
+[Reading the images](#reading-the-images).*
 
 ### What flow measures
 
@@ -354,8 +494,13 @@ Keep three limits in mind when you read a flow picture:
   the neuropil's synapse count, up to 0.22 world units. A centroid is a
   position, not the neuropil's shape: the Codex download has no neuropil
   meshes.
-- **Colour** comes from the neuropil name without its side, so `LO_L` and
-  `LO_R` match.
+- **Colour** is the neuropil's brain region, from
+  `connectomekg.neuropils.NEUROPIL_REGION` and
+  `connectomekg.colors.REGION_COLOR`, so `LO_L`, `LO_R` and `ME_L` are all
+  optic-lobe orange. Spheres and tubes are lit more evenly than the rest of
+  the scene (`_FLOW_AMBIENT`), because shading darkens a colour toward its
+  neighbours: a shaded yellow reads as orange. The images in these docs add
+  neuropil labels; `connkg quilt` and the viewer do not draw labels.
 - **Tubes** follow the `--top` strongest pairs. A tube's radius scales with
   the square root of its flow relative to the strongest drawn pair, and its
   colour is the source neuropil's colour.
@@ -405,7 +550,9 @@ most in a still and on the panel.
 ![LPLC2 and DNp01 over a floor, with shadows](images/floor_lplc2_dnp01.png)
 
 *`connkg quilt LPLC2 DNp01 --tubes --floor --still`: the 210 LPLC2 neurons
-and the two DNp01 neurons, drawn as tubes, over the floor.*
+(reddish purple) and the two DNp01 neurons (blue), drawn as tubes, over the
+floor.
+See [Reading the images](#reading-the-images).*
 
 `connectomekg.scene.add_floor` adds three things:
 
@@ -443,13 +590,15 @@ are in world units, where the brain is about 8 units wide.
 | `_CONTEXT_RADIUS` | 0.005 | context sphere radius, circuit view |
 | `_FLOW_CONTEXT_RADIUS` | 0.014 | context sphere radius, flow view |
 | `_FLOW_CONTEXT_STRIDE` | 10 | flow view draws every Nth neuron |
-| `_CONTEXT_LIGHTEN` | 0.35 | how far context colours move toward white |
+| `_CONTEXT_MUTE` | 0.45 | how far context dot colours blend toward the background |
+| `_FLOW_CONTEXT_COLOR` | `#8A8F96` | context dot colour in the flow view, before muting |
 | `_SOMA_RADIUS`, `_FALLBACK_RADIUS` | 0.05, 0.09 | soma and missing-skeleton spheres |
 | `_TUBE_RADIUS` | 0.01 | skeleton tube radius with `--tubes` |
 | `_NEUROPIL_MAX_RADIUS` | 0.22 | largest neuropil sphere |
 | `_FLOW_MAX_RADIUS`, `_FLOW_MIN_RADIUS` | 0.08, 0.004 | flow tube radius range |
 | `_FLOW_BOW` | 0.15 | tube bow, as a fraction of the distance between endpoints |
 | `_CONTEXT_DIM` | 0.85 | darkening of idle neuropil spheres |
+| `_FLOW_AMBIENT` | 0.45 | ambient share of the lighting on neuropil spheres and flow tubes |
 | `FLOOR_ELEVATION` | 25 | default `--elevation` with `--floor`, degrees |
 | `_FLOOR_DROP`, `_FLOOR_SIZE` | 0.15, 120 | floor distance below the scene, and its side length |
 | `_KEY_LIGHT_HEIGHT`, `_KEY_LIGHT_CONE` | 20, 75 | key light height above the scene, and its cone in degrees |
