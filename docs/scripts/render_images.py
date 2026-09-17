@@ -80,12 +80,15 @@ def main() -> None:
     kg = ConnectomeKG(".")
     try:
         for stem, options, floor, labels in IMAGES:
-            plotter = pv.Plotter(
-                off_screen=True,
-                window_size=[round(SPEC.tile_height * SPEC.aspect), SPEC.tile_height],
-            )
+            plotter = pv.Plotter(off_screen=True)
             info = build_brain_scene(plotter, kg, **options)
-            aim_camera(plotter, info.points, fov=FOV, elevation=FLOOR_ELEVATION if floor else 0.0)
+            aim_camera(
+                plotter,
+                info.points,
+                fov=FOV,
+                elevation=FLOOR_ELEVATION if floor else 0.0,
+                spec=SPEC,
+            )
             if floor:
                 add_floor(plotter)
             if labels:

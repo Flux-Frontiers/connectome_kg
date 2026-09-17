@@ -372,10 +372,15 @@ def test_build_brain_scene_rejects_bad_view_and_top(kg):
 
 def test_aim_camera_elevation_looks_down_and_frames_the_scene(kg):
     pv = pytest.importorskip("pyvista")
-    pytest.importorskip("quiltwright")
-    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    quiltwright = pytest.importorskip("quiltwright")
+    spec = quiltwright.QUILT_PRESETS["16-landscape"].scaled(0.05)
+    plotter = pv.Plotter(off_screen=True, window_size=(100, 100))
     info = scene.build_brain_scene(plotter, kg, view="flow")
-    near, far, focal = scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    near, far, focal = scene.aim_camera(
+        plotter, info.points, elevation=scene.FLOOR_ELEVATION, spec=spec
+    )
+    width, height = plotter.window_size
+    assert width / height == pytest.approx(spec.aspect, rel=0.02)  # display aspect, not the tile's
     forward = np.subtract(plotter.camera.focal_point, plotter.camera.position)
     assert forward[2] < 0  # looking down
     assert 0 < near <= focal <= far

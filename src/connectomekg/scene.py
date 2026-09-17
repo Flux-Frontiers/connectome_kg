@@ -52,6 +52,7 @@ from connectomekg.validation import (
 
 if TYPE_CHECKING:
     import pyvista as pv
+    from quiltwright import QuiltSpec
 
     from connectomekg.module import ConnectomeKG
 
@@ -570,6 +571,7 @@ def aim_camera(
     *,
     fov: float = 14.0,
     elevation: float = 0.0,
+    spec: QuiltSpec | None = None,
 ) -> tuple[float, float, float]:
     """Point the camera at a composed scene and frame it tightly at that view.
 
@@ -580,16 +582,21 @@ def aim_camera(
     and far depths. ``reset_camera()`` would fit the un-tilted bounds instead,
     which leaves a tilted scene small in frame.
 
-    ``frame_and_focus`` measures ``plotter.bounds`` and the window aspect, so
-    call this before :func:`add_floor` and after setting ``window_size`` to
-    the aspect the render captures at. Afterwards, pass ``fov=None`` to
-    ``render_quilt`` and ``depth_report``: the camera is locked.
+    ``frame_and_focus`` measures ``plotter.bounds``, so call this before
+    :func:`add_floor`. It also fits to the window's aspect: pass the quilt or
+    still *spec* you will render, and the window is set to the aspect
+    ``render_quilt`` captures each view at (16:9 for ``16-landscape``, whose
+    tiles are 4:3). Afterwards, pass ``fov=None`` to ``render_quilt`` and
+    ``depth_report``: the camera is locked.
 
     :param plotter: Plotter with the scene composed.
     :param points: World points the view direction is computed from,
         usually ``SceneInfo.points``.
     :param fov: Vertical field of view to lock the camera to, in degrees.
     :param elevation: Degrees to tilt the camera up from the front view.
+    :param spec: The ``quiltwright.QuiltSpec`` the scene will be rendered at;
+        ``None`` frames at the window's current aspect, as an interactive
+        viewer wants.
     :return: ``(near, far, focal_distance)`` from ``frame_and_focus``.
     """
     from kg_utils.viz3d import frame_tree  # noqa: PLC0415 - the viz3d-render-only import boundary
@@ -603,7 +610,7 @@ def aim_camera(
     if elevation:
         camera.Elevation(elevation)
         camera.OrthogonalizeViewUp()
-    return frame_and_focus(plotter, fov=fov)
+    return frame_and_focus(plotter, fov=fov, spec=spec)
 
 
 def add_floor(plotter: pv.Plotter) -> None:
