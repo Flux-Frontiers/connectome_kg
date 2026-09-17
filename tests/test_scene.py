@@ -223,6 +223,7 @@ def test_build_brain_scene_context_only(kg):
     plotter = pv.Plotter(off_screen=True)
     info = scene.build_brain_scene(plotter, kg)
     assert "context" in plotter.actors
+    assert plotter.background_color == scene.BACKGROUND
     assert info.n_context > 0
     assert info.n_circuit == 0
     assert info.n_skeletons == 0

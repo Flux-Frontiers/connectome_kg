@@ -69,7 +69,11 @@ _SQL_NEURON_XYZ = (
 #: Point size and darkening for the context cloud -- dim rather than
 #: transparent, since alpha ghosts in light-field renders (plan section 3.A).
 _CONTEXT_POINT_SIZE: Final = 3.0
-_CONTEXT_DIM: Final = 0.55
+_CONTEXT_DIM: Final = 0.85
+#: Scene background: a muted mid grey. On PyVista's default white the dimmed
+#: context cloud all but disappears; on this grey it reads as the brain's
+#: outline without competing with the subject.
+BACKGROUND: Final = "#5A5D62"
 #: The flow view thins the context cloud to every Nth neuron and draws it
 #: smaller: at full density it hides the neuropil spheres and arcs inside it.
 _FLOW_CONTEXT_STRIDE: Final = 10
@@ -539,6 +543,7 @@ def build_brain_scene(
             progress(message)
 
     plotter.clear_actors()
+    plotter.set_background(BACKGROUND)  # ty: ignore[invalid-argument-type]
     frame = world_frame(kg.store)
     world_points: list[np.ndarray] = []
 
@@ -678,6 +683,7 @@ def build_brain_scene(
 
 
 __all__ = [
+    "BACKGROUND",
     "NM_PER_WORLD_UNIT",
     "VIEWS",
     "NeuropilFlow",
