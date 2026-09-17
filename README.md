@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
 [![CI](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
-[![DOI](https://img.shields.io/badge/DOI-pending-lightgrey.svg)](https://zenodo.org/)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22817369-blue.svg)](https://doi.org/10.5281/zenodo.22817369)
 [![Data: FlyWire FAFB v783](https://img.shields.io/badge/data-FlyWire%20FAFB%20v783-orange.svg)](docs/DOWNLOAD.md)
 
 # ConnectomeKG -- Connectomes as Knowledge Graphs
@@ -231,11 +231,11 @@ If you use FlyWire data, cite the data papers:
 
 ## Citation
 
-If you use ConnectomeKG in research or a project, please cite it. The software is archived on Zenodo with each GitHub release; the DOI is added here when the first archive is minted.
+If you use ConnectomeKG in research or a project, please cite it. The software is archived on Zenodo with each GitHub release. The DOI below, [10.5281/zenodo.22817369](https://doi.org/10.5281/zenodo.22817369), always resolves to the newest version.
 
 **APA**
 
-> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.2.0) [Software]. Flux-Frontiers. https://github.com/Flux-Frontiers/connectome_kg
+> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.2.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
 
 **BibTeX**
 
@@ -246,6 +246,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
   version   = {0.2.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
+  doi       = {10.5281/zenodo.22817369},
   url       = {https://github.com/Flux-Frontiers/connectome_kg},
 }
 ```
