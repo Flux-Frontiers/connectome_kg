@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A provenance report for every build.** `connkg build` writes
+  `reports/build_<timestamp>.md`, following gutenberg_kg's ingest reports:
+  package versions and git commit, host and Python, the options, every input
+  file's SHA-256 against the manifest, time per extraction stage, the counts
+  written, database size and peak resident memory. A failed build still
+  writes one, marked FAILED. Reports are gitignored; `git add -f` the ones
+  worth keeping.
+- **`connkg snapshot save/list/show/diff/prune`.** Snapshots of the built
+  graph on the shared `kg_utils` manager, following the fleet snapshot
+  standard: the subclass sets `package_name` and adds the dataset figures,
+  per-layer neuron coverage and hub neurons, and overrides nothing else.
+  They live in `.connectomekg/snapshots/`, now tracked while the rest of
+  `.connectomekg/` stays ignored.
+
 - **Annotation layers from the optional Codex files.** The reader now joins
   `cell_stats`, `visual_neuron_types`, `column_assignment`,
   `connectivity_tags` and `processed_labels` when present, and keeps the

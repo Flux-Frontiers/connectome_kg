@@ -8,8 +8,15 @@ build/
 .ruff_cache/
 .coverage
 htmlcov/
-# built graphs and vector stores are derived data, never committed
-.connectomekg/
+# built graphs and vector stores are derived data, never committed; the
+# snapshots beside them are small metric records and are tracked
+.connectomekg/*
+!.connectomekg/snapshots/
+# Build reports -- one is written per `connkg build` run, so routine rebuilds
+# would otherwise pile up in the diff. They are good provenance (host, versions,
+# input digests, stage timings, peak memory), so keep the ones worth keeping
+# deliberately:  git add -f reports/build_<date>.md
+reports/build_*.md
 # real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
 data/
 fafb_v783/
