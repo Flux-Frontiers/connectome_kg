@@ -1,8 +1,9 @@
 """Snapshots of a built ConnectomeKG graph, on the shared ``kg_utils`` manager.
 
-A snapshot records a graph's metrics at a point in time, with the provenance
-the shared manager captures (tool and version, git branch and tree hash,
-subject). This module follows the fleet snapshot standard: it sets
+A snapshot records a graph's metrics at a point in time. It is keyed on a
+release tag, or on a UTC timestamp between releases, never on the git tree
+hash, which the shared manager records only as provenance alongside the tool,
+its version, the branch and the subject (``corpus:<dataset id>``). This module follows the fleet snapshot standard: it sets
 ``package_name`` and supplies connectome metrics through ``_domain_metrics``,
 and overrides nothing else. Saving, keying, listing, diffing and pruning are
 the base class's.
@@ -13,9 +14,9 @@ Usage
 -----
 >>> from connectomekg.snapshots import SnapshotManager
 >>> mgr = SnapshotManager(".connectomekg/snapshots", db_path=".connectomekg/graph.sqlite")
->>> snap = mgr.capture(graph_stats_dict=stats, subject="dataset:fafb783",
+>>> snap = mgr.capture(graph_stats_dict=stats, key="0.2.0", subject="corpus:fafb783",
 ...                    hotspots=mgr.hub_neurons())
->>> mgr.save_snapshot(snap)
+>>> mgr.save_snapshot(snap, force=True)
 """
 
 from __future__ import annotations

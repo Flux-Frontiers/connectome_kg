@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   graph on the shared `kg_utils` manager, following the fleet snapshot
   standard: the subclass sets `package_name` and adds the dataset figures,
   per-layer neuron coverage and hub neurons, and overrides nothing else.
+  `snapshot save [OPTIONS] VERSION` keys on the release tag, or on a UTC
+  timestamp when it is omitted, never on the git tree hash, which is recorded
+  only as provenance. The subject is `corpus:<dataset id>` (`corpus:fafb783`),
+  since the graph measures a connectome release rather than this package's
+  code; the repo's release skill spells that out for the release snapshot.
   They live in `.connectomekg/snapshots/`, now tracked while the rest of
   `.connectomekg/` stays ignored.
 

@@ -1,9 +1,11 @@
 """``connkg snapshot`` -- save, list, show, diff and prune graph snapshots.
 
 Snapshots live in ``<root>/.connectomekg/snapshots/`` and are tracked in git.
-A snapshot is keyed on the VERSION given to ``save``, or on a UTC timestamp
-when none is given; the git tree hash is recorded as provenance, not used as
-the key.
+``save`` follows the fleet CLI contract, ``snapshot save [OPTIONS] VERSION``:
+the snapshot is keyed on VERSION (the release tag), or on a UTC timestamp when
+it is omitted. The git tree hash is recorded as provenance and is never the
+key. The subject is ``corpus:<dataset id>``, because the graph measures a
+connectome release, not this package's code.
 """
 
 from __future__ import annotations
@@ -31,15 +33,31 @@ def snapshot() -> None:
 
 
 @snapshot.command("save")
-@click.argument("version", default="", required=False)
-@click.option("--subject", default="", help="What was measured (default: dataset:<dataset id>).")
-@click.option("--force", is_flag=True, help="Write a new entry even if nothing changed.")
+@click.argument("version", metavar="VERSION", default="", required=False)
+@click.option(
+    "--subject",
+    default=None,
+    metavar="TEXT",
+    help=(
+        "What was measured (default: corpus:<dataset id>, e.g. corpus:fafb783). "
+        "Use repo:connectome-kg only for a snapshot of the package's own code."
+    ),
+)
+@click.option("--force", is_flag=True, help="Write a new entry even if metrics are unchanged.")
 @click.pass_context
-def save(ctx: click.Context, version: str, subject: str, force: bool) -> None:
+def save(ctx: click.Context, version: str, subject: str | None, force: bool) -> None:
     """Capture the built graph's metrics as a snapshot.
 
-    Pass VERSION (a release tag) to key the snapshot on it; omit it to key on a
-    UTC timestamp.
+    The snapshot is keyed on VERSION. **Pass it explicitly at release time**,
+    with --force so an unchanged graph does not replace the previous release's
+    entry. Omitting VERSION keys on a UTC timestamp, which is right between
+    releases: the graph changes when a release is rebuilt, not when the repo is
+    tagged. The git tree hash is recorded as provenance and is never the key.
+    \f
+
+    :param version: Snapshot key; a UTC timestamp when omitted.
+    :param subject: What was measured; defaults to ``corpus:<dataset id>``.
+    :param force: Always create a new manifest entry.
     """
     mgr = _manager(ctx)
     if mgr.db_path is None or not mgr.db_path.exists():
@@ -48,20 +66,20 @@ def save(ctx: click.Context, version: str, subject: str, force: bool) -> None:
         stats = kg.store.stats()
         row = kg.store.con.execute("SELECT qualname FROM nodes WHERE kind='dataset'").fetchone()
     snap = mgr.capture(
-        version=version or None,
         graph_stats_dict=stats,
         hotspots=mgr.hub_neurons(),
         key=version,
-        subject=subject or f"dataset:{row[0] if row else 'unknown'}",
+        subject=subject or f"corpus:{row[0] if row else 'unknown'}",
     )
-    path = mgr.save_snapshot(snap, force=force)
+    try:
+        path = mgr.save_snapshot(snap, force=force)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
     m = snap.metrics
     click.echo(f"saved {path}")
     click.echo(f"  key      {snap.key}")
     click.echo(f"  subject  {snap.subject}")
-    click.echo(
-        f"  tool     {snap.tool} {snap.tool_version}, {snap.branch} tree {snap.tree_hash[:10]}"
-    )
+    click.echo(f"  tool     {snap.tool} {snap.tool_version}")
     click.echo(f"  nodes    {m.get('total_nodes', 0):,}   edges {m.get('total_edges', 0):,}")
 
 
