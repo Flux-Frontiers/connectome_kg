@@ -31,28 +31,12 @@ from typing import TYPE_CHECKING, Any, Final
 import plotly.graph_objects as go
 from kg_utils.viz import GraphTheme, KindStyle, TooltipRow, TooltipSpec, build_graph_html
 
+from connectomekg.colors import SIGN_COLOR, SUPER_CLASS_COLOR
+from connectomekg.colors import UNKNOWN_COLOR as _UNKNOWN_COLOR
 from connectomekg.schema import NT_SIGN
 
 if TYPE_CHECKING:
     from connectomekg.module import ConnectomeKG
-
-#: Colour per super class. Okabe-Ito first, for the classes most types belong to.
-SUPER_CLASS_COLOR: Final[dict[str, str]] = {
-    "central": "#0072B2",
-    "optic": "#009E73",
-    "visual_projection": "#56B4E9",
-    "visual_centrifugal": "#CC79A7",
-    "sensory": "#E69F00",
-    "sensory_ascending": "#F0E442",
-    "ascending": "#D55E00",
-    "descending": "#882255",
-    "motor": "#332288",
-    "endocrine": "#999933",
-}
-_UNKNOWN_COLOR: Final = "#9AA3AB"
-
-#: Edge colour per transmitter sign: excitatory warm, inhibitory cool, unknown grey.
-SIGN_COLOR: Final[dict[int, str]] = {1: "#C8553D", -1: "#2E6F9E", 0: "#9AA3AB"}
 
 
 def _super_class(node: Mapping[str, Any]) -> str:

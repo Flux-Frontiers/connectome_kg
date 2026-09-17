@@ -28,6 +28,8 @@ __all__ = [
     "MAX_MAX_NODES",
     "MAX_MIN_SYN",
     "MAX_QUERY_LEN",
+    "MAX_SCENE_NEURONS",
+    "MAX_SKELETON_STEP",
     "bounded_int",
     "normalize_node_id",
     "normalize_spec",
@@ -49,6 +51,14 @@ MAX_MIN_SYN = 10_000
 MAX_QUERY_LEN = 500
 #: A ``label:`` regex. Label texts are short; a long pattern buys nothing.
 MAX_LABEL_PATTERN = 100
+#: Neurons drawn in one viz3d scene (connkg quilt / connkg viz3d). A hop-2
+#: cone of LC4 alone resolves to 5,998 neurons -- far beyond what reads or
+#: renders as individual skeletons.
+MAX_SCENE_NEURONS = 500
+#: Skeleton simplification stride (connectomekg.skeletons.segments' ``step``).
+#: Above this a "simplified" skeleton would drop nearly everything but its
+#: structural points.
+MAX_SKELETON_STEP = 50
 
 
 def bounded_int(name: str, value: int, minimum: int, maximum: int) -> int:
