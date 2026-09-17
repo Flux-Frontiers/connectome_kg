@@ -53,6 +53,11 @@ pip install -e ".[semantic]"      # or: poetry install --with dev --extras seman
 
 The `semantic` extra adds the embedding model for `connkg query`. Without it, everything except semantic search works; pass `--no-index` to `build`.
 
+The `viz3d` extra (`pip install -e ".[viz3d]"`) adds PyVista, PyQt5, pyvistaqt
+and `quiltwright` for `connkg quilt` and `connkg viz3d`: real-geometry 3-D
+views of the whole brain plus a circuit's traced skeletons, rendered to a
+Looking Glass quilt or opened in an interactive viewer.
+
 No install at all also works from the clone root: `PYTHONPATH=src python -m connectomekg <arguments>`. With Poetry, prefix commands with `poetry run`.
 
 ### Try it on a synthetic connectome
@@ -142,6 +147,8 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
+| **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |
+| **Open a circuit inside the whole brain in an interactive 3-D viewer** | `connkg viz3d SPEC [SPEC...]` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR` |
 

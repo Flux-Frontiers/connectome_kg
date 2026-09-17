@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg quilt` and `connkg viz3d`, real-geometry 3-D views of a connectome**
+  (the new `viz3d` extra). Unlike the fleet's other viz3d consumers, this
+  graph already has space: view A is every neuron's marked point as a dim
+  whole-brain context cloud, coloured by super class or transmitter sign; view
+  B is a spec's circuit -- neurons resolved via `ConnectomeKG.neurons_of`,
+  drawn from their traced skeletons (read from `fafb_v783/sk_lod1_783_healed/`
+  by the new `connectomekg.skeletons`, NumPy only) at full brightness, one
+  line mesh per cell type plus a soma sphere; a neuron with no skeleton file
+  falls back to a larger sphere at its marked point, counted separately.
+  `connectomekg.scene.build_brain_scene` composes both views into a
+  caller-supplied `pv.Plotter`, framed with `kg_utils.viz3d.frame_tree` and
+  coloured deterministically per cell type via `seed_from_key`; it is Qt-free,
+  so `connkg quilt` (headless, `quiltwright.render_quilt`/`save_quilt`,
+  printing `depth_report` every run, optional `--cast`) and `connkg viz3d`
+  (an interactive PyQt5/pyvistaqt viewer with one Cast-to-Looking-Glass
+  toolbar action) are two callers of one function. A circuit is capped at
+  `MAX_SCENE_NEURONS` (500) neurons; `--skeleton-step` simplifies a skeleton's
+  point count while preserving its branch topology, bounded by
+  `MAX_SKELETON_STEP` (50). `renders/` follows quiltwright's own layout
+  (`stills/`, `quilts/`, `views/`, `reports/`) rather than a flat directory.
+
 - **`connkg viz`, 2-D views of a cell type's local circuit** (the new `viz`
   extra). `--view network` draws the type with its strongest input and output
   partner types through the shared `kg_utils.viz` renderer: nodes coloured by

@@ -59,6 +59,7 @@ few thousand neurons means a synthetic fixture was built there instead.
 | fuzzy concept ("giant fibre escape") | `connkg query`, only if the vector index exists; see below |
 | overall counts, hubs, coverage | `connkg --root . stats`, `connkg --root . analyze` |
 | a picture of a type's local circuit | `connkg --root . viz LC4 --view network\|partners -o out.html` (needs the `viz` extra; about a second on FAFB) |
+| a real-geometry 3-D view of a circuit inside the whole brain | `connkg --root . quilt SPEC [SPEC...]` (Looking Glass quilt) or `connkg --root . viz3d SPEC [SPEC...]` (interactive viewer); needs the `viz3d` extra and reads skeletons from `fafb_v783/sk_lod1_783_healed/` -- see below |
 
 **Specs** (the `--from`, `--to` and `SPEC` arguments) accept a cell type name
 (exact, case-sensitive: `LC4`, `KCg-m`, `DA1_lPN`), a root id
@@ -161,6 +162,33 @@ poetry run connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-
   repo's `.claude/skills/release/SKILL.md` describes.
   `.connectomekg/snapshots/` is tracked in git.
 
+## 3-D views
+
+`connkg quilt SPEC [SPEC...]` and `connkg viz3d SPEC [SPEC...]` need the
+`viz3d` extra (`pip install "connectome-kg[viz3d]"`) and draw two things at
+once: every neuron's marked point as a dim whole-brain context cloud, plus
+the given spec(s)' circuit at full brightness, drawn from **real traced
+skeletons** read from `fafb_v783/sk_lod1_783_healed/<root_id>.swc`. Without
+`--data-dir` (default `fafb_v783`) or a missing skeleton file, a neuron falls
+back to a larger sphere at its marked point instead of a traced shape.
+
+- **Do not start a real quilt render, cast, or the viewer yourself.** These
+  are the maintainer's to run and watch, like a real build. Give the command;
+  do not run `connkg quilt`, `connkg viz3d`, or anything with `--cast`.
+- A circuit is capped at `MAX_SCENE_NEURONS` (500) neurons -- a hop-2 cone of
+  a large type can resolve to thousands, so narrow the spec(s) rather than
+  expecting the cap to be raised.
+- `--skeleton-step` (default 4, capped at `MAX_SKELETON_STEP` = 50)
+  simplifies a skeleton's point count for rendering; step 1 draws every
+  traced point.
+- Output lands under `renders/` (`stills/` for a `--preview` PNG, `quilts/`
+  for the quilt itself), none of it committed.
+
+```bash
+poetry run connkg --root . quilt DNp01 --preview renders/stills/dnp01.png
+poetry run connkg --root . viz3d LC4 DNp01
+```
+
 ## MCP server
 
 `connkg-mcp --root <dir>` serves the graph over stdio (`--transport sse` for
@@ -190,5 +218,10 @@ Do not claim or try these; they are planned, not built:
 
 - KGRAG registration or federated queries across KGs
 - other datasets (hemibrain, MANC, BANC) or a neuPrint reader
-- activity simulation, and soma positions or morphology from the skeletons
-  (neuron `x`/`y`/`z` is a marked point, not necessarily the soma)
+- activity simulation, and neuropil meshes (no mesh source in the download;
+  a neuropil is visible only as the density of the 3-D context cloud)
+- soma positions in the graph itself: neuron `x`/`y`/`z` metadata is a marked
+  point, not necessarily the soma. `connkg quilt`/`viz3d` read each neuron's
+  real soma from its skeleton file when one exists (falling back to the
+  skeleton's root point otherwise); nothing has back-filled the soma into the
+  graph's own `x`/`y`/`z` metadata
