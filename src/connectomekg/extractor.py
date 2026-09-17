@@ -1,4 +1,4 @@
-"""Turn :class:`ConnectomeTables` into the section 4 graph of the plan.
+"""Turn :class:`ConnectomeTables` into the graph (README, "What is in the graph").
 
 Node kinds: dataset, taxon, hemilineage, neuropil, cell_type, neuron, label.
 Edge kinds: CONTAINS, MEMBER_OF, INNERVATES, INSTANCE_OF, IN_NEUROPIL, LABELED,

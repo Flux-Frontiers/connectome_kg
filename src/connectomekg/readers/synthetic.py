@@ -1,8 +1,7 @@
 """A seeded synthetic connectome shaped like FlyWire, for tests and demos.
 
 Population shares, degree tails, synapse-count histogram, transmitter shares and
-reciprocity follow the statistics measured on the real v783 connectivity in
-``docs/FLY_CONNECTOME_MODEL_PLAN.md`` section 4. On top of the sampled wiring a
+reciprocity follow statistics measured on the real v783 connectivity. On top of the sampled wiring a
 few named circuits are planted with the real cell-type names, so the classic
 queries have something to find:
 

@@ -24,6 +24,15 @@ skeletons, inside the FAFB v783 context cloud.*
 
 *Flow view: the strongest 100 of 5,786 directed neuropil pairs.*
 
+!!! note "Data credit and licence"
+    The images on this page are renders of the
+    [FlyWire](https://flywire.ai) FAFB v783 connectome: Dorkenwald, S. et al.
+    (2024), *Nature* 634, 124-138, and Schlegel, P. et al. (2024), *Nature*
+    634, 139-152. The data is licensed under
+    [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+    The renders are adaptations of it, shared under the same licence, not
+    under the software's Elastic License 2.0.
+
 ## Quilts and Looking Glass displays
 
 A Looking Glass display shows a 3-D scene without glasses. Lenticular optics

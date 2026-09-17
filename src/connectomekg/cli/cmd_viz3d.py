@@ -10,8 +10,8 @@ with the extra -- the same ``importlib.util.find_spec`` + install-hint
 pattern as ``cli/cmd_viz.py``.
 
 Output layout under ``renders/`` follows quiltwright's own
-(kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md section 4): ``stills/`` for working
-PNGs (``--preview``), ``quilts/`` for Looking Glass quilts, ``views/``
+(see ``renders/README.md``): ``stills/`` for working PNGs (``--still``,
+``--preview``), ``quilts/`` for Looking Glass quilts, ``views/``
 reserved for per-view captures, ``reports/`` reserved for future per-render
 provenance records.
 """

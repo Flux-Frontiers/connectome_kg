@@ -7,8 +7,7 @@
 # Build system : Poetry 2.x with PEP 621 [project] table
 #
 # Extras are user-facing features; dev tooling is a Poetry group, so it never
-# ships in the wheel and cannot be pip-installed. See FLEET_STANDARDS.md in
-# kgrag_priv.
+# ships in the wheel and cannot be pip-installed.
 #
 # Quick install (pip)
 # -------------------
@@ -93,9 +92,8 @@ viz = [
 # skeletons.py (SWC parsing, NumPy only), scene.py (Qt-free scene composition,
 # needs PyVista) and viz3d.py (the Qt viewer). Pulled via
 # kgmodule-utils[viz3d-render,viz3d-qt] rather than hand-listing pyvista/PyQt5,
-# per kgrag_priv/docs/FLEET_STANDARDS.md (diary_kg's own viz3d extra went dead
-# the other way: hand-listing the render stack with no dependency on the SDK
-# extra that actually holds it).
+# so the render stack stays pinned where the SDK that uses it pins it (a repo
+# that hand-lists it drifts from the SDK extra that actually holds it).
 #
 # pyvistaqt IS hand-listed, deliberately: checked against 0.21.0's own wheel
 # metadata, kgmodule-utils[viz3d-qt] pulls PyQt5 and pyvista but not

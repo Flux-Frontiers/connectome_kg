@@ -22,7 +22,7 @@ fafb_v783/
 uv.lock
 
 # === Rendered output (renders/), following quiltwright's layout -- see
-# renders/README.md and kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md section 4.
+# renders/README.md and docs/rendering.md.
 # stills/ and views/ are local scratch (a working --preview PNG, per-view
 # captures); quilts/ holds Looking Glass quilts (tens of MB each); reports/
 # is reserved for future per-render provenance records and stays tracked --

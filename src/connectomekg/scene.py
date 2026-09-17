@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 #: World units per nanometre's worth of scale: 1 world unit per 100,000 nm,
 #: so the brain (about 0.81 x 0.39 x 0.28 mm) is roughly 8 x 4 x 3 units --
 #: inside the depth budget ``quiltwright.depth_report`` checks. See
-#: kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md section 5.
+#: docs/rendering.md, "World coordinates".
 NM_PER_WORLD_UNIT: Final = 100_000.0
 
 _SQL_NEURON_XYZ = (
@@ -71,7 +71,7 @@ _SQL_NEURON_XYZ = (
 #: display and in a quilt tile, while a world-sized glyph scales with the view.
 #: Its colours are lightened toward white so they stand off the grey
 #: background -- lightened rather than made transparent, since alpha ghosts in
-#: light-field renders (plan section 3.A).
+#: light-field renders.
 _CONTEXT_RADIUS: Final = 0.005
 _CONTEXT_LIGHTEN: Final = 0.35
 #: Darkening for idle neuropil spheres in the flow view.
@@ -258,8 +258,8 @@ class NeuropilFlow:
 
     Flow from neuropil A to B is carried by neurons: each neuron's output
     synapses in B, apportioned by the share of its input synapses that lie in
-    A, summed over neurons, with A = B excluded. See
-    kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md section 3.C.
+    A, summed over neurons, with A = B excluded. See docs/rendering.md,
+    "What flow measures".
 
     :param names: Neuropil abbreviations, e.g. ``"ME_R"``, sorted.
     :param bases: Each neuropil's side-free base, e.g. ``"ME"``, same order.

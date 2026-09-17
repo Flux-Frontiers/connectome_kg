@@ -13,6 +13,15 @@ connected neuron pairs.
 
 ![Neuropil flow across the FAFB v783 brain](images/flow_all.png)
 
+!!! note "Data credit and licence"
+    The image above is a render of the
+    [FlyWire](https://flywire.ai) FAFB v783 connectome: Dorkenwald, S. et al.
+    (2024), *Nature* 634, 124-138, and Schlegel, P. et al. (2024), *Nature*
+    634, 139-152. The data is licensed under
+    [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+    The render is an adaptation of it, shared under the same licence, not
+    under the software's Elastic License 2.0.
+
 ## Where to start
 
 | page | covers |

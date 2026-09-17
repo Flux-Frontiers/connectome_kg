@@ -224,7 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial import from the `kgrag_priv/connectome_kg` prototype: normalised
+- Initial import from the private KGRAG fleet prototype: normalised
   connectome tables, the FlyWire FAFB v783 release manifest with checksums,
   the Codex reader, a seeded synthetic connectome with planted feeding,
   escape and grooming circuits, the extractor emitting neurons, cell types,

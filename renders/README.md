@@ -2,12 +2,12 @@
 
 Output, not source. Everything here regenerates from `.connectomekg/graph.sqlite`
 plus `connkg quilt` / `connkg viz3d` -- see
-kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md. Layout follows quiltwright's own
-`renders/` (`~/repos/quiltwright/renders/README.md`).
+[docs/rendering.md](../docs/rendering.md). Layout follows
+[quiltwright](https://github.com/Flux-Frontiers/quiltwright)'s own `renders/`.
 
 | Directory | Contents | Kept |
 |---|---|---|
-| `stills/` | Working renders: `connkg quilt --preview` PNGs, one-off orientation checks | local scratch, never committed |
+| `stills/` | Working renders: `connkg quilt --still` images and `--preview` PNGs | local scratch, never committed |
 | `quilts/` | Looking Glass quilts, `connkg quilt --out` default | never committed -- one 16" landscape quilt is tens of MB; regenerate with `connkg quilt` |
 | `views/` | Per-view captures or test frames, if produced | local scratch, never committed |
 | `reports/` | Reserved for a per-render provenance record (scene, commit, camera, counts) | tracked, once a report writer exists -- none is built yet |
