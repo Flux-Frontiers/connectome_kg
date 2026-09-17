@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,8 @@ class ConnectomeKG(KGModule):
     :param connections_file: Name of the connections table inside ``data_dir``;
         omit it to auto-detect whichever one the download contains.
     :param tables: Pre-loaded tables; overrides ``source`` and ``data_dir``.
+    :param progress: Called with a short message at each extraction stage;
+        ``None`` (the default) keeps the build silent.
     """
 
     _default_dir = ".connectomekg"
@@ -59,6 +62,7 @@ class ConnectomeKG(KGModule):
         min_syn: int = 1,
         connections_file: str | None = None,
         tables: ConnectomeTables | None = None,
+        progress: Callable[[str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(repo_root, **kwargs)
@@ -71,7 +75,12 @@ class ConnectomeKG(KGModule):
         self.min_syn = min_syn
         self.connections_file = connections_file
         self._tables = tables
+        self.progress = progress
         self._graph: SynapseGraph | None = None
+
+    def __enter__(self) -> ConnectomeKG:
+        # KGModule.__enter__ is typed as the base class; narrow it for callers.
+        return self
 
     # ------------------------------------------------------------ contract
     def kind(self) -> str:
@@ -99,7 +108,12 @@ class ConnectomeKG(KGModule):
     def make_extractor(self) -> KGExtractor:
         return ConnectomeExtractor(
             self.repo_root,
-            {"tables": self.tables(), "embed_neurons": self.embed_neurons, "min_syn": self.min_syn},
+            {
+                "tables": self.tables(),
+                "embed_neurons": self.embed_neurons,
+                "min_syn": self.min_syn,
+                "progress": self.progress,
+            },
         )
 
     def _kind_priority(self, kind: str) -> int:

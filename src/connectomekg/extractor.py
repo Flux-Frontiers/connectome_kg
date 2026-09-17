@@ -11,7 +11,7 @@ Edge weight is not persisted by the store, so the synapse count lives in
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,8 @@ EDGE_KINDS = (
 )
 #: Relations a query expands along by default: structure plus the type-level wiring.
 DEFAULT_RELS = ("CONTAINS", "INSTANCE_OF", "INNERVATES", "TYPE_SYNAPSES_TO", "LABELED")
+#: Pairs between progress reports in the synapse loop, which dominates extraction.
+_PROGRESS_EVERY = 250_000
 
 
 def _s(v: Any) -> str:
@@ -61,7 +63,8 @@ class ConnectomeExtractor(KGExtractor):
     :param repo_path: Corpus root (unused for ids; kept for the SDK contract).
     :param config: ``tables`` (a :class:`ConnectomeTables`), optional
         ``embed_neurons`` (bool, default False), ``min_syn`` (int, default 1),
-        ``top_k`` (int, partners listed per type, default 5).
+        ``top_k`` (int, partners listed per type, default 5), ``progress``
+        (a callable taking one message string, default None for silence).
     """
 
     def __init__(self, repo_path: Path, config: dict[str, Any] | None = None) -> None:
@@ -70,6 +73,7 @@ class ConnectomeExtractor(KGExtractor):
         self.embed_neurons: bool = bool(self.config.get("embed_neurons", False))
         self.min_syn: int = int(self.config.get("min_syn", 1))
         self.top_k: int = int(self.config.get("top_k", 5))
+        self.progress: Callable[[str], None] | None = self.config.get("progress")
         self.prefix = f"connectome:{self.tables.dataset.dataset_id}"
 
     # ------------------------------------------------------------------ ids
@@ -127,6 +131,7 @@ class ConnectomeExtractor(KGExtractor):
         if self.min_syn > 1:
             con = con[con["syn_count"] >= self.min_syn]
 
+        self._say(f"aggregating {len(con):,} connection rows over {len(neurons):,} neurons")
         sign = t.sign_of()
         neurons["sign"] = neurons["root_id"].map(sign).fillna(0).astype(int)
         for col in ("cell_type", "super_class", "class", "hemilineage", "side", "nt_type"):
@@ -163,6 +168,7 @@ class ConnectomeExtractor(KGExtractor):
             labels_by_neuron.setdefault(int(rid), []).append(str(text))
 
         # ---------------------------------------------------------- dataset
+        self._say("taxa, hemilineages, neuropils")
         yield NodeSpec(
             node_id=self.dataset_id(),
             kind="dataset",
@@ -266,6 +272,7 @@ class ConnectomeExtractor(KGExtractor):
             )
 
         # -------------------------------------------------------- cell types
+        self._say("cell types")
         type_of = dict(zip(neurons["root_id"], neurons["cell_type"], strict=True))
         pairs_t = pairs.reset_index()
         pairs_t["pre_t"] = pairs_t["pre"].map(type_of)
@@ -368,6 +375,7 @@ class ConnectomeExtractor(KGExtractor):
             )
 
         # ----------------------------------------------------------- labels
+        self._say(f"labels ({len(t.labels):,})")
         seen_labels: set[str] = set()
         for rid, text, user, aff, date in zip(
             t.labels["root_id"],
@@ -397,6 +405,7 @@ class ConnectomeExtractor(KGExtractor):
             )
 
         # ---------------------------------------------------------- neurons
+        self._say(f"neurons ({len(neurons):,})")
         for row in neurons.to_dict("records"):
             rid = int(row["root_id"])
             nid = self.neuron_id(rid)
@@ -446,7 +455,11 @@ class ConnectomeExtractor(KGExtractor):
 
         # ---------------------------------------------------------- synapses
         sign_d = dict(zip(neurons["root_id"], neurons["sign"], strict=True))
-        for (pre, post), row in pairs.iterrows():
+        n_pairs = len(pairs)
+        self._say(f"synaptic pairs ({n_pairs:,})")
+        for i, ((pre, post), row) in enumerate(pairs.iterrows(), 1):
+            if i % _PROGRESS_EVERY == 0:
+                self._say(f"  {i:,} / {n_pairs:,} pairs")
             s = int(row["syn_count"])
             yield EdgeSpec(
                 self.neuron_id(int(pre)),
@@ -463,6 +476,11 @@ class ConnectomeExtractor(KGExtractor):
 
         for nid in top_level:
             yield EdgeSpec(nid, self.dataset_id(), "IN_DATASET")
+        self._say("extraction done; writing to SQLite (no progress from here)")
+
+    def _say(self, message: str) -> None:
+        if self.progress is not None:
+            self.progress(message)
 
 
 def _float_or_none(v: Any) -> float | None:
