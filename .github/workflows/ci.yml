@@ -110,6 +110,70 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
+  viz:
+    name: Test viz extras (Python 3.12)
+    runs-on: ubuntu-latest
+    # The test jobs above install no extras, so every test that needs plotly,
+    # PyVista, quiltwright or PyQt5 skips there: the 2-D charts, scene
+    # composition (circuit, flow, floor, camera) and the quilt/still CLI paths
+    # would never run in CI. This job installs the viz and viz3d extras,
+    # renders off-screen on a virtual display, and fails if any of those
+    # packages is missing rather than letting the tests skip.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # VTK needs an OpenGL context: this starts Xvfb with Mesa and exports
+      # DISPLAY for the steps that follow.
+      - name: Set up a headless display
+        uses: pyvista/setup-headless-display-action@v4
+
+      # Libraries PyQt5's QtWidgets links against, for the viewer import test.
+      - name: Install Qt runtime libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libdbus-1-3
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: viz-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev --extras "viz viz3d"
+
+      # importorskip turns a missing package into a skip; here that would be
+      # a silent pass, so check every package the gated tests need first.
+      - name: Check the extras import
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          poetry run python -c "import plotly, pyvis, pyvista, pyvistaqt, PyQt5.QtWidgets, quiltwright; print('viz and viz3d extras import')"
+
+      - name: Run the extra-gated tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -o pipefail  # the default bash -e would let tee hide a pytest failure
+          poetry run pytest tests/test_viz.py tests/test_scene.py tests/test_cli_viz3d.py \
+            tests/test_viz3d.py -rs | tee /tmp/viz-tests.out
+          if grep -q "SKIPPED" /tmp/viz-tests.out; then
+            echo "a test skipped although the extras are installed"; exit 1
+          fi
+
   wheel:
     name: Installed CLI
     runs-on: ubuntu-latest
