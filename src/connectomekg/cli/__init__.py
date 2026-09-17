@@ -11,6 +11,7 @@ from connectomekg.cli import (  # noqa: F401
     cmd_query,
     cmd_snapshot,
     cmd_viz,
+    cmd_viz3d,
 )
 from connectomekg.cli.group import cli
 
