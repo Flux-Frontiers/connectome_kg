@@ -57,6 +57,9 @@ def test_help(command):
 
 
 def test_quilt_unknown_preset_is_a_usage_error(kg):
+    # The preset is checked after the extra's own import check.
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
     result = CliRunner().invoke(
         cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--preset", "nope"]
     )
@@ -65,6 +68,8 @@ def test_quilt_unknown_preset_is_a_usage_error(kg):
 
 
 def test_quilt_over_the_cap_is_a_usage_error(kg, monkeypatch):
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
     monkeypatch.setattr(scene_mod, "MAX_SCENE_NEURONS", 1)
     result = CliRunner().invoke(cli, ["--root", str(kg.repo_root), "quilt", "LC4"])
     assert result.exit_code == 2, result.output

@@ -66,8 +66,12 @@ jobs:
           path: .venv
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
+      # The viz and viz3d extras, so ty checks the render code against the
+      # same PyVista and plotly types a developer's environment has. Without
+      # them those imports are unresolved, and suppressions that PyVista's
+      # decorated methods need locally are reported as unused here.
       - name: Install dependencies
-        run: poetry install --no-interaction --with dev
+        run: poetry install --no-interaction --with dev --extras "viz viz3d"
 
       - name: Run ty
         run: poetry run ty check src/
@@ -122,7 +126,9 @@ jobs:
     #      proves the code imports; only this proves it runs. --no-index keeps
     #      it free of the semantic extra and any model download.
     #   3. every packaged submodule imports, including ones no entry point or
-    #      build path reaches.
+    #      build path reaches. The two modules that exist only to serve an
+    #      extra (viz, viz3d) may fail on a missing third-party module and
+    #      nothing else; scene.py and skeletons.py must import core-only.
     steps:
       - uses: actions/checkout@v5
 
@@ -195,10 +201,19 @@ jobs:
           if not names:
               sys.exit("connectomekg has no submodules -- the wheel is missing its package body")
 
+          # Modules that import their extra at module scope, and the extra.
+          extra_only = {"connectomekg.viz": "viz", "connectomekg.viz3d": "viz3d"}
+
           failed = []
           for name in sorted(names):
               try:
                   importlib.import_module(name)
+              except ModuleNotFoundError as exc:
+                  if name in extra_only and not (exc.name or "").startswith("connectomekg"):
+                      print(f"  skip  {name} (needs the {extra_only[name]} extra: {exc.name})")
+                      continue
+                  failed.append(name)
+                  print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
               except Exception as exc:
                   failed.append(name)
                   print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
