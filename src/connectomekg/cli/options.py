@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import click
@@ -58,6 +59,19 @@ def source_options[F: Callable[..., Any]](fn: F) -> F:
     for option in reversed(_SOURCE_OPTIONS):
         fn = option(fn)
     return fn
+
+
+@contextmanager
+def usage_errors() -> Iterator[None]:
+    """Report ``ConnectomeKG``'s boundary validation as a usage error, not a traceback.
+
+    Validation lives in the module's methods so the CLI and the MCP server share
+    it; this is the CLI's translation of the ``ValueError`` those methods raise.
+    """
+    try:
+        yield
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
 
 
 def open_kg(

@@ -63,6 +63,11 @@ classifiers = [
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
+    # Upper-bounded: mcp 2.0 removed the bundled `mcp.server.fastmcp` module (it
+    # became the standalone fastmcp package). mcp_server.py imports FastMCP from
+    # mcp, so an unbounded floor would let a clean install break `connkg-mcp` at
+    # import time. Lift only alongside a port to fastmcp.
+    "mcp>=1.0.0,<2",
     # Floor is the release this prototype was written against.
     "kgmodule-utils>=0.21.0",
     "numpy>=1.24.0",
@@ -79,7 +84,8 @@ Homepage   = "https://github.com/Flux-Frontiers/connectome_kg"
 Repository = "https://github.com/Flux-Frontiers/connectome_kg"
 
 [project.scripts]
-connkg = "connectomekg.cli:cli"
+connkg     = "connectomekg.cli:cli"
+connkg-mcp = "connectomekg.mcp_server:main"
 
 # ---------------------------------------------------------------------------
 # Dev tooling (Poetry group, not a PEP 621 extra)

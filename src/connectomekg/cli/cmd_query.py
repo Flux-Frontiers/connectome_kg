@@ -8,7 +8,7 @@ from typing import Any
 import click
 
 from connectomekg.cli.group import cli
-from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options
+from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, usage_errors
 
 
 @cli.command("query")
@@ -19,8 +19,12 @@ from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options
 @click.pass_context
 def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
     """Semantic query with graph expansion."""
-    with open_kg(ctx.obj["root"], **source) as kg:
-        kg.query(q, k=k, hop=hop).print_summary()
+    with open_kg(ctx.obj["root"], **source) as kg, usage_errors():
+        try:
+            result = kg.query(q, k=k, hop=hop)
+        except FileNotFoundError as exc:
+            raise click.ClickException(str(exc)) from exc
+        result.print_summary()
 
 
 @cli.command("path")
@@ -31,7 +35,8 @@ def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
 def path(ctx: click.Context, src: str, dst: str, **source: Any) -> None:
     """Strongest synaptic path between two specs."""
     with open_kg(ctx.obj["root"], **source) as kg:
-        res = kg.strongest_path(src, dst)
+        with usage_errors():
+            res = kg.strongest_path(src, dst)
         if res is None:
             click.echo(f"no path from {src} to {dst}")
             sys.exit(1)
@@ -65,7 +70,8 @@ def cone(
 ) -> None:
     """Downstream or upstream cone of a spec."""
     with open_kg(ctx.obj["root"], **source) as kg:
-        reached = kg.cone(spec, hops=hops, min_syn=source["min_syn"], direction=direction)
+        with usage_errors():
+            reached = kg.cone(spec, hops=hops, min_syn=source["min_syn"], direction=direction)
         by_hop: dict[int, list[str]] = {}
         for nid, h in reached.items():
             n = kg.store.node(nid) or {}

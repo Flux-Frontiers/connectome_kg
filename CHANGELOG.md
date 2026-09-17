@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg-mcp`, an MCP server for the graph.** Fourteen tools over stdio or
+  SSE: `graph_stats`, `find_nodes`, `get_node`, `node_edges`, `neurons_of`,
+  `type_partners`, `strongest_path`, `cone`, `query_connectome`,
+  `pack_connectome`, `analyze_connectome` and `snapshot_list/show/diff`. It
+  follows the fleet MCP standards as genealogy_kg and swift_kg implement them:
+  a `FastMCP` `lifespan` hook closes the graph on shutdown, and every argument
+  is validated in `ConnectomeKG` itself (new `validation.py`), so the CLI, the
+  server and the Python API share one set of bounds. Out-of-range values are
+  rejected with a message naming the range, never clamped; a `label:` spec's
+  regex is length-capped and must compile before it runs over the labels; and
+  specs are resolved before the synapse graph loads, so a bad argument costs
+  nothing. `query`/`pack` without a vector index now say so instead of failing
+  inside the SDK. Tests drive the real server through `mcp.shared.memory`.
+  `mcp>=1.0.0,<2` is a direct dependency.
+
 - **A provenance report for every build.** `connkg build` writes
   `reports/build_<timestamp>.md`, following gutenberg_kg's ingest reports:
   package versions and git commit, host and Python, the options, every input

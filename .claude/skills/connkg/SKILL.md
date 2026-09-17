@@ -12,8 +12,8 @@ description: >
   sign, ontology term or labels. Also use for the connkg CLI (build, verify,
   files, fixture, stats, analyze, query, path, cone, snapshot), downloading and
   checking the Codex files, build reports, snapshots, SQL against
-  .connectomekg/graph.sqlite, the synthetic fixture, or troubleshooting
-  ConnectomeKG.
+  .connectomekg/graph.sqlite, the connkg-mcp server and its tools, the synthetic
+  fixture, or troubleshooting ConnectomeKG.
 ---
 
 # ConnectomeKG (connkg)
@@ -160,11 +160,33 @@ poetry run connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-
   repo's `.claude/skills/release/SKILL.md` describes.
   `.connectomekg/snapshots/` is tracked in git.
 
+## MCP server
+
+`connkg-mcp --root <dir>` serves the graph over stdio (`--transport sse` for
+SSE). When its tools are connected, prefer them to shelling out to the CLI:
+
+| tool | use for |
+|---|---|
+| `graph_stats`, `analyze_connectome` | orientation, the Markdown report |
+| `find_nodes(name, kind, limit)` | a node whose exact name or id is unknown |
+| `get_node(node_id)`, `node_edges(node_id, rel, direction, limit)` | metadata; a neuron's neuropils, a column's neurons, a type's ontology terms |
+| `neurons_of(spec)`, `type_partners(cell_type, direction, limit)` | resolve a spec; partner types by synapses |
+| `strongest_path(source, target)`, `cone(spec, hops, min_syn, direction, limit)` | circuits |
+| `query_connectome`, `pack_connectome` | concept search, only with a vector index |
+| `snapshot_list`, `snapshot_show`, `snapshot_diff` | metric history |
+
+Arguments outside their bounds come back as tool errors naming the range
+(`k` 1-100, `hop`/`hops` 0-5, `limit`/`max_nodes` 1-500, `min_syn` 1-10000,
+text at most 500 characters, a `label:` regex at most 100 and compilable);
+fix the argument rather than retrying. Validation lives in `ConnectomeKG`
+(`connectomekg/validation.py`), so the CLI and the Python API enforce the same
+bounds. The first `strongest_path` or `cone` call in a server loads every
+synapse edge; later calls reuse it.
+
 ## Not available yet
 
 Do not claim or try these; they are planned, not built:
 
-- an MCP server (no `connkg-mcp`, no MCP tools)
 - KGRAG registration or federated queries across KGs
 - other datasets (hemibrain, MANC, BANC) or a neuPrint reader
 - activity simulation, and soma positions or morphology from the skeletons

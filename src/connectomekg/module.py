@@ -12,11 +12,23 @@ from kg_utils.extractor import KGExtractor
 from kg_utils.pipeline import KGModule
 from kg_utils.specs import QueryResult, SnippetPack
 
-from connectomekg.extractor import DEFAULT_RELS, ConnectomeExtractor
+from connectomekg.extractor import DEFAULT_RELS, EDGE_KINDS, NODE_KINDS, ConnectomeExtractor
 from connectomekg.paths import PathResult, SynapseGraph
 from connectomekg.readers.codex import read_codex
 from connectomekg.readers.synthetic import synthetic_tables
 from connectomekg.schema import FAFB_783, ConnectomeTables, DatasetInfo
+from connectomekg.validation import (
+    MAX_HOP,
+    MAX_K,
+    MAX_LIMIT,
+    MAX_MAX_NODES,
+    MAX_MIN_SYN,
+    bounded_int,
+    normalize_node_id,
+    normalize_spec,
+    require_choice,
+    require_query,
+)
 
 _KIND_PRIORITY = {
     "cell_type": 0,
@@ -123,11 +135,62 @@ class ConnectomeKG(KGModule):
     def _kind_priority(self, kind: str) -> int:
         return _KIND_PRIORITY.get(kind, 99)
 
-    def query(self, q: str, *, rels: tuple[str, ...] = DEFAULT_RELS, **kw: Any) -> QueryResult:
-        return super().query(q, rels=rels, **kw)
+    def query(
+        self,
+        q: str,
+        *,
+        k: int = 8,
+        hop: int = 1,
+        rels: tuple[str, ...] = DEFAULT_RELS,
+        **kw: Any,
+    ) -> QueryResult:
+        """Semantic query with graph expansion, validated at the boundary.
 
-    def pack(self, q: str, *, rels: tuple[str, ...] = DEFAULT_RELS, **kw: Any) -> SnippetPack:
-        return super().pack(q, rels=rels, **kw)
+        :param q: Natural-language query, at most 500 characters.
+        :param k: Seed hits, 1-100.
+        :param hop: Expansion hops, 0-5.
+        :param rels: Relations to expand along.
+        :return: Ranked nodes and edges.
+        :raises ValueError: On an out-of-range argument.
+        :raises FileNotFoundError: When the vector index has not been built.
+        """
+        q, k, hop = self._check_search(q, k, hop, kw)
+        return super().query(q, k=k, hop=hop, rels=rels, **kw)
+
+    def pack(
+        self,
+        q: str,
+        *,
+        k: int = 8,
+        hop: int = 1,
+        rels: tuple[str, ...] = DEFAULT_RELS,
+        **kw: Any,
+    ) -> SnippetPack:
+        """Semantic query returned as a Markdown pack, validated at the boundary.
+
+        :param q: Natural-language query, at most 500 characters.
+        :param k: Seed hits, 1-100.
+        :param hop: Expansion hops, 0-5.
+        :param rels: Relations to expand along.
+        :return: The pack.
+        :raises ValueError: On an out-of-range argument.
+        :raises FileNotFoundError: When the vector index has not been built.
+        """
+        q, k, hop = self._check_search(q, k, hop, kw)
+        return super().pack(q, k=k, hop=hop, rels=rels, **kw)
+
+    def _check_search(self, q: str, k: int, hop: int, kw: dict[str, Any]) -> tuple[str, int, int]:
+        q = require_query(q)
+        k = bounded_int("k", k, 1, MAX_K)
+        hop = bounded_int("hop", hop, 0, MAX_HOP)
+        if kw.get("max_nodes") is not None:
+            kw["max_nodes"] = bounded_int("max_nodes", kw["max_nodes"], 1, MAX_MAX_NODES)
+        if not Path(self.vectors_path).exists():
+            raise FileNotFoundError(
+                f"no vector index at {self.vectors_path}: semantic search needs a build "
+                "without --no-index and the semantic extra"
+            )
+        return q, k, hop
 
     # --------------------------------------------------------- navigation
     @property
@@ -143,7 +206,9 @@ class ConnectomeKG(KGModule):
         :param spec: ``"LC4"``, ``"720575940612345678"``, a ``connectome:...:n:`` id,
             or ``"label:<regex>"``.
         :return: Neuron node ids, possibly empty.
+        :raises ValueError: If the spec is empty, too long, or a bad ``label:`` pattern.
         """
+        spec = normalize_spec(spec)
         con = self.store.con
         if spec.startswith("connectome:") and ":n:" in spec:
             return [spec] if self.store.node(spec) else []
@@ -154,11 +219,22 @@ class ConnectomeKG(KGModule):
             return [r[0] for r in rows]
         if spec.startswith("label:"):
             pat = re.compile(spec[6:], re.IGNORECASE)
-            rows = con.execute(
-                "SELECT e.src, n.qualname FROM edges e JOIN nodes n ON n.id = e.dst "
-                "WHERE e.rel='LABELED'"
-            ).fetchall()
-            return sorted({src for src, text in rows if pat.search(text or "")})
+            # Match the distinct label texts first (thousands), then fetch only
+            # their edges, rather than running the pattern over every LABELED row.
+            labels = [
+                lid
+                for lid, text in con.execute("SELECT id, qualname FROM nodes WHERE kind='label'")
+                if pat.search(text or "")
+            ]
+            found: set[str] = set()
+            for lid in labels:
+                found.update(
+                    r[0]
+                    for r in con.execute(
+                        "SELECT src FROM edges WHERE rel='LABELED' AND dst=?", (lid,)
+                    )
+                )
+            return sorted(found)
         rows = con.execute(
             "SELECT e.src FROM edges e JOIN nodes t ON t.id = e.dst "
             "WHERE e.rel='INSTANCE_OF' AND t.kind='cell_type' AND t.name = ?",
@@ -168,17 +244,133 @@ class ConnectomeKG(KGModule):
 
     def strongest_path(self, source: str, target: str) -> PathResult | None:
         """Strongest synaptic path between two specs (see :meth:`neurons_of`)."""
-        return self.graph.strongest_path(self.neurons_of(source), self.neurons_of(target))
+        # Resolve (and so validate) both specs before loading the synapse graph.
+        sources, targets = self.neurons_of(source), self.neurons_of(target)
+        return self.graph.strongest_path(sources, targets)
 
     def cone(self, spec: str, *, hops: int = 1, min_syn: int = 1, direction: str = "down"):
-        """Downstream or upstream cone of a spec, as ``{node_id: hop}``."""
-        return self.graph.cone(
-            self.neurons_of(spec), hops=hops, min_syn=min_syn, direction=direction
-        )
+        """Downstream or upstream cone of a spec, as ``{node_id: hop}``.
+
+        :param spec: See :meth:`neurons_of`.
+        :param hops: Depth, 0-5.
+        :param min_syn: Synapse threshold per edge, 1-10000.
+        :param direction: ``"down"`` or ``"up"``.
+        :raises ValueError: On an out-of-range argument.
+        """
+        hops = bounded_int("hops", hops, 0, MAX_HOP)
+        min_syn = bounded_int("min_syn", min_syn, 1, MAX_MIN_SYN)
+        direction = require_choice("direction", direction, ("down", "up"))
+        seeds = self.neurons_of(spec)
+        return self.graph.cone(seeds, hops=hops, min_syn=min_syn, direction=direction)
 
     def describe(self, node_id: str) -> dict[str, Any] | None:
-        """A node with its metadata decoded."""
-        return self.store.node(node_id)
+        """A node with its metadata decoded.
+
+        :param node_id: Node id; surrounding backticks, quotes and whitespace are stripped.
+        :raises ValueError: If the id is empty or too long.
+        """
+        return self.store.node(normalize_node_id(node_id))
+
+    def type_partners(
+        self, cell_type: str, *, direction: str = "down", limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """A cell type's partner types, strongest first.
+
+        :param cell_type: Cell type name, e.g. ``"LC4"``.
+        :param direction: ``"down"`` for types it synapses onto, ``"up"`` for its inputs.
+        :param limit: Partners returned, 1-500.
+        :return: Dicts with ``cell_type``, ``syn_count``, ``n_pairs`` and ``nt_type``.
+        :raises ValueError: On an out-of-range argument.
+        """
+        name = normalize_spec(cell_type)
+        direction = require_choice("direction", direction, ("down", "up"))
+        limit = bounded_int("limit", limit, 1, MAX_LIMIT)
+        tid = next(
+            (
+                r[0]
+                for r in self.store.con.execute(
+                    "SELECT id FROM nodes WHERE kind='cell_type' AND name=?", (name,)
+                )
+            ),
+            None,
+        )
+        if tid is None:
+            return []
+        mine, other = ("src", "dst") if direction == "down" else ("dst", "src")
+        rows = self.store.con.execute(
+            f"SELECT n.name, json_extract(e.evidence,'$.syn_count') AS syn, "
+            f"json_extract(e.evidence,'$.n_pairs'), json_extract(e.evidence,'$.nt_type') "
+            f"FROM edges e JOIN nodes n ON n.id = e.{other} "
+            f"WHERE e.{mine} = ? AND e.rel = 'TYPE_SYNAPSES_TO' ORDER BY syn DESC LIMIT ?",
+            (tid, limit),
+        ).fetchall()
+        return [
+            {"cell_type": r[0], "syn_count": r[1], "n_pairs": r[2], "nt_type": r[3]} for r in rows
+        ]
+
+    def node_edges(
+        self, node_id: str, *, rel: str = "", direction: str = "out", limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Edges at one node, with the node at the other end.
+
+        :param node_id: Node id.
+        :param rel: One relation from ``EDGE_KINDS``, or ``""`` for all.
+        :param direction: ``"out"`` (node is the source) or ``"in"``.
+        :param limit: Edges returned, 1-500.
+        :return: Dicts with ``rel``, ``node`` (id), ``name``, ``kind`` and ``evidence``.
+        :raises ValueError: On an out-of-range argument or unknown relation.
+        """
+        nid = normalize_node_id(node_id)
+        if rel:
+            require_choice("rel", rel, EDGE_KINDS)
+        direction = require_choice("direction", direction, ("out", "in"))
+        limit = bounded_int("limit", limit, 1, MAX_LIMIT)
+        mine, other = ("src", "dst") if direction == "out" else ("dst", "src")
+        sql = (
+            f"SELECT e.rel, e.{other}, n.name, n.kind, e.evidence FROM edges e "
+            f"LEFT JOIN nodes n ON n.id = e.{other} WHERE e.{mine} = ?"
+        )
+        args: list[Any] = [nid]
+        if rel:
+            sql += " AND e.rel = ?"
+            args.append(rel)
+        sql += " LIMIT ?"
+        args.append(limit)
+        return [
+            {
+                "rel": r[0],
+                "node": r[1],
+                "name": r[2],
+                "kind": r[3],
+                "evidence": json.loads(r[4]) if r[4] else None,
+            }
+            for r in self.store.con.execute(sql, args)
+        ]
+
+    def find_nodes(self, name: str, *, kind: str = "", limit: int = 20) -> list[dict[str, Any]]:
+        """Nodes whose name contains a string, case-insensitively.
+
+        :param name: Substring to look for, e.g. ``"DNp"``.
+        :param kind: One kind from ``NODE_KINDS``, or ``""`` for all.
+        :param limit: Nodes returned, 1-500.
+        :return: Dicts with ``id``, ``kind``, ``name`` and ``qualname``.
+        :raises ValueError: On an out-of-range argument or unknown kind.
+        """
+        needle = require_query(name)
+        if kind:
+            require_choice("kind", kind, NODE_KINDS)
+        limit = bounded_int("limit", limit, 1, MAX_LIMIT)
+        sql = "SELECT id, kind, name, qualname FROM nodes WHERE instr(lower(name), lower(?)) > 0"
+        args: list[Any] = [needle]
+        if kind:
+            sql += " AND kind = ?"
+            args.append(kind)
+        sql += " ORDER BY length(name), name LIMIT ?"
+        args.append(limit)
+        return [
+            {"id": r[0], "kind": r[1], "name": r[2], "qualname": r[3]}
+            for r in self.store.con.execute(sql, args)
+        ]
 
     # ------------------------------------------------------------ analyze
     def analyze(self) -> str:

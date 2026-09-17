@@ -20,7 +20,7 @@ Everything runs on your laptop. A full v783 build without the vector index takes
 
 *Author: Eric G. Suchanek, PhD -- Flux-Frontiers, Liberty TWP, OH*
 
-> **Status: pre-alpha (0.1.0).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis and the `connkg` CLI work end to end, and a real FAFB v783 build has been run and measured. Not done yet: snapshots, the neuPrint reader (hemibrain, MaleCNS), the LIF what-if simulation, and fleet wiring (MCP server, KGRAG adapter).
+> **Status: pre-alpha (0.1.0).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI and the `connkg-mcp` server work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS), the LIF what-if simulation, and the KGRAG adapter.
 
 ---
 
@@ -141,6 +141,8 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
+| **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
+| **Give an AI agent the graph** | `connkg-mcp --root DIR` |
 
 `--root` comes before the command and names the directory that owns `.connectomekg/`. Run `connkg <command> --help` for every option.
 
@@ -155,6 +157,40 @@ with ConnectomeKG("/tmp/kg", source="synthetic", n_neurons=1000, seed=1) as kg:
     print(path.strength, path.net_sign, [h.node_id for h in path.hops])
     print(kg.analyze())
 ```
+
+### As an MCP server
+
+`connkg-mcp` serves the graph to MCP clients (Claude Code, Claude Desktop,
+Cursor) over stdio, or SSE with `--transport sse`. Point it at the directory
+that owns `.connectomekg/`. In a project's `.mcp.json`, which holds absolute
+paths and is gitignored:
+
+```json
+{
+  "mcpServers": {
+    "connkg": {
+      "command": "/path/to/connectome_kg/.venv/bin/connkg-mcp",
+      "args": ["--root", "/path/to/connectome_kg"]
+    }
+  }
+}
+```
+
+| Tool | Answers |
+|---|---|
+| `graph_stats`, `analyze_connectome` | counts; the Markdown report |
+| `find_nodes`, `get_node`, `node_edges` | find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
+| `neurons_of`, `type_partners` | resolve a spec to neurons; a type's partner types by synapses |
+| `strongest_path`, `cone` | the strongest synaptic route; everything within N hops |
+| `query_connectome`, `pack_connectome` | semantic search (needs a build with the vector index) |
+| `snapshot_list`, `snapshot_show`, `snapshot_diff` | saved metric snapshots |
+
+Every argument is bounded and checked inside `ConnectomeKG`, so the CLI and the
+server reject the same bad input with the same message: `k` 1-100, `hop` and
+`hops` 0-5, `limit` and `max_nodes` 1-500, `min_syn` 1-10000, queries and ids at
+most 500 characters, and a `label:` regex at most 100 characters that must
+compile. The first `strongest_path` or `cone` call on FAFB v783 loads all 3.7 M
+synapse edges; later calls reuse them.
 
 ---
 
