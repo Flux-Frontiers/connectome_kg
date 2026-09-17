@@ -5246,4 +5246,4 @@ viz3d = ["kgmodule-utils", "pyvistaqt", "quiltwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "434db7934a79b08df0f6f562af2d8a912ca6ac57e246877989d1c7cf2314caee"
+content-hash = "7e398eb3d01c70f7fd4993c621f03026a86e3551f09c02be6b2e6c06391a0428"

@@ -24,12 +24,50 @@ skeletons, inside the FAFB v783 context cloud.*
 
 *Flow view: the strongest 100 of 5,786 directed neuropil pairs.*
 
+## Quilts and Looking Glass displays
+
+A Looking Glass display shows a 3-D scene without glasses. Lenticular optics
+send a slightly different image toward each viewing angle, so each eye sees
+the scene from its own position. The display plays a *quilt*: a single PNG
+that tiles many renders of the same scene in a grid, one per camera
+position.
+
+ConnectomeKG does not build quilts itself. It composes a PyVista scene, and
+[quiltwright](https://flux-frontiers.github.io/quiltwright/) renders that scene into a quilt, reports its depth
+budget, and sends it to the display. For each view, quiltwright:
+
+1. Starts from the scene's camera. The camera's focal point becomes the
+   plane of the physical glass. `frame_tree` puts the focal point at the
+   centre of the drawn scene, so the middle of the brain sits at the glass,
+   with nearer structures in front of it and farther ones behind.
+2. Slides the camera sideways across the display's view cone without
+   turning it.
+3. Renders with an off-axis (asymmetric-frustum) projection, which keeps the
+   glass plane identical in every view. The display can only fuse views that
+   share that plane. Turning each camera toward the subject ("toe-in")
+   produces ghosting instead of depth.
+
+The default preset, `16-landscape`, targets the 16-inch landscape display:
+48 views in 8 columns and 6 rows, a 7680 x 4320 quilt, and a 50-degree view
+cone. View 0, the leftmost camera, is the bottom-left tile. The filename
+suffix, for example `_qs8x6a1.77778`, records the columns, rows and aspect
+ratio, so Looking Glass Bridge configures playback from the name.
+
+A scene that is too deep for the display looks blurred at its front and
+back. The *depth budget* is how far in front of and behind the glass plane a
+scene can extend before that happens. `connkg quilt` checks it on every run
+(see [World coordinates](#world-coordinates)).
+
+For the full method, the other rendering backends, and Bridge setup, see the
+[quiltwright documentation](https://flux-frontiers.github.io/quiltwright/), in particular
+[the PyVista backend](https://flux-frontiers.github.io/quiltwright/lfd/).
+
 ## Before you begin
 
 You need the following:
 
 - The `viz3d` extra, which installs PyVista, PyQt5, pyvistaqt and
-  `quiltwright`:
+  [quiltwright](https://flux-frontiers.github.io/quiltwright/):
 
     ```bash
     pip install -e ".[viz3d]"      # or: poetry install --extras viz3d
@@ -56,8 +94,9 @@ connkg --root . viz3d --view flow LC4           # flow carried by LC4 only
 ```
 
 Drag to orbit, scroll to zoom, and shift-drag to pan. To send the current
-camera view to a Looking Glass display, click **Cast to Looking Glass**.
-Looking Glass Bridge must be running.
+camera view to a Looking Glass display as a quilt, click **Cast to Looking
+Glass**. Looking Glass Bridge must be running; see
+[Set up Bridge and the display](https://flux-frontiers.github.io/quiltwright/lfd/#1-set-up-bridge-and-the-display).
 
 To render a quilt without a window, run `connkg quilt`:
 

@@ -162,6 +162,9 @@ pycode-kg = ">=0.27.0"
 optional = true
 
 [tool.poetry.group.docs.dependencies]
+# mkdocs is capped below 2: 2.0 removes the plugin system, and this site
+# depends on two plugins (search, mkdocstrings).
+mkdocs = ">=1.6,<2"
 mkdocs-material = ">=9.5"
 mkdocstrings = { version = ">=0.26", extras = ["python"] }
 
