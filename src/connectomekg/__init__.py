@@ -7,4 +7,4 @@ dataset-neutral so hemibrain, MaleCNS and other connectomes plug in later.
 from connectomekg.module import ConnectomeKG
 
 __all__ = ["ConnectomeKG"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

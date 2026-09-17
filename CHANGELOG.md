@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-17
+
 ### Added
 
 - **A key for the rendered images, and a script that regenerates them.**
@@ -163,6 +165,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason for each.
 
 ### Changed
+
+- **Tagged releases no longer publish to PyPI.** The Release workflow builds
+  the wheel and sdist and attaches them to the GitHub Release, which is what
+  Zenodo archives; its PyPI publish job is removed until the KGRAG adapter
+  gives the package a consumer that needs it on an index.
 
 - **`quiltwright>=0.14.1` in the `viz3d` extra** (was `>=0.10.0`).
   `scene.aim_camera` takes `spec=` and passes it to quiltwright's

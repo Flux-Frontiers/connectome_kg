@@ -1,5 +1,11 @@
 name: Release
 
+# Builds the wheel and sdist and attaches them to a GitHub Release. There is
+# deliberately no PyPI publish job: connectome-kg is not published to PyPI
+# until the KGRAG adapter gives it a consumer that needs a versioned
+# dependency. Restore a pypa/gh-action-pypi-publish job (with the `pypi`
+# environment and id-token: write) when that changes.
+
 on:
   push:
     tags: ['v*']
@@ -32,14 +38,6 @@ jobs:
       - name: Build wheel and sdist
         run: poetry build
 
-      # Hand the built files to the publish job rather than letting it rebuild,
-      # so PyPI and the GitHub Release carry byte-identical artifacts.
-      - name: Stash dist for the publish job
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist/
-
       # Publishing the GitHub Release is what makes Zenodo archive this version
       # and mint its DOI; a bare tag push does not.
       - name: Create GitHub Release
@@ -55,24 +53,3 @@ jobs:
               --title "ConnectomeKG $TAG" \
               --notes-file release-notes.md
           fi
-
-  publish:
-    name: Publish to PyPI
-    needs: release
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/connectome-kg
-    # Replaces the workflow-level `contents: write` for this job: publishing
-    # needs to mint an OIDC token and nothing else.
-    permissions:
-      id-token: write
-    steps:
-      - name: Fetch the artifacts the release job built
-        uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
