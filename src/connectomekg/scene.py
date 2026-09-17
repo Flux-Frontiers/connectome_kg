@@ -99,6 +99,22 @@ _FLOW_MIN_RADIUS: Final = 0.004
 _FLOW_BOW: Final = 0.15
 _FLOW_ARC_POINTS: Final = 17
 
+#: Floor and shadow rig for :func:`add_floor`, world units. The floor sits a
+#: little below the subject and is far larger than any frame, so it fills the
+#: view behind the brain. The key light is a wide spotlight high above: a
+#: narrow cone shows its circular edge on the floor, and a wide one spreads
+#: the shadow map thin, hence the large map. VTK's default 1024 px map draws
+#: visibly blocky shadows at 4K.
+FLOOR_ELEVATION: Final = 25.0
+_FLOOR_DROP: Final = 0.15
+_FLOOR_SIZE: Final = 120.0
+_KEY_LIGHT_HEIGHT: Final = 20.0
+_KEY_LIGHT_OFFSET: Final = (-4.0, -6.0)
+_KEY_LIGHT_CONE: Final = 75.0
+_KEY_LIGHT_INTENSITY: Final = 0.9
+_FILL_LIGHT_INTENSITY: Final = 0.35
+_SHADOW_MAP_RESOLUTION: Final = 8192
+
 #: The views :func:`build_brain_scene` composes.
 VIEWS: Final = ("circuit", "flow")
 
@@ -499,6 +515,94 @@ def _draw_flow(
     return len(drawn), len(flow.pairs)
 
 
+def aim_camera(
+    plotter: pv.Plotter,
+    points: np.ndarray,
+    *,
+    fov: float = 14.0,
+    elevation: float = 0.0,
+) -> tuple[float, float, float]:
+    """Point the camera at a composed scene and frame it tightly at that view.
+
+    ``kg_utils.viz3d.frame_tree`` sets the view direction (from the front,
+    dorsal up), the camera tilts up by *elevation* degrees so it looks down on
+    the scene, and ``quiltwright.frame_and_focus`` then fits the scene at that
+    final direction and puts the focal plane at the harmonic mean of its near
+    and far depths. ``reset_camera()`` would fit the un-tilted bounds instead,
+    which leaves a tilted scene small in frame.
+
+    ``frame_and_focus`` measures ``plotter.bounds`` and the window aspect, so
+    call this before :func:`add_floor` and after setting ``window_size`` to
+    the aspect the render captures at. Afterwards, pass ``fov=None`` to
+    ``render_quilt`` and ``depth_report``: the camera is locked.
+
+    :param plotter: Plotter with the scene composed.
+    :param points: World points the view direction is computed from,
+        usually ``SceneInfo.points``.
+    :param fov: Vertical field of view to lock the camera to, in degrees.
+    :param elevation: Degrees to tilt the camera up from the front view.
+    :return: ``(near, far, focal_distance)`` from ``frame_and_focus``.
+    """
+    from kg_utils.viz3d import frame_tree  # noqa: PLC0415 - the viz3d-render-only import boundary
+    from quiltwright import frame_and_focus  # noqa: PLC0415
+
+    frame = frame_tree(points, fov=fov)
+    camera = plotter.camera
+    camera.position = frame.position
+    camera.focal_point = frame.focal_point
+    camera.up = frame.up
+    if elevation:
+        camera.Elevation(elevation)
+        camera.OrthogonalizeViewUp()
+    return frame_and_focus(plotter, fov=fov)
+
+
+def add_floor(plotter: pv.Plotter) -> None:
+    """Put a shadow-receiving floor under the composed scene, lit from above.
+
+    Adds a floor plane (actor ``floor``) in the background grey just below
+    ``plotter.bounds``, replaces the lights with a shadow-casting key
+    spotlight above the scene plus a weak headlight, and enables shadow
+    mapping. The floor is only visible from a camera that looks down on it,
+    so pair it with a non-zero ``elevation`` in :func:`aim_camera`, and call
+    it after framing: the floor is far larger than the scene and would
+    otherwise decide the framing.
+
+    :param plotter: Plotter with the scene composed and the camera framed.
+    """
+    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
+
+    xmin, xmax, ymin, ymax, zmin, zmax = plotter.bounds
+    cx, cy = (xmin + xmax) / 2, (ymin + ymax) / 2
+    floor = pv.Plane(
+        center=(cx, cy, zmin - _FLOOR_DROP),
+        direction=(0, 0, 1),
+        i_size=_FLOOR_SIZE,
+        j_size=_FLOOR_SIZE,
+        i_resolution=1,
+        j_resolution=1,
+    )
+    plotter.add_mesh(floor, color=BACKGROUND, ambient=0.25, diffuse=0.8, specular=0.0, name="floor")
+
+    plotter.remove_all_lights()
+    dx, dy = _KEY_LIGHT_OFFSET
+    key = pv.Light(
+        position=(cx + dx, cy + dy, zmax + _KEY_LIGHT_HEIGHT),
+        focal_point=(cx, cy, zmin),
+        light_type="scene light",
+        intensity=_KEY_LIGHT_INTENSITY,
+    )
+    key.positional = True
+    key.cone_angle = _KEY_LIGHT_CONE
+    plotter.add_light(key)
+    plotter.add_light(pv.Light(light_type="headlight", intensity=_FILL_LIGHT_INTENSITY))
+    plotter.enable_shadows()  # ty: ignore[missing-argument]
+    # PyVista exposes no setter for the shadow map size.
+    shadow_pass = plotter.renderer._render_passes._shadow_map_pass
+    if shadow_pass is not None:
+        shadow_pass.GetShadowMapBakerPass().SetResolution(_SHADOW_MAP_RESOLUTION)
+
+
 def build_brain_scene(
     plotter: pv.Plotter,
     kg: ConnectomeKG,
@@ -689,11 +793,14 @@ def build_brain_scene(
 
 __all__ = [
     "BACKGROUND",
+    "FLOOR_ELEVATION",
     "NM_PER_WORLD_UNIT",
     "VIEWS",
     "NeuropilFlow",
     "SceneInfo",
     "WorldFrame",
+    "add_floor",
+    "aim_camera",
     "build_brain_scene",
     "circuit_neurons",
     "context_points",

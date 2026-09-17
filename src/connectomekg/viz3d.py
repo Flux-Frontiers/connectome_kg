@@ -21,7 +21,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from kg_utils.viz3d import frame_tree
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtWidgets import QAction, QMainWindow, QMessageBox, QToolBar
 from pyvistaqt import QtInteractor
@@ -45,6 +44,8 @@ class BrainSceneWindow(QMainWindow):
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.
+    :param floor: Stand the scene over a floor lit from above, with shadows.
+    :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
     """
 
@@ -59,6 +60,8 @@ class BrainSceneWindow(QMainWindow):
         skeleton_step: int = 4,
         tubes: bool = False,
         top: int = 100,
+        floor: bool = False,
+        elevation: float = 0.0,
         preset: str = DEFAULT_QUILT_PRESET,
     ) -> None:
         super().__init__()
@@ -70,6 +73,7 @@ class BrainSceneWindow(QMainWindow):
         self._skeleton_step = skeleton_step
         self._tubes = tubes
         self._top = top
+        self._floor = floor
         self._preset = preset
 
         self.plotter = QtInteractor(self)
@@ -88,11 +92,9 @@ class BrainSceneWindow(QMainWindow):
         )
         self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
 
-        frame = frame_tree(info.points)
-        self.plotter.camera.position = frame.position
-        self.plotter.camera.focal_point = frame.focal_point
-        self.plotter.camera.up = frame.up
-        self.plotter.reset_camera()
+        render3d.aim_camera(self.plotter, info.points, elevation=elevation)
+        if floor:
+            render3d.add_floor(self.plotter)
 
         toolbar = QToolBar("Actions", self)
         self.addToolBar(toolbar)
@@ -108,6 +110,7 @@ class BrainSceneWindow(QMainWindow):
         kg, specs, view = self._kg, self._specs, self._view
         data_dir, color_by = self._data_dir, self._color_by
         skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
+        floor = self._floor
 
         def build(plotter) -> None:
             render3d.build_brain_scene(
@@ -121,6 +124,8 @@ class BrainSceneWindow(QMainWindow):
                 tubes=tubes,
                 top=top,
             )
+            if floor:
+                render3d.add_floor(plotter)
 
         out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
         result = cast_scene_to_looking_glass(build, self.plotter.camera_position, out_stem, spec)
@@ -138,6 +143,8 @@ def launch(
     skeleton_step: int = 4,
     tubes: bool = False,
     top: int = 100,
+    floor: bool = False,
+    elevation: float = 0.0,
     preset: str = DEFAULT_QUILT_PRESET,
     dataset_id: str | None = None,
     width: int = 1400,
@@ -154,6 +161,8 @@ def launch(
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.
+    :param floor: Stand the scene over a floor lit from above, with shadows.
+    :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
     :param dataset_id: Dataset id; ``"fafb783"`` selects the FAFB v783 record.
     :param width: Window width in pixels.
@@ -174,6 +183,8 @@ def launch(
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            floor=floor,
+            elevation=elevation,
             preset=preset,
         )
         window.resize(width, height)

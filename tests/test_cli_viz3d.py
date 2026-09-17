@@ -14,6 +14,7 @@ from click.testing import CliRunner
 from connectomekg import scene as scene_mod
 from connectomekg.cli import cli
 from connectomekg.cli import cmd_viz3d as mod
+from connectomekg.scene import FLOOR_ELEVATION
 
 # ---------------------------------------------------------------------------
 # renders/ path resolution -- no CLI invocation
@@ -109,3 +110,77 @@ def test_quilt_rejects_oversized_skeleton_step(kg):
         cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--skeleton-step", "1000"]
     )
     assert result.exit_code == 2
+
+
+def test_resolve_elevation_defaults_to_a_look_down_only_with_a_floor():
+    assert mod.resolve_elevation(False, None) == 0.0
+    assert mod.resolve_elevation(True, None) == FLOOR_ELEVATION
+    assert mod.resolve_elevation(True, 10.0) == 10.0
+
+
+def test_quilt_still_with_cast_is_a_usage_error(kg):
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--still", "--cast"]
+    )
+    assert result.exit_code == 2, result.output
+    assert "cannot be combined with --still" in result.output
+
+
+@pytest.mark.parametrize("command", ["quilt", "viz3d"])
+def test_elevation_out_of_range_is_a_usage_error(kg, command):
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg.repo_root), command, "LC4", "--elevation", "95"]
+    )
+    assert result.exit_code == 2, result.output
+
+
+def test_quilt_still_writes_one_flat_image_with_a_floor(kg, tmp_path, monkeypatch):
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
+    monkeypatch.setattr(mod, "STILL_HEIGHT", 90)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--root",
+            str(kg.repo_root),
+            "quilt",
+            "--view",
+            "flow",
+            "--still",
+            "--floor",
+            "-o",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    written = list(tmp_path.glob("flow_qs1x1a*.png"))
+    assert len(written) == 1
+    assert "adjacent-view disparity" not in result.output  # no depth report for a still
+
+
+def test_quilt_with_floor_reports_depth_and_writes_a_quilt(kg, tmp_path, monkeypatch):
+    pytest.importorskip("pyvista")
+    quiltwright = pytest.importorskip("quiltwright")
+    tiny = quiltwright.QuiltSpec(
+        columns=2, rows=1, quilt_width=160, quilt_height=45, aspect=1.77778, view_cone=50.0
+    )
+    monkeypatch.setitem(quiltwright.QUILT_PRESETS, "tiny", tiny)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--root",
+            str(kg.repo_root),
+            "quilt",
+            "--view",
+            "flow",
+            "--floor",
+            "--preset",
+            "tiny",
+            "-o",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "adjacent-view disparity" in result.output
+    assert "35.0 deg" in result.output  # --view-cone default, not the preset's 50
+    assert len(list(tmp_path.glob("flow_qs2x1a*.png"))) == 1

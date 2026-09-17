@@ -353,3 +353,30 @@ def test_build_brain_scene_rejects_bad_view_and_top(kg):
         scene.build_brain_scene(plotter, kg, view="mood")
     with pytest.raises(ValueError, match="top must be between 1 and 500"):
         scene.build_brain_scene(plotter, kg, view="flow", top=501)
+
+
+def test_aim_camera_elevation_looks_down_and_frames_the_scene(kg):
+    pv = pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    info = scene.build_brain_scene(plotter, kg, view="flow")
+    near, far, focal = scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    forward = np.subtract(plotter.camera.focal_point, plotter.camera.position)
+    assert forward[2] < 0  # looking down
+    assert 0 < near <= focal <= far
+    assert plotter.camera.view_angle == pytest.approx(14.0)
+
+
+def test_add_floor_adds_a_floor_below_the_scene_with_shadows(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    scene.build_brain_scene(plotter, kg, view="flow")
+    zmin = plotter.bounds[4]
+    scene.add_floor(plotter)
+    assert "floor" in plotter.actors
+    floor_z = plotter.actors["floor"].GetMapper().GetInput().GetPoints().GetPoint(0)[2]
+    assert floor_z < zmin
+    shadow_pass = plotter.renderer._render_passes._shadow_map_pass
+    assert shadow_pass is not None
+    assert shadow_pass.GetShadowMapBakerPass().GetResolution() == scene._SHADOW_MAP_RESOLUTION
+    assert any(light.positional for light in plotter.renderer.lights)

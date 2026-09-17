@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--floor`, `--elevation` and `--still` for the 3-D views.** `--floor`
+  (on `connkg quilt` and `connkg viz3d`) stands the scene over a floor in
+  the background grey, lit by a shadow-casting spotlight from above, with an
+  8192 px shadow map. The new `scene.add_floor` does it after framing, so the
+  floor never decides the framing, and the viewer's Cast rebuilds it.
+  `--elevation` tilts the camera to look down (default 25 degrees with a
+  floor, which is invisible from level). `connkg quilt --still` renders the
+  quilt's centre view as one flat image at the preset's aspect, 3840 x 2160
+  for `16-landscape`, into `renders/stills/`. The rendering guide gains
+  "Camera and framing" and "Floor and shadows" sections.
+
 - **Documentation site and a rendering guide.** `mkdocs.yml`, a `docs`
   Poetry group (mkdocs-material, mkdocstrings) and a Pages workflow, set up
   the same way as quiltwright's. `docs/rendering.md` explains both 3-D views:
@@ -31,14 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so nothing new is stored at build time. SPEC(s) become optional in this
   view and limit the sum to their neurons. The context cloud is thinned to
   every 10th neuron so it does not hide the neuropils.
-
-### Changed
-
-- **3-D scenes render on a muted grey background, and the context cloud is
-  drawn as sphere glyphs sized in world units.** The cloud used to be
-  pixel-sized points on white. It disappeared in a HiDPI viewer window and
-  in quilt tiles. Its colours are now lightened 35% toward white instead of
-  darkened.
 
 - **`connkg quilt` and `connkg viz3d`, real-geometry 3-D views of a connectome**
   (the new `viz3d` extra). Unlike the fleet's other viz3d consumers, this
@@ -148,6 +151,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason for each.
 
 ### Changed
+
+- **`connkg quilt` frames with quiltwright's `frame_and_focus` and sweeps a
+  35-degree view cone by default.** The new `scene.aim_camera` points the
+  camera with `frame_tree`, applies `--elevation`, then fits the scene at
+  that final view with the focal plane at the harmonic mean of near and far
+  depth; `depth_report` and `render_quilt` both take `fov=None` after it,
+  so neither re-frames. The render window now matches the aspect quiltwright
+  captures views at (16:9) rather than the 4:3 quilt tile, which had put the
+  focal plane at 30.5 units instead of 23.4. The view cone was the preset's
+  full 50 degrees; `--view-cone` (default 35) matches quiltwright's own CLI.
+  A cast now goes through `save_and_cast_quilt`, so a missing Bridge never
+  loses the quilt.
+
+- **3-D scenes render on a muted grey background, and the context cloud is
+  drawn as sphere glyphs sized in world units.** The cloud used to be
+  pixel-sized points on white. It disappeared in a HiDPI viewer window and
+  in quilt tiles. Its colours are now lightened 35% toward white instead of
+  darkened.
 
 - **The CLI is Click, and the command is `connkg`.** `connectome-kg` was long
   to type and argparse was the odd one out in the fleet. The commands and

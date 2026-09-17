@@ -37,9 +37,9 @@ ConnectomeKG does not build quilts itself. It composes a PyVista scene, and
 budget, and sends it to the display. For each view, quiltwright:
 
 1. Starts from the scene's camera. The camera's focal point becomes the
-   plane of the physical glass. `frame_tree` puts the focal point at the
-   centre of the drawn scene, so the middle of the brain sits at the glass,
-   with nearer structures in front of it and farther ones behind.
+   plane of the physical glass. ConnectomeKG places the focal plane inside
+   the brain (see [Camera and framing](#camera-and-framing)), so nearer
+   structures stand in front of the glass and farther ones sit behind it.
 2. Slides the camera sideways across the display's view cone without
    turning it.
 3. Renders with an off-axis (asymmetric-frustum) projection, which keeps the
@@ -48,8 +48,9 @@ budget, and sends it to the display. For each view, quiltwright:
    produces ghosting instead of depth.
 
 The default preset, `16-landscape`, targets the 16-inch landscape display:
-48 views in 8 columns and 6 rows, a 7680 x 4320 quilt, and a 50-degree view
-cone. View 0, the leftmost camera, is the bottom-left tile. The filename
+48 views in 8 columns and 6 rows, and a 7680 x 4320 quilt. The display
+accepts a 50-degree view cone, but `connkg quilt` sweeps 35 degrees by
+default (`--view-cone`), the same cap quiltwright's own CLI applies. View 0, the leftmost camera, is the bottom-left tile. The filename
 suffix, for example `_qs8x6a1.77778`, records the columns, rows and aspect
 ratio, so Looking Glass Bridge configures playback from the name.
 
@@ -102,15 +103,22 @@ To render a quilt without a window, run `connkg quilt`:
 
 ```bash
 connkg --root . quilt DNp01 --preview dnp01.png
-connkg --root . quilt --view flow --top 60 --preview flow.png --cast
+connkg --root . quilt --view flow --top 60 --floor --cast
 ```
 
-`connkg quilt` prints what it drew and a depth report, then writes files
-under `renders/`:
+To render one flat image instead of a quilt, add `--still`. The still is the
+quilt's centre view at the preset's aspect, 3840 x 2160 for `16-landscape`:
+
+```bash
+connkg --root . quilt LPLC2 DNp01 --tubes --floor --still
+```
+
+`connkg quilt` prints what it drew and, for a quilt, a depth report. It then
+writes files under `renders/`:
 
 | path | contents |
 |---|---|
-| `renders/stills/` | the `--preview` PNG, when the value is a bare filename |
+| `renders/stills/` | a `--still` image, and the `--preview` PNG when the value is a bare filename |
 | `renders/quilts/` | the quilt, named after the specs (`flow_LC4_qs8x6a1.77778.png` for a flow) |
 
 Quilts are never committed.
@@ -125,9 +133,13 @@ Quilts are never committed.
 | `--skeleton-step` | circuit | `4` | keep every Nth skeleton point, 1 to 50 |
 | `--tubes` | circuit | off | draw skeletons as tubes instead of lines |
 | `--top` | flow | `100` | strongest neuropil pairs drawn, 1 to 500 |
+| `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
+| `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
+| `--view-cone` | quilt | `35` | degrees the quilt cameras sweep |
 | `--fov`, `--zoom` | quilt | `14.0`, `1.0` | per-view field of view in degrees, and camera dolly |
-| `--cast` | quilt | off | send the finished quilt to Looking Glass Bridge |
+| `--still` | quilt | off | render one flat centre view instead of a quilt |
+| `--cast` | quilt | off | send the finished quilt to Looking Glass Bridge; not with `--still` |
 
 The circuit view needs at least one SPEC. In the flow view, SPECs are
 optional.
@@ -178,11 +190,32 @@ world = ((x - cx) / S,  (z - cz) / S,  -(y - cy) / S)       S = 100,000 nm
 Negating `y` puts dorsal up. At this scale the brain is about 8 x 4 x 3 world
 units, which fits inside the depth budget of a Looking Glass quilt.
 
-The camera comes from `kg_utils.viz3d.frame_tree`, which frames every drawn
-point and looks along world `+y`, so you see the brain from the front.
-`connkg quilt` prints `quiltwright.depth_report` on every run with the same
-`--fov` and `--zoom` it renders with. If the report says the scene is too
-deep for the preset, lower `--zoom` or `--fov`.
+## Camera and framing
+
+`connectomekg.scene.aim_camera` sets the camera in three steps:
+
+1. `kg_utils.viz3d.frame_tree` points the camera along world `+y`, so you
+   see the brain from the front with dorsal up.
+2. With a non-zero `--elevation`, the camera tilts up by that many degrees
+   and looks down on the brain.
+3. `quiltwright.frame_and_focus` fits the scene tightly at that final
+   direction and puts the focal plane at the harmonic mean of the scene's
+   near and far depths. A tilted view framed by `reset_camera()` instead
+   leaves the brain small in frame.
+
+`frame_and_focus` fits to the window's shape, so `connkg quilt` sizes its
+window to the aspect quiltwright captures each view at (16:9 for
+`16-landscape`), not to the quilt tile (4:3). After framing, the camera is
+fixed: the depth report and the render both take `fov=None`, so neither
+re-frames it.
+
+For a quilt, `connkg quilt` prints `quiltwright.depth_report` for that
+camera and `--zoom`. The report lists how many pixels the nearest and
+farthest geometry shift between neighbouring views. Around 4 to 5 px is the
+practical ceiling, and rows above 5.5 px are flagged as soft. The flow view
+with a floor comes to about 3.4 px at `--zoom 1.0` and about 3.7 px at
+`--zoom 1.1`. Above about 1.15 the camera crops the optic lobes, because the
+brain already spans the width of the frame.
 
 ## The context cloud
 
@@ -354,6 +387,42 @@ default of 100 shows most of the picture. The difference between LA_R ->
 ME_R and LA_L -> ME_L is present in the `IN_NEUROPIL` counts themselves. The
 aggregation does not introduce it.
 
+## Floor and shadows
+
+`--floor` stands the scene over a floor and lights it from above so that it
+casts shadows. The shadow shows where structures sit in depth, which helps
+most in a still and on the panel.
+
+![LPLC2 and DNp01 over a floor, with shadows](images/floor_lplc2_dnp01.png)
+
+*`connkg quilt LPLC2 DNp01 --tubes --floor --still`: the 210 LPLC2 neurons
+and the two DNp01 neurons, drawn as tubes, over the floor.*
+
+`connectomekg.scene.add_floor` adds three things:
+
+- **A floor plane** in the background grey, a little below the scene and
+  far larger than the frame, so it fills the view behind the brain. The
+  floor is only visible from a camera that looks down on it, which is why
+  `--floor` defaults `--elevation` to 25 degrees.
+- **A key light**: a spotlight high above the brain with a 75-degree cone
+  that casts the shadows, plus a weak headlight so that shadowed surfaces
+  stay readable.
+- **Shadow mapping** at 8192 x 8192 pixels. At VTK's default of 1024, the
+  shadows are visibly blocky at 4K, and a wide cone spreads the map over
+  more floor. A narrower cone gives sharper shadows but shows its circular
+  edge on the floor.
+
+The floor is added after the camera is framed and after the depth report,
+because it reaches past the camera and would otherwise decide both. In the
+viewer, **Cast to Looking Glass** rebuilds the floor with the scene.
+
+Skeletons drawn as lines cast almost no shadow. Add `--tubes` to a floored
+circuit view.
+
+Shadow mapping adds a render pass for each frame, so the interactive viewer
+can respond more slowly with `--floor`. The stills and quilts are not
+affected in practice: a floored 4K still takes about 4 to 6 seconds.
+
 ## Tuning constants
 
 The visual constants live at the top of `src/connectomekg/scene.py`. Sizes
@@ -372,6 +441,11 @@ are in world units, where the brain is about 8 units wide.
 | `_FLOW_MAX_RADIUS`, `_FLOW_MIN_RADIUS` | 0.08, 0.004 | flow tube radius range |
 | `_FLOW_BOW` | 0.15 | tube bow, as a fraction of the distance between endpoints |
 | `_CONTEXT_DIM` | 0.85 | darkening of idle neuropil spheres |
+| `FLOOR_ELEVATION` | 25 | default `--elevation` with `--floor`, degrees |
+| `_FLOOR_DROP`, `_FLOOR_SIZE` | 0.15, 120 | floor distance below the scene, and its side length |
+| `_KEY_LIGHT_HEIGHT`, `_KEY_LIGHT_CONE` | 20, 75 | key light height above the scene, and its cone in degrees |
+| `_KEY_LIGHT_INTENSITY`, `_FILL_LIGHT_INTENSITY` | 0.9, 0.35 | key light and headlight intensity |
+| `_SHADOW_MAP_RESOLUTION` | 8192 | shadow map size, pixels per side |
 
 Bounds on user input live in `connectomekg.validation` and apply equally to
 the CLI and the Python API:
@@ -394,26 +468,28 @@ the CLI and the Python API:
 
 ## Use the scene from Python
 
-`build_brain_scene` takes the same options as the CLI:
+`build_brain_scene`, `aim_camera` and `add_floor` are the steps
+`connkg quilt` runs, in the same order:
 
 ```python
 import pyvista as pv
-from kg_utils.viz3d import frame_tree
+from quiltwright import QUILT_PRESETS, render_quilt, save_quilt
 
 from connectomekg import ConnectomeKG
-from connectomekg.scene import build_brain_scene
+from connectomekg.scene import FLOOR_ELEVATION, add_floor, aim_camera, build_brain_scene
 
+spec = QUILT_PRESETS["16-landscape"].still(height=2160)
 kg = ConnectomeKG(".")  # the directory that holds .connectomekg/
-plotter = pv.Plotter(off_screen=True, window_size=(1600, 1000))
+plotter = pv.Plotter(
+    off_screen=True, window_size=(round(spec.tile_height * spec.aspect), spec.tile_height)
+)
 info = build_brain_scene(plotter, kg, view="flow", specs=["LC4"], progress=print)
 print(info.title, info.n_flow_pairs, info.n_flow_total)
 
-frame = frame_tree(info.points, fov=14.0)
-plotter.camera.position = frame.position
-plotter.camera.focal_point = frame.focal_point
-plotter.camera.up = frame.up
-plotter.reset_camera()
-plotter.screenshot("flow_lc4.png")
+aim_camera(plotter, info.points, fov=14.0, elevation=FLOOR_ELEVATION)
+add_floor(plotter)
+save_quilt(render_quilt(plotter, spec, fov=None), "renders/stills/flow_lc4", spec)
+plotter.close()
 kg.close()
 ```
 

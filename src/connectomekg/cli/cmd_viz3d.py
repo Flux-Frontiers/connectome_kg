@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import click
@@ -36,6 +37,28 @@ STILLS_DIR = RENDERS_ROOT / "stills"
 QUILTS_DIR = RENDERS_ROOT / "quilts"
 VIEWS_DIR = RENDERS_ROOT / "views"
 REPORTS_DIR = RENDERS_ROOT / "reports"
+
+#: Height of a ``--still`` image; the width follows the preset's aspect, so a
+#: 16-landscape still is 3840 x 2160.
+STILL_HEIGHT = 2160
+#: Default quilt view cone, degrees. quiltwright's library sweeps a preset's
+#: full cone (50 for 16-landscape); its CLI and render scripts cap at 35.
+DEFAULT_VIEW_CONE = 35.0
+
+
+def resolve_elevation(floor: bool, elevation: float | None) -> float:
+    """The camera elevation to render at: explicit, else a floor's default.
+
+    :param floor: Whether ``--floor`` was given.
+    :param elevation: The ``--elevation`` value, or ``None`` when omitted.
+    :return: *elevation* when given; otherwise ``FLOOR_ELEVATION`` with a
+        floor, which is invisible from a level camera, and 0 without.
+    """
+    if elevation is not None:
+        return elevation
+    from connectomekg.scene import FLOOR_ELEVATION  # noqa: PLC0415 - numpy only, no extra
+
+    return FLOOR_ELEVATION if floor else 0.0
 
 
 def resolve_preview_path(preview: str) -> Path:
@@ -128,6 +151,19 @@ top_option = click.option(
     type=click.IntRange(1, MAX_FLOW_PAIRS),
     help="Flow view: strongest neuropil pairs drawn.",
 )
+floor_option = click.option(
+    "--floor",
+    is_flag=True,
+    help="Stand the scene over a floor lit from above, with shadows. Tilts the "
+    "camera down (see --elevation).",
+)
+elevation_option = click.option(
+    "--elevation",
+    default=None,
+    type=click.FloatRange(-80.0, 80.0),
+    help="Degrees to tilt the camera up from the front view, so it looks down. "
+    "Default 25 with --floor, else 0.",
+)
 dataset_id_option = click.option(
     "--dataset-id", default=None, help="Dataset id; fafb783 selects FAFB v783."
 )
@@ -141,7 +177,16 @@ dataset_id_option = click.option(
 @skeleton_step_option
 @tubes_option
 @top_option
+@floor_option
+@elevation_option
 @preset_option
+@click.option(
+    "--view-cone",
+    default=DEFAULT_VIEW_CONE,
+    show_default=True,
+    type=click.FloatRange(1.0, 90.0),
+    help="Degrees the quilt cameras sweep; the preset's own cone can exceed what fuses.",
+)
 @click.option(
     "--fov",
     default=14.0,
@@ -158,7 +203,13 @@ dataset_id_option = click.option(
     "out_dir",
     default=None,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Output directory for the quilt (default: renders/quilts).",
+    help="Output directory (default: renders/quilts, or renders/stills with --still).",
+)
+@click.option(
+    "--still",
+    is_flag=True,
+    help="Render one flat centre view at the preset's aspect (3840x2160 for "
+    "16-landscape) instead of a quilt.",
 )
 @click.option(
     "--preview",
@@ -178,10 +229,14 @@ def quilt(
     skeleton_step: int,
     tubes: bool,
     top: int,
+    floor: bool,
+    elevation: float | None,
     preset: str,
+    view_cone: float,
     fov: float,
     zoom: float,
     out_dir: Path | None,
+    still: bool,
     preview: str | None,
     cast: bool,
     dataset_id: str | None,
@@ -192,9 +247,12 @@ def quilt(
     (see ``ConnectomeKG.neurons_of``). With ``--view circuit`` their union is
     the circuit drawn at full brightness, capped at ``MAX_SCENE_NEURONS``
     neurons. With ``--view flow`` SPECs are optional and restrict the flow to
-    their neurons.
+    their neurons. ``--still`` renders the same camera's centre view as one
+    flat image.
     """
     require_specs_for_view(view, specs)
+    if still and cast:
+        raise click.UsageError("--cast sends a quilt; it cannot be combined with --still")
     missing = _missing_modules("pyvista", "quiltwright")
     if missing:
         raise click.UsageError(
@@ -202,8 +260,13 @@ def quilt(
         )
 
     import pyvista as pv  # noqa: PLC0415 - arrives with the viz3d extra
-    from kg_utils.viz3d import frame_tree  # noqa: PLC0415
-    from quiltwright import QUILT_PRESETS, depth_report, render_quilt, save_quilt  # noqa: PLC0415
+    from quiltwright import (  # noqa: PLC0415
+        QUILT_PRESETS,
+        depth_report,
+        render_quilt,
+        save_and_cast_quilt,
+        save_quilt,
+    )
 
     from connectomekg import scene as render3d  # noqa: PLC0415
 
@@ -211,9 +274,17 @@ def quilt(
         raise click.UsageError(
             f"Unknown quilt preset {preset!r}. Choose from: {', '.join(QUILT_PRESETS)}"
         )
-    spec_obj = QUILT_PRESETS[preset]
+    spec_obj = replace(QUILT_PRESETS[preset], view_cone=view_cone)
+    if still:
+        spec_obj = spec_obj.still(height=STILL_HEIGHT)
 
-    plotter = pv.Plotter(off_screen=True)
+    # Frame at the aspect render_quilt captures views at (the display's), not
+    # the tile's: frame_and_focus fits to the window, and a 16-landscape tile
+    # is 4:3 while its views are 16:9.
+    plotter = pv.Plotter(
+        off_screen=True,
+        window_size=[round(spec_obj.tile_height * spec_obj.aspect), spec_obj.tile_height],
+    )
     with open_kg(ctx.obj["root"], dataset_id=dataset_id) as kg, usage_errors():
         info = render3d.build_brain_scene(
             plotter,
@@ -236,37 +307,40 @@ def quilt(
     else:
         click.echo(f"Scene: {info.title}")
 
-    frame = frame_tree(info.points, fov=fov)
-    plotter.camera.position = frame.position
-    plotter.camera.focal_point = frame.focal_point
-    plotter.camera.up = frame.up
-    plotter.reset_camera()  # ty: ignore[missing-argument]
-
-    click.echo(depth_report(plotter, spec_obj, fov=fov, zoom=zoom))
+    render3d.aim_camera(
+        plotter, info.points, fov=fov, elevation=resolve_elevation(floor, elevation)
+    )
+    # The camera is locked now, so the report and the render both take
+    # fov=None. The report comes before the floor, which reaches past the
+    # camera and would otherwise be what it measures.
+    if not still:
+        click.echo(depth_report(plotter, spec_obj, fov=None, zoom=zoom))
+    if floor:
+        render3d.add_floor(plotter)
 
     if preview is not None:
         preview_path = resolve_preview_path(preview)
         plotter.screenshot(str(preview_path))
         click.echo(f"Wrote preview {preview_path}")
 
-    out_dir = out_dir or QUILTS_DIR
+    out_dir = out_dir or (STILLS_DIR if still else QUILTS_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = out_dir / scene_stem(view, specs)
     click.echo(
         f"Rendering {spec_obj.n_views} views at {spec_obj.tile_width}x{spec_obj.tile_height}..."
     )
-    path = save_quilt(render_quilt(plotter, spec_obj, fov=fov, zoom=zoom), stem, spec_obj)
+    image = render_quilt(plotter, spec_obj, fov=None, zoom=zoom)
     plotter.close()
-    click.echo(f"Wrote {path}")
-
     if cast:
-        from quiltwright import cast_quilt  # noqa: PLC0415
-
-        try:
-            cast_quilt(path.resolve(), spec_obj)
+        path, error = save_and_cast_quilt(image, stem, spec_obj)
+        click.echo(f"Wrote {path}")
+        if error:
+            click.echo(f"Cast failed (is Looking Glass Bridge running?): {error}", err=True)
+        else:
             click.echo("Cast to Looking Glass Bridge.")
-        except Exception as exc:  # noqa: BLE001 - Bridge absence must not fail the render
-            click.echo(f"Cast failed (is Looking Glass Bridge running?): {exc}", err=True)
+    else:
+        path = save_quilt(image, stem, spec_obj)
+        click.echo(f"Wrote {path}")
 
 
 @cli.command("viz3d")
@@ -277,6 +351,8 @@ def quilt(
 @skeleton_step_option
 @tubes_option
 @top_option
+@floor_option
+@elevation_option
 @preset_option
 @click.option("--width", default=1400, show_default=True, type=int, help="Window width, pixels.")
 @click.option("--height", default=900, show_default=True, type=int, help="Window height, pixels.")
@@ -291,6 +367,8 @@ def viz3d(
     skeleton_step: int,
     tubes: bool,
     top: int,
+    floor: bool,
+    elevation: float | None,
     preset: str,
     width: int,
     height: int,
@@ -321,6 +399,8 @@ def viz3d(
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            floor=floor,
+            elevation=resolve_elevation(floor, elevation),
             preset=preset,
             dataset_id=dataset_id,
             width=width,

@@ -192,11 +192,23 @@ back to a larger sphere at its marked point instead of a traced shape.
   flows are ME -> LO, LA -> ME, LO -> LOP and LO -> PVLP. Each arc bows to one
   side, so A -> B and B -> A do not overlap. The context cloud is thinned to
   every 10th neuron in this view.
+- `--floor` stands the scene over a floor lit from above, with shadows, and
+  defaults `--elevation` to 25 degrees (the floor is invisible from level).
+  Pair it with `--tubes` in the circuit view: line skeletons cast almost no
+  shadow. `connkg quilt --still` renders one flat 3840 x 2160 centre view to
+  `renders/stills/` instead of a quilt; it cannot be combined with `--cast`.
+- A quilt sweeps `--view-cone` 35 degrees by default and prints
+  `depth_report` before rendering. The flow view with a floor measures about
+  3.4 px of adjacent-view disparity at `--zoom 1.0`; above about 1.15 zoom
+  crops the optic lobes. A quick flat still is fine to render yourself to
+  check framing; full quilts and casts stay the maintainer's.
 
 ```bash
 poetry run connkg --root . quilt DNp01 --preview renders/stills/dnp01.png
 poetry run connkg --root . viz3d LC4 DNp01
 poetry run connkg --root . quilt --view flow --top 60 --preview flow.png
+poetry run connkg --root . quilt LPLC2 DNp01 --tubes --floor --still
+poetry run connkg --root . quilt --view flow --floor --cast
 poetry run connkg --root . viz3d --view flow LC4
 ```
 
