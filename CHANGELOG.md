@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg build` reports progress.** A real FAFB v783 build ran for three
+  minutes with no output at all, which reads as a hang. The extractor takes an
+  optional `progress` callback, reports each stage and a count every 250,000
+  synaptic pairs, and says when it hands over to the SQLite write. The CLI
+  prints these on stderr; library use stays silent by default.
+
 - **`python -m connectomekg`** runs the CLI from a clone with nothing
   installed. The `connectome-kg` script only exists after an install, so the
   first thing anyone tries returned "command not found".
@@ -22,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason for each.
 
 ### Changed
+
+- **The CLI is Click, and the command is `connkg`.** `connectome-kg` was long
+  to type and argparse was the odd one out in the fleet. The commands and
+  their options are unchanged, `--root` still comes before the command, and
+  numeric options are now range-checked at parse time (`--k` 1-100, `--hop`
+  and `--hops` 0-5). Commands close the graph through `open_kg()` and a `with`
+  block instead of leaving the SQLite handle to process exit.
 
 - **Checksum differences are reported as drift, not failure.** Codex states
   that its downloads are synchronised with the live database and may differ
@@ -43,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one it found.
 
 ### Fixed
+
+- **Current Codex exports failed to load.** `classification.csv.gz` no longer
+  carries a `cell_type` column, and the reader demanded it, so every build
+  from a fresh download stopped with "Usecols do not match columns". The
+  reader now reads the columns a download has and takes cell types from
+  `consolidated_cell_types.csv.gz`. The synthetic fixture wrote the old
+  schema, which is why the suite never noticed; it now writes the current one.
 
 - **The synthetic fixture crashed below 361 neurons.** The planted circuits
   claim a fixed number of neurons from each super class, so a small

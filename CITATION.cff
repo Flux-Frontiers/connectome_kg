@@ -1,0 +1,31 @@
+cff-version: "1.2.0"
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "ConnectomeKG: Connectomes as Knowledge Graphs"
+abstract: >
+  ConnectomeKG turns an electron-microscopy connectome into a queryable
+  knowledge graph. Neurons, cell types, neuropils, hemilineages, taxa and
+  community labels are nodes; synapse edges carry counts and transmitter
+  signs. It supports semantic search over the cell type and neuropil
+  vocabulary, strongest signed paths, upstream and downstream cones, and a
+  Markdown analysis. The first corpus is the FlyWire FAFB v783 adult
+  Drosophila brain.
+authors:
+  - family-names: Suchanek
+    given-names: "Eric G., PhD"
+    orcid: "https://orcid.org/0009-0009-0891-1507"
+    email: suchanek@flux-frontiers.com
+    affiliation: "Flux-Frontiers"
+version: "0.1.0"
+date-released: "2026-09-16"
+license-url: "https://www.elastic.co/licensing/elastic-license"
+repository-code: "https://github.com/Flux-Frontiers/connectome_kg"
+url: "https://github.com/Flux-Frontiers/connectome_kg"
+keywords:
+  - knowledge-graph
+  - connectome
+  - flywire
+  - drosophila
+  - neuroscience
+  - sqlite-vec
+  - kgmodule
