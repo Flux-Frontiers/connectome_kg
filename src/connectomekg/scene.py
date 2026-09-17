@@ -66,18 +66,24 @@ _SQL_NEURON_XYZ = (
     "AND json_extract(metadata,'$.z') IS NOT NULL"
 )
 
-#: Point size and darkening for the context cloud -- dim rather than
-#: transparent, since alpha ghosts in light-field renders (plan section 3.A).
-_CONTEXT_POINT_SIZE: Final = 3.0
+#: The context cloud is one low-poly sphere glyph per neuron, sized in world
+#: units rather than screen pixels: a pixel-sized point vanishes on a HiDPI
+#: display and in a quilt tile, while a world-sized glyph scales with the view.
+#: Its colours are lightened toward white so they stand off the grey
+#: background -- lightened rather than made transparent, since alpha ghosts in
+#: light-field renders (plan section 3.A).
+_CONTEXT_RADIUS: Final = 0.005
+_CONTEXT_LIGHTEN: Final = 0.35
+#: Darkening for idle neuropil spheres in the flow view.
 _CONTEXT_DIM: Final = 0.85
 #: Scene background: a muted mid grey. On PyVista's default white the dimmed
 #: context cloud all but disappears; on this grey it reads as the brain's
 #: outline without competing with the subject.
 BACKGROUND: Final = "#5A5D62"
-#: The flow view thins the context cloud to every Nth neuron and draws it
-#: smaller: at full density it hides the neuropil spheres and arcs inside it.
+#: The flow view thins the context cloud to every Nth neuron, drawn with
+#: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
-_FLOW_CONTEXT_POINT_SIZE: Final = 2.0
+_FLOW_CONTEXT_RADIUS: Final = 0.02
 #: Sphere radii, world units. A fallback sphere (no skeleton) is drawn larger
 #: than a real soma so it reads as a stand-in, not a measurement.
 _SOMA_RADIUS: Final = 0.05
@@ -549,26 +555,25 @@ def build_brain_scene(
 
     _say("context point cloud")
     ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
-    point_size = _CONTEXT_POINT_SIZE
+    radius = _CONTEXT_RADIUS
     if view == "flow":
         ctx_ids = ctx_ids[::_FLOW_CONTEXT_STRIDE]
         ctx_points_nm = ctx_points_nm[::_FLOW_CONTEXT_STRIDE]
         ctx_colors = ctx_colors[::_FLOW_CONTEXT_STRIDE]
-        point_size = _FLOW_CONTEXT_POINT_SIZE
+        radius = _FLOW_CONTEXT_RADIUS
     n_context = len(ctx_ids)
     if n_context:
         ctx_world = frame.to_world(ctx_points_nm)
         cloud = pv.PolyData(ctx_world)
         rgb = np.asarray([_hex_to_rgb(c) for c in ctx_colors], dtype=np.float64)
-        cloud.point_data["rgb"] = np.clip(rgb * _CONTEXT_DIM, 0, 255).astype(np.uint8)
-        plotter.add_mesh(
-            cloud,
-            scalars="rgb",
-            rgb=True,
-            point_size=point_size,
-            render_points_as_spheres=True,
-            name="context",
+        rgb = rgb + (255.0 - rgb) * _CONTEXT_LIGHTEN
+        cloud.point_data["rgb"] = np.clip(rgb, 0, 255).astype(np.uint8)
+        glyphs = cloud.glyph(
+            geom=pv.Sphere(radius=radius, theta_resolution=6, phi_resolution=4),
+            orient=False,
+            scale=False,
         )
+        plotter.add_mesh(glyphs, scalars="rgb", rgb=True, name="context")
         world_points.append(ctx_world)
 
     ds_row = kg.store.con.execute("SELECT name FROM nodes WHERE kind='dataset'").fetchone()
