@@ -14,7 +14,7 @@ Type Predictions".
 `connkg files` prints this table, less the last column, at any time.
 
 The last column records what the reference download holds: the September
-2026 `fafb_v783/` that the footprint in step 6 was measured on.
+2026 `fafb_v783/` in which every file below was checked against the portal.
 
 | portal label | downloads as | size | needed | reference download |
 |---|---|---|---|---|
@@ -24,10 +24,27 @@ The last column records what the reference download holds: the September
 | Cell Types | `consolidated_cell_types.csv.gz` | 902 KB | optional | yes |
 | Marked Neuron Coordinates | `coordinates.csv.gz` | 5,315 KB | optional | yes |
 | Community Labels (Raw) | `labels.csv.gz` | 4,771 KB | optional | yes |
-| Cell Size Measurements | `cell_stats.csv.gz` | 2,527 KB | optional | no |
+| Cell Size Measurements | `cell_stats.csv.gz` | 2,527 KB | optional | yes |
+| Visual Neuron Annotations | `visual_neuron_types.csv.gz` | 632 KB | optional | yes |
+| Visual Neuron Columns | `column_assignment.csv.gz` | 463 KB | optional | yes |
+| Connectivity Tags | `connectivity_tags.csv.gz` | 638 KB | optional | yes |
+| Community Labels (Refined) | `processed_labels.csv.gz` | 1,018 KB | optional | yes |
 
 Three required files, about 71 MB. The optional ones add cell type names,
-3D positions, community annotations with attribution, and morphometrics.
+3D positions, community annotations with attribution, cable length, area and
+volume, visual families and subsystems, retinotopic columns, connectivity
+tags, and Fly Anatomy Ontology (FBbt) ids from the refined labels. Each is
+read when present and skipped when not.
+
+Two things about the optional files that are easy to get wrong:
+
+- `column_assignment.csv.gz` numbers columns separately in each optic lobe,
+  so a column is a hemisphere plus an id: 796 ids, 1,581 columns.
+- `connectivity_tags.csv.gz` holds comma-separated tags. The portal's
+  "28 unique values" counts combinations of 8 tags. Four of the 8 are on 44%
+  to 95% of all neurons, so only `broadcaster`, `integrator`, `nsrn` and
+  `highly_reciprocal_neuron` get graph nodes; every tag stays in neuron
+  metadata.
 
 ### Safari strips the `.gz` without decompressing
 
@@ -63,11 +80,8 @@ it lists the Synapse Table as `synapse_table.csv.gz`.
 |---|---|---|---|---|
 | Synapse Table | `fafb_v783_princeton_synapse_table.csv.gz` | 2,695 MB | the graph is at neuron resolution, it uses synapse counts | yes |
 | Neuron Skeletons | `sk_lod1_783_healed/` | 13 GB zipped, 31 GB unpacked | coordinates give one position per neuron instead | yes |
-| Community Labels (Refined) | `processed_labels.csv.gz` | 1,018 KB | the raw labels carry the attribution the graph records | yes |
 | Connections (Unfiltered) | not checked | 277 MB | millions of single-synapse rows, mostly detection noise | no |
 | Proofread Cell Names And Groups | not checked | 1,182 KB | cell types carry the identity the graph uses | no |
-| Visual Neuron Annotations / Columns | not checked | 1,095 KB | not yet wired in | no |
-| Connectivity Tags | not checked | 638 KB | not yet wired in | no |
 | Synapse Coordinates / Attachment Rates | not checked | varies | per-synapse detail the neuron-level graph does not use | no |
 | Anything marked "prior to July 2025" | not checked | varies | superseded; mixing detectors is not valid | no |
 
@@ -159,14 +173,21 @@ used on the dataset node.
    extra installed) to also embed the cell types, neuropils, labels and taxa;
    that is about 20k short texts and takes a few minutes on CPU.
 
-6. Measured footprint, `--no-index` on the real v783 release (Apple silicon,
-   September 2026): **2 minutes 52 seconds and 2.0 GB** of SQLite for
-   155,673 nodes and 5,008,717 edges.
+6. Measured footprint, `--no-index` on the real v783 release with every
+   optional file present (Apple silicon, September 2026): **3 minutes 57
+   seconds and 2.1 GB** of SQLite for 157,698 nodes and 5,072,285 edges.
 
    Keep about 4 GB free rather than 2. The whole build lands in one
    transaction, so `graph.sqlite` stays near 100 MB while the write-ahead log
    grows to roughly 2 GB, and both exist at once during the checkpoint that
    ends the build.
+
+   Every build writes `reports/build_<timestamp>.md`: versions and git commit,
+   the options, each input file's SHA-256 against the manifest, time per
+   extraction stage, the counts written, and peak resident memory. The reports
+   are gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
+   records the built graph's metrics in `.connectomekg/snapshots/`, which is
+   tracked.
 
 ## If Codex offers something other than what you expected
 

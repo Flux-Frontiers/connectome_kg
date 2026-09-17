@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from connectomekg.manifest import verify_dir
@@ -45,6 +46,11 @@ def test_codex_round_trip(tables, tmp_path):
         "consolidated_cell_types.csv.gz",
         "coordinates.csv.gz",
         "labels.csv.gz",
+        "cell_stats.csv.gz",
+        "visual_neuron_types.csv.gz",
+        "column_assignment.csv.gz",
+        "connectivity_tags.csv.gz",
+        "processed_labels.csv.gz",
     }
     back = read_codex(d, tables.dataset)
     assert len(back.neurons) == len(tables.neurons)
@@ -53,6 +59,14 @@ def test_codex_round_trip(tables, tmp_path):
     assert list(back.neurons["cell_type"]) == list(tables.neurons["cell_type"])
     assert back.connections["syn_count"].sum() == tables.connections["syn_count"].sum()
     assert back.neurons["x"].notna().all()
+    for col in ("fbbt", "connectivity_tags", "refined_labels"):
+        assert list(back.neurons[col]) == list(tables.neurons[col])
+    for col in ("column_id", "column_q", "score_gaba", "length_nm"):
+        # CSV text can move the last digit of a float.
+        assert np.allclose(back.neurons[col].fillna(-1), tables.neurons[col].fillna(-1))
+    assert back.neurons["visual_family"].fillna("").tolist() == (
+        tables.neurons["visual_family"].fillna("").tolist()
+    )
 
 
 def test_too_few_neurons_is_refused_not_silently_shrunk():

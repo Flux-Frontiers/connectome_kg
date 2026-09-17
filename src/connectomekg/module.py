@@ -22,10 +22,14 @@ _KIND_PRIORITY = {
     "cell_type": 0,
     "neuropil": 1,
     "neuron": 2,
-    "label": 3,
-    "taxon": 4,
-    "hemilineage": 5,
-    "dataset": 6,
+    "ontology_term": 3,
+    "label": 4,
+    "taxon": 5,
+    "hemilineage": 6,
+    "nerve": 7,
+    "connectivity_tag": 8,
+    "column": 9,
+    "dataset": 10,
 }
 
 
@@ -265,5 +269,16 @@ class ConnectomeKG(KGModule):
             out.append(
                 f"- neurons with a community label: {labelled} of {n_neu} ({labelled / n_neu:.1%})"
             )
+            layers = (
+                ("a visual family", "json_extract(metadata,'$.visual_family') != ''"),
+                ("a visual column", "json_extract(metadata,'$.column') != ''"),
+                ("an ontology term", "json_array_length(metadata,'$.fbbt') > 0"),
+                ("a cable length", "json_extract(metadata,'$.length_nm') IS NOT NULL"),
+            )
+            for what, cond in layers:
+                k = con.execute(
+                    f"SELECT COUNT(*) FROM nodes WHERE kind='neuron' AND {cond}"
+                ).fetchone()[0]
+                out.append(f"- neurons with {what}: {k} of {n_neu} ({k / n_neu:.1%})")
         out.append("")
         return "\n".join(out)

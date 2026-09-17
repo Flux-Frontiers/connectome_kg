@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Annotation layers from the optional Codex files.** The reader now joins
+  `cell_stats`, `visual_neuron_types`, `column_assignment`,
+  `connectivity_tags` and `processed_labels` when present, and keeps the
+  per-transmitter prediction scores it used to discard. The graph gains
+  sub-class taxa, `nerve` nodes (`VIA_NERVE`), visual subsystem and family
+  taxa that contain their cell types, retinotopic `column` nodes keyed by
+  hemisphere and id (`IN_COLUMN`), `connectivity_tag` nodes for the four
+  selective tags (`TAGGED`), and Fly Anatomy Ontology `ontology_term` nodes
+  mapped from cell types (`MAPS_TO`), with the `Fbbt_`/`FBbt_` spelling
+  normalised. A type maps to a term only when at least half as many of its
+  neurons carry it as carry its best-supported term: on v783 that drops 247
+  of 552 raw mappings, such as T4b to the T4a, T4c and T4d terms on 40, 6
+  and 6 stray labels against 1,426 for its own. Neurons carry flow, nerve, transmitter scores, cable length,
+  area, volume, column, tags and refined labels in metadata; cell type
+  docstrings mention flow, visual family and ontology ids. `analyze` reports
+  coverage for each layer. The synthetic fixture writes every new file.
+
 - **CI and release workflows from doc_kg.** CI adds a blocking `ty` type
   check and an installed-wheel job that loads the `connkg` entry point, builds
   and path-queries a synthetic connectome, and imports every packaged

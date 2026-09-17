@@ -7,6 +7,7 @@ which release it came from.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -16,6 +17,12 @@ import pandas as pd
 EXCITATORY = ("ACH", "DA", "OCT", "SER")
 INHIBITORY = ("GABA", "GLUT")
 NT_SIGN: dict[str, int] = {nt: 1 for nt in EXCITATORY} | {nt: -1 for nt in INHIBITORY}
+
+#: Prediction score per transmitter, one column each.
+NT_SCORE_COLUMNS = ("score_ach", "score_da", "score_gaba", "score_glut", "score_oct", "score_ser")
+
+#: Neuron columns holding tuples of strings; empty tuples when a release has none.
+LIST_COLUMNS = ("connectivity_tags", "refined_labels", "fbbt")
 
 NEURON_COLUMNS = (
     "root_id",
@@ -32,9 +39,37 @@ NEURON_COLUMNS = (
     "x",
     "y",
     "z",
+    *NT_SCORE_COLUMNS,
+    "length_nm",
+    "area_nm2",
+    "volume_nm3",
+    "visual_family",
+    "visual_subsystem",
+    "visual_category",
+    "column_hemisphere",
+    "column_id",
+    "column_x",
+    "column_y",
+    "column_p",
+    "column_q",
+    *LIST_COLUMNS,
 )
 CONNECTION_COLUMNS = ("pre", "post", "neuropil", "syn_count", "nt_type")
 LABEL_COLUMNS = ("root_id", "text", "user", "affiliation", "date")
+
+_FBBT = re.compile(r"\bfbbt_(\d{8})\b", re.IGNORECASE)
+
+
+def fbbt_ids(texts: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    """Fly Anatomy Ontology ids mentioned in some label texts, normalised.
+
+    Codex spells the prefix both ``FBbt_`` and ``Fbbt_``; the ontology's own
+    form is ``FBbt_``, so every match is rewritten to it.
+
+    :param texts: Label strings.
+    :return: Sorted distinct ids such as ``("FBbt_00003733",)``.
+    """
+    return tuple(sorted({f"FBbt_{m.group(1)}" for t in texts for m in _FBBT.finditer(t)}))
 
 
 @dataclass(frozen=True)
@@ -79,7 +114,9 @@ class ConnectomeTables:
     """The normalised tables for one connectome.
 
     :param dataset: Provenance record.
-    :param neurons: One row per neuron, columns :data:`NEURON_COLUMNS`.
+    :param neurons: One row per neuron, columns :data:`NEURON_COLUMNS`. Optional
+        annotations are NaN when a release lacks them, except
+        :data:`LIST_COLUMNS`, which are empty tuples.
     :param connections: One row per (pre, post, neuropil), columns
         :data:`CONNECTION_COLUMNS`. ``pre`` and ``post`` are root ids.
     :param labels: One row per community annotation, columns :data:`LABEL_COLUMNS`.
