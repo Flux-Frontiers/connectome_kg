@@ -55,8 +55,10 @@ The `semantic` extra adds the embedding model for `connkg query`. Without it, ev
 
 The `viz3d` extra (`pip install -e ".[viz3d]"`) adds PyVista, PyQt5, pyvistaqt
 and `quiltwright` for `connkg quilt` and `connkg viz3d`: real-geometry 3-D
-views of the whole brain plus a circuit's traced skeletons, rendered to a
-Looking Glass quilt or opened in an interactive viewer.
+views of the whole brain plus a circuit's traced skeletons or the signal flow
+between neuropils, rendered to a Looking Glass quilt or opened in an
+interactive viewer. [docs/rendering.md](docs/rendering.md) explains both views
+and how each is drawn.
 
 No install at all also works from the clone root: `PYTHONPATH=src python -m connectomekg <arguments>`. With Poetry, prefix commands with `poetry run`.
 

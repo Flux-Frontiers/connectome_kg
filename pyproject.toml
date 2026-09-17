@@ -22,7 +22,8 @@
 #   poetry install                      core runtime only
 #   poetry install --with dev           + pytest, ruff, ty, pre-commit
 #   poetry install --with kg            + the dockg/pycodekg CLIs (maintainer tooling)
-#   poetry install --all-extras --with dev,kg   full maintainer environment
+#   poetry install --with docs          + mkdocs, to build the docs site
+#   poetry install --all-extras --with dev,kg,docs   full maintainer environment
 #
 # Run tests
 # ---------
@@ -150,6 +151,21 @@ doc-kg = ">=0.26.0"
 pycode-kg = ">=0.27.0"
 
 # ---------------------------------------------------------------------------
+# Docs site (Poetry group, not a PEP 621 extra)
+# ---------------------------------------------------------------------------
+# mkdocs-material renders docs/*.md as-is, and mkdocstrings adds an API
+# reference generated from the package's own docstrings so it cannot drift
+# from the code. Same setup as quiltwright.
+#
+#   poetry install --with docs && poetry run mkdocs serve
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+mkdocs-material = ">=9.5"
+mkdocstrings = { version = ">=0.26", extras = ["python"] }
+
+# ---------------------------------------------------------------------------
 # Tool configuration
 # ---------------------------------------------------------------------------
 [tool.ruff]
@@ -180,5 +196,6 @@ exclude = ["tests"]
 include = ["src"]
 
 [tool.dockg]
-# fafb_v783/ and data/ hold connectome downloads, not documentation.
-exclude = ["__pycache__", "dist", "src", "tests", "data", "fafb_v783"]
+# fafb_v783/ and data/ hold connectome downloads, not documentation. site/ is
+# the gitignored mkdocs build: it would index every page twice.
+exclude = ["__pycache__", "dist", "src", "tests", "data", "fafb_v783", "site"]

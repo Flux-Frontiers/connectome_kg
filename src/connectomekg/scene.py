@@ -83,7 +83,7 @@ BACKGROUND: Final = "#5A5D62"
 #: The flow view thins the context cloud to every Nth neuron, drawn with
 #: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
-_FLOW_CONTEXT_RADIUS: Final = 0.02
+_FLOW_CONTEXT_RADIUS: Final = 0.014
 #: Sphere radii, world units. A fallback sphere (no skeleton) is drawn larger
 #: than a real soma so it reads as a stand-in, not a measurement.
 _SOMA_RADIUS: Final = 0.05
