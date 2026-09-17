@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI and release workflows from doc_kg.** CI adds a blocking `ty` type
+  check and an installed-wheel job that loads the `connkg` entry point, builds
+  and path-queries a synthetic connectome, and imports every packaged
+  submodule, all from a clean core-only install. A `v*` tag builds the
+  package, creates the GitHub Release (which Zenodo archives) and publishes
+  to PyPI through trusted publishing.
+
 - **`connkg build` reports progress.** A real FAFB v783 build ran for three
   minutes with no output at all, which reads as a hang. The extractor takes an
   optional `progress` callback, reports each stage and a count every 250,000
@@ -56,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one it found.
 
 ### Fixed
+
+- **Importing `connectomekg.cli.__main__` ran the CLI.** It called `cli()`
+  with no `__main__` guard, so anything that walked the package, like the new
+  wheel job, printed help and exited. `python -m connectomekg.cli` still works.
+
+- **`ty check src/` reported 17 errors.** pandas types `groupby` keys as
+  `Hashable`; the extractor and synthetic reader now convert them with `str()`,
+  which they already were at runtime.
 
 - **Current Codex exports failed to load.** `classification.csv.gz` no longer
   carries a `cell_type` column, and the reader demanded it, so every build

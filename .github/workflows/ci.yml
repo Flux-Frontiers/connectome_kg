@@ -7,39 +7,203 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: snok/install-poetry@v1
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
-      - run: poetry install --with dev --no-interaction
-      - run: poetry run ruff format --check .
-      - run: poetry run ruff check .
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: lint-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dev dependencies
+        run: poetry install --no-interaction --with dev
+
+      - name: Check formatting
+        run: poetry run ruff format --check .
+
+      - name: Lint
+        run: poetry run ruff check .
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
+
+      - name: Run ty
+        run: poetry run ty check src/
 
   test:
-    name: Tests
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: snok/install-poetry@v1
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
-      - run: poetry install --with dev --no-interaction
-      # The semantic query test skips without the semantic extra; CI runs
-      # the structural suite only, which needs no model download.
-      - run: poetry run pytest
+
+      - name: Cache virtualenv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: test-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        # No semantic extra: the semantic query test skips without it, and the
+        # structural suite needs no model download.
+        run: poetry install --no-interaction --with dev
+
+      - name: Run tests
+        run: poetry run pytest
+
+  wheel:
+    name: Installed CLI
+    runs-on: ubuntu-latest
+    # Guards what the other jobs cannot see: they run against the source tree,
+    # so they pass even when the built wheel is missing modules the CLI imports
+    # or declares a dependency in a form PyPI strips from wheel metadata.
+    #
+    # This builds the artifact users actually receive, installs it core-only
+    # somewhere with no source tree in sight, and puts it through three gates:
+    #
+    #   1. every console-script entry point loads. entry_point.load() imports
+    #      the module and resolves the attribute without calling it.
+    #   2. a synthetic connectome builds and answers a path query. Gate 1
+    #      proves the code imports; only this proves it runs. --no-index keeps
+    #      it free of the semantic extra and any model download.
+    #   3. every packaged submodule imports, including ones no entry point or
+    #      build path reaches.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Build wheel
+        run: poetry build
+
+      - name: Install the wheel into a clean venv
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+
+      - name: Load every console-script entry point
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib.metadata as md
+          import sys
+
+          eps = [e for e in md.distribution("connectome-kg").entry_points
+                 if e.group == "console_scripts"]
+          if not eps:
+              sys.exit("no console scripts found in the installed distribution")
+
+          failed = []
+          for e in sorted(eps, key=lambda e: e.name):
+              try:
+                  e.load()
+                  print(f"  ok    {e.name} -> {e.value}")
+              except Exception as exc:
+                  failed.append(e.name)
+                  print(f"  FAIL  {e.name} -> {e.value}\n        {type(exc).__name__}: {exc}")
+          if failed:
+              sys.exit(f"\n{len(failed)} console script(s) unusable when installed: "
+                       + ", ".join(failed))
+          print(f"\nall {len(eps)} console scripts load from a clean install")
+          PY
+
+      - name: Build a synthetic connectome and query it end to end
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/connkg fixture --out /tmp/synth --n 1000 --seed 1
+          /tmp/smoke/bin/connkg --root /tmp/kg build --data-dir /tmp/synth \
+            --dataset-id synthetic1k --no-index --wipe
+          test -f /tmp/kg/.connectomekg/graph.sqlite || { echo "no graph.sqlite"; exit 1; }
+          /tmp/smoke/bin/connkg --root /tmp/kg path --dataset-id synthetic1k \
+            --from GRN_sugar --to MN9 | tee /tmp/path.out
+          grep -q "MN9/" /tmp/path.out \
+            || { echo "path query did not reach the planted motor neuron"; exit 1; }
+          echo "end-to-end build + path query OK"
+
+      - name: Import every packaged submodule
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib
+          import pkgutil
+          import sys
+
+          import connectomekg
+
+          names = [m.name for m in pkgutil.walk_packages(connectomekg.__path__, "connectomekg.")]
+          if not names:
+              sys.exit("connectomekg has no submodules -- the wheel is missing its package body")
+
+          failed = []
+          for name in sorted(names):
+              try:
+                  importlib.import_module(name)
+              except Exception as exc:
+                  failed.append(name)
+                  print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
+          if failed:
+              sys.exit(f"\n{len(failed)} of {len(names)} submodule(s) fail to import "
+                       "from the installed wheel: " + ", ".join(failed))
+          print(f"all {len(names)} packaged submodules import from a clean install")
+          PY

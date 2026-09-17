@@ -197,6 +197,7 @@ class ConnectomeExtractor(KGExtractor):
         for sc, g in neurons.groupby("super_class", sort=True):
             if not sc:
                 continue
+            sc = str(sc)
             sid = self.taxon_id(sc)
             top_level.append(sid)
             yield NodeSpec(
@@ -211,6 +212,7 @@ class ConnectomeExtractor(KGExtractor):
             for cls, gg in g.groupby("class", sort=True):
                 if not cls:
                     continue
+                cls = str(cls)
                 cid = self.taxon_id(sc, cls)
                 yield NodeSpec(
                     node_id=cid,
@@ -230,6 +232,7 @@ class ConnectomeExtractor(KGExtractor):
         for hl, g in neurons.groupby("hemilineage", sort=True):
             if not hl:
                 continue
+            hl = str(hl)
             hid = self.hemilineage_id(hl)
             top_level.append(hid)
             types = sorted({x for x in g["cell_type"] if x})
@@ -295,6 +298,7 @@ class ConnectomeExtractor(KGExtractor):
         for ct, g in neurons.groupby("cell_type", sort=True):
             if not ct:
                 continue
+            ct = str(ct)
             tid = self.type_id(ct)
             top_level.append(tid)
             sides = g["side"].str.upper().str[:1]

@@ -278,7 +278,7 @@ def synthetic_tables(n_neurons: int = 1000, seed: int = 1) -> ConnectomeTables:
     out_deg = rng.lognormal(np.log(k_mean) - sigma**2 / 2, sigma, size=n)
     out_deg = np.clip(np.round(out_deg), 0, n // 4).astype(int)
     by_np: dict[str, np.ndarray] = {
-        k: g.index.to_numpy() for k, g in df.groupby("neuropil", sort=False)
+        str(k): g.index.to_numpy() for k, g in df.groupby("neuropil", sort=False)
     }
     homes = df["_home"].to_numpy()
     sides = df["side"].to_numpy()
