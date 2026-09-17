@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A key for the rendered images, and a script that regenerates them.**
+  `docs/rendering.md` gains "Reading the images": swatches for the
+  background, the context cloud's super classes and signs, what each shape,
+  size, thickness and curve means in the circuit and flow views, a region
+  colour table, and a collapsible table of every labelled neuropil. The
+  swatches are generated from `connectomekg.colors` and show the colours as
+  drawn. `docs/scripts/render_images.py` redraws the four doc images through
+  the same steps as `connkg quilt --still` and labels neuropils in the flow
+  images. `connectomekg.neuropils` gains `REGION_NAMES`, `NEUROPIL_REGION`
+  and `neuropil_region`, grouping every neuropil into the 13 regions of the
+  nomenclature FlyWire follows (Ito et al. 2014).
+
 - **`--floor`, `--elevation` and `--still` for the 3-D views.** `--floor`
   (on `connkg quilt` and `connkg viz3d`) stands the scene over a floor in
   the background grey, lit by a shadow-casting spotlight from above, with an
@@ -151,6 +163,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason for each.
 
 ### Changed
+
+- **Colour-blind-safe colours in the 3-D views, with no pastels.** Neuropil
+  spheres and flow tubes are coloured by brain region (`scene.region_color`)
+  instead of a 15-colour hash of the neuropil name, which had given unrelated
+  neuropils the same colour. The regions use the 8 saturated Okabe-Ito colours
+  (`colors.REGION_COLOR`); neighbouring regions share a colour where 13 do not
+  fit. Cell-type colours are the 7 non-black Okabe-Ito colours. The flow
+  view's context cloud is one neutral grey, so colour there means only region,
+  and `--color-by` applies to the circuit view alone. The context cloud is
+  muted toward the grey background instead of lightened toward white, so a
+  skeleton that shares a hue with the dots around it still stands out.
+  Neuropil spheres and tubes are lit more evenly (`_FLOW_AMBIENT`), because
+  shading turned the yellow region colour orange.
 
 - **`connkg quilt` frames with quiltwright's `frame_and_focus` and sweeps a
   35-degree view cone by default.** The new `scene.aim_camera` points the

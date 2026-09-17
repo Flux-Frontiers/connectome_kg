@@ -39,7 +39,8 @@ import numpy as np
 from kg_utils.store import GraphStore
 from kg_utils.viz3d import seed_from_key
 
-from connectomekg.colors import SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
+from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
+from connectomekg.neuropils import neuropil_region
 from connectomekg.skeletons import Skeleton, load_skeletons, segments, soma
 from connectomekg.validation import (
     MAX_FLOW_PAIRS,
@@ -69,11 +70,14 @@ _SQL_NEURON_XYZ = (
 #: The context cloud is one low-poly sphere glyph per neuron, sized in world
 #: units rather than screen pixels: a pixel-sized point vanishes on a HiDPI
 #: display and in a quilt tile, while a world-sized glyph scales with the view.
-#: Its colours are lightened toward white so they stand off the grey
-#: background -- lightened rather than made transparent, since alpha ghosts in
+#: Its colours are blended part of the way toward the background, which keeps
+#: their hue but mutes them, so the subject drawn at full saturation stands
+#: out even where it shares a hue with the cloud around it. Toward the grey
+#: background, not toward white: lightened colours turn pastel, which
+#: colour-blind readers cannot tell apart. Opaque, since alpha ghosts in
 #: light-field renders.
 _CONTEXT_RADIUS: Final = 0.005
-_CONTEXT_LIGHTEN: Final = 0.35
+_CONTEXT_MUTE: Final = 0.45
 #: Darkening for idle neuropil spheres in the flow view.
 _CONTEXT_DIM: Final = 0.85
 #: Scene background: a muted mid grey. On PyVista's default white the dimmed
@@ -84,6 +88,10 @@ BACKGROUND: Final = "#5A5D62"
 #: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
 _FLOW_CONTEXT_RADIUS: Final = 0.014
+#: The flow view draws its context cloud in one neutral grey, so that colour
+#: in that view means only a neuropil's brain region: super-class colours on
+#: the dots would reuse the same hues for something else.
+_FLOW_CONTEXT_COLOR: Final = "#8A8F96"
 #: Sphere radii, world units. A fallback sphere (no skeleton) is drawn larger
 #: than a real soma so it reads as a stand-in, not a measurement.
 _SOMA_RADIUS: Final = 0.05
@@ -98,6 +106,11 @@ _FLOW_MAX_RADIUS: Final = 0.08
 _FLOW_MIN_RADIUS: Final = 0.004
 _FLOW_BOW: Final = 0.15
 _FLOW_ARC_POINTS: Final = 17
+#: Ambient share of the lighting on neuropil spheres and flow tubes. Shading
+#: darkens a colour toward its neighbours (a shaded yellow reads as orange),
+#: and region colours must stay recognisable, so these surfaces are lit more
+#: evenly than the default.
+_FLOW_AMBIENT: Final = 0.45
 
 #: Floor and shadow rig for :func:`add_floor`, world units. The floor sits a
 #: little below the subject and is far larger than any frame, so it fills the
@@ -119,8 +132,9 @@ _SHADOW_MAP_RESOLUTION: Final = 8192
 VIEWS: Final = ("circuit", "flow")
 
 #: Qualitative palette a cell type's colour is deterministically drawn from,
-#: via :func:`type_color`. Okabe-Ito colour-blind-safe eight, extended with a
-#: further seven visually distinct hues so nearby types rarely collide.
+#: via :func:`type_color`: the seven saturated Okabe-Ito colours other than
+#: black, which stay distinguishable under the common forms of colour
+#: blindness. A circuit rarely draws more than a few cell types at once.
 _TYPE_PALETTE: Final[tuple[str, ...]] = (
     "#E69F00",
     "#56B4E9",
@@ -129,15 +143,17 @@ _TYPE_PALETTE: Final[tuple[str, ...]] = (
     "#0072B2",
     "#D55E00",
     "#CC79A7",
-    "#999999",
-    "#882255",
-    "#44AA99",
-    "#332288",
-    "#AA4499",
-    "#117733",
-    "#DDCC77",
-    "#88CCEE",
 )
+
+
+def region_color(neuropil: str) -> str:
+    """The colour for a neuropil: its brain region's colour.
+
+    :param neuropil: FlyWire abbreviation, with or without side suffix.
+    :return: A ``#RRGGBB`` colour from :data:`connectomekg.colors.REGION_COLOR`,
+        or the unknown grey for a neuropil with no region.
+    """
+    return REGION_COLOR.get(neuropil_region(neuropil) or "", UNKNOWN_COLOR)
 
 
 def type_color(name: str) -> str:
@@ -449,6 +465,29 @@ def _segments_to_polydata(segs: np.ndarray) -> pv.PolyData:
     return mesh
 
 
+def _context_for_view(
+    view: str, ids: list[str], points_nm: np.ndarray, colors: list[str]
+) -> tuple[list[str], np.ndarray, list[str], float]:
+    """The context cloud a view draws: which neurons, their colours, glyph radius.
+
+    The circuit view draws every neuron in its super-class or sign colour.
+    The flow view thins the cloud to every :data:`_FLOW_CONTEXT_STRIDE`-th
+    neuron, draws larger glyphs, and colours every glyph neutral grey so that
+    colour in that view means only a neuropil's region.
+
+    :return: ``(ids, points_nm, colors, radius)``.
+    """
+    if view != "flow":
+        return ids, points_nm, colors, _CONTEXT_RADIUS
+    ids = ids[::_FLOW_CONTEXT_STRIDE]
+    return (
+        ids,
+        points_nm[::_FLOW_CONTEXT_STRIDE],
+        [_FLOW_CONTEXT_COLOR] * len(ids),
+        _FLOW_CONTEXT_RADIUS,
+    )
+
+
 def _draw_flow(
     plotter: pv.Plotter,
     kg: ConnectomeKG,
@@ -461,8 +500,8 @@ def _draw_flow(
     """Draw neuropil spheres and the *top* flow arcs (view C) into *plotter*.
 
     One sphere actor per neuropil (``neuropil:<name>``) and one tube actor per
-    source neuropil (``flow:<name>``), coloured by the neuropil's side-free
-    base so a left/right pair matches.
+    source neuropil (``flow:<name>``), coloured by the neuropil's brain region
+    (:func:`region_color`).
 
     :return: ``(arcs drawn, directed pairs with nonzero flow)``.
     """
@@ -491,13 +530,17 @@ def _draw_flow(
             continue
         rel = np.cbrt(flow.n_synapses[i] / max_syn) if max_syn > 0 else 1.0
         radius = max(_NEUROPIL_MAX_RADIUS * float(rel), _FLOW_MIN_RADIUS)
-        color = type_color(flow.bases[i])
+        color = region_color(name)
         if name not in active:
             radius *= 0.5
             rgb = np.clip(np.asarray(_hex_to_rgb(color)) * _CONTEXT_DIM, 0, 255)
             color = "#{:02X}{:02X}{:02X}".format(*(int(c) for c in rgb))
         plotter.add_mesh(
-            pv.Sphere(radius=radius, center=centers[i]), color=color, name=f"neuropil:{name}"
+            pv.Sphere(radius=radius, center=centers[i]),
+            color=color,
+            ambient=_FLOW_AMBIENT,
+            diffuse=1.0 - _FLOW_AMBIENT,
+            name=f"neuropil:{name}",
         )
     world_points.append(centers[placed])
 
@@ -511,7 +554,13 @@ def _draw_flow(
         world_points.append(arc)
     for source, meshes in tubes_by_source.items():
         mesh = meshes[0] if len(meshes) == 1 else pv.merge(meshes)
-        plotter.add_mesh(mesh, color=type_color(flow.bases[index[source]]), name=f"flow:{source}")
+        plotter.add_mesh(
+            mesh,
+            color=region_color(source),
+            ambient=_FLOW_AMBIENT,
+            diffuse=1.0 - _FLOW_AMBIENT,
+            name=f"flow:{source}",
+        )
     return len(drawn), len(flow.pairs)
 
 
@@ -629,6 +678,7 @@ def build_brain_scene(
         circuit neuron falls back to a marked-point sphere. Unused by the
         flow view.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
+        The flow view ignores it and draws the cloud in neutral grey.
     :param skeleton_step: Skeleton simplification stride, bounded to
         ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
@@ -659,18 +709,15 @@ def build_brain_scene(
 
     _say("context point cloud")
     ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
-    radius = _CONTEXT_RADIUS
-    if view == "flow":
-        ctx_ids = ctx_ids[::_FLOW_CONTEXT_STRIDE]
-        ctx_points_nm = ctx_points_nm[::_FLOW_CONTEXT_STRIDE]
-        ctx_colors = ctx_colors[::_FLOW_CONTEXT_STRIDE]
-        radius = _FLOW_CONTEXT_RADIUS
+    ctx_ids, ctx_points_nm, ctx_colors, radius = _context_for_view(
+        view, ctx_ids, ctx_points_nm, ctx_colors
+    )
     n_context = len(ctx_ids)
     if n_context:
         ctx_world = frame.to_world(ctx_points_nm)
         cloud = pv.PolyData(ctx_world)
         rgb = np.asarray([_hex_to_rgb(c) for c in ctx_colors], dtype=np.float64)
-        rgb = rgb + (255.0 - rgb) * _CONTEXT_LIGHTEN
+        rgb = rgb + (np.asarray(_hex_to_rgb(BACKGROUND), dtype=np.float64) - rgb) * _CONTEXT_MUTE
         cloud.point_data["rgb"] = np.clip(rgb, 0, 255).astype(np.uint8)
         glyphs = cloud.glyph(
             geom=pv.Sphere(radius=radius, theta_resolution=6, phi_resolution=4),
@@ -806,6 +853,7 @@ __all__ = [
     "context_points",
     "flow_arc",
     "neuropil_flow",
+    "region_color",
     "type_color",
     "world_frame",
 ]

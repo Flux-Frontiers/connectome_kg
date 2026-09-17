@@ -1,7 +1,8 @@
 # Images
 
 Every image in this directory is a render of the FlyWire FAFB v783
-connectome, made with `connkg quilt` or `connectomekg.scene`.
+connectome. Regenerate them all from a built graph and the skeleton download
+with `poetry run python docs/scripts/render_images.py`.
 
 The data comes from FlyWire (https://flywire.ai):
 

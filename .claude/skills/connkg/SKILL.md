@@ -191,7 +191,14 @@ back to a larger sphere at its marked point instead of a traced shape.
   restrict the sum to their neurons, with no neuron cap. The largest v783
   flows are ME -> LO, LA -> ME, LO -> LOP and LO -> PVLP. Each arc bows to one
   side, so A -> B and B -> A do not overlap. The context cloud is thinned to
-  every 10th neuron in this view.
+  every 10th neuron in this view, in one neutral grey.
+- Colours are colour-blind safe, with no pastels. Neuropils and flow tubes
+  take their brain region's colour (13 regions from
+  `connectomekg.neuropils.NEUROPIL_REGION` over 8 Okabe-Ito colours, so
+  neighbouring regions share one); cell types use the 7 non-black Okabe-Ito
+  colours; the circuit view's cloud is its super-class colours muted toward
+  the background. The key is "Reading the images" in `docs/rendering.md`;
+  regenerate the doc images with `docs/scripts/render_images.py`.
 - `--floor` stands the scene over a floor lit from above, with shadows, and
   defaults `--elevation` to 25 degrees (the floor is invisible from level).
   Pair it with `--tubes` in the circuit view: line skeletons cast almost no

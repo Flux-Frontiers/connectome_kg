@@ -118,7 +118,8 @@ color_by_option = click.option(
     type=click.Choice(["super_class", "sign"]),
     default="super_class",
     show_default=True,
-    help="Colour the context cloud by super class or transmitter sign.",
+    help="Colour the context cloud by super class or transmitter sign (circuit view; "
+    "the flow view's cloud is neutral grey).",
 )
 skeleton_step_option = click.option(
     "--skeleton-step",
