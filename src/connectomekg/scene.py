@@ -2,7 +2,8 @@
 
 Builds the real-geometry 3-D views of a connectome: view A, every neuron's
 marked point as a dim context cloud, and view B, the skeletons of a query's
-neurons drawn at full brightness inside it. Unlike the fleet's other viz3d
+neurons drawn at full brightness inside it, and view C, neuropils linked by
+the signal flow their neurons carry between them. Unlike the fleet's other viz3d
 consumers (``gutenberg_kg``, ``pycode_kg``, ``genealogy_kg``), this graph
 already has space -- every neuron carries real ``x``/``y``/``z`` coordinates
 and the download holds a traced skeleton for most of them -- so there is no
@@ -13,8 +14,9 @@ What is reused from that engine is just the camera rule (``frame_tree``, in
 Split the way ``pycode_kg.scene3d`` and ``genealogy_kg.scene`` split their own
 layout from composition, so most of this is testable without PyVista:
 
-* :class:`WorldFrame`, :func:`world_frame`, :func:`context_points` and
-  :func:`circuit_neurons` are pure NumPy plus SQL -- no PyVista import.
+* :class:`WorldFrame`, :func:`world_frame`, :func:`context_points`,
+  :func:`circuit_neurons`, :func:`neuropil_flow` and :func:`flow_arc` are pure
+  NumPy plus SQL -- no PyVista import.
 * :func:`build_brain_scene` composes those into a caller-supplied
   ``pv.Plotter``. This half needs the ``viz3d`` extra.
 
@@ -27,7 +29,8 @@ reason ``genealogy_kg`` keeps its palette in ``theme.py`` rather than
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections import defaultdict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -39,6 +42,7 @@ from kg_utils.viz3d import seed_from_key
 from connectomekg.colors import SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
 from connectomekg.skeletons import Skeleton, load_skeletons, segments, soma
 from connectomekg.validation import (
+    MAX_FLOW_PAIRS,
     MAX_SCENE_NEURONS,
     MAX_SKELETON_STEP,
     bounded_int,
@@ -66,11 +70,27 @@ _SQL_NEURON_XYZ = (
 #: transparent, since alpha ghosts in light-field renders (plan section 3.A).
 _CONTEXT_POINT_SIZE: Final = 3.0
 _CONTEXT_DIM: Final = 0.55
+#: The flow view thins the context cloud to every Nth neuron and draws it
+#: smaller: at full density it hides the neuropil spheres and arcs inside it.
+_FLOW_CONTEXT_STRIDE: Final = 10
+_FLOW_CONTEXT_POINT_SIZE: Final = 2.0
 #: Sphere radii, world units. A fallback sphere (no skeleton) is drawn larger
 #: than a real soma so it reads as a stand-in, not a measurement.
 _SOMA_RADIUS: Final = 0.05
 _FALLBACK_RADIUS: Final = 0.09
 _TUBE_RADIUS: Final = 0.01
+#: View C sizes, world units. A neuropil sphere's radius scales with the cube
+#: root of its synapse count, an arc's tube radius with the square root of its
+#: flow, each relative to the largest; idle neuropils (no drawn arc) are drawn
+#: at half size and dimmed.
+_NEUROPIL_MAX_RADIUS: Final = 0.22
+_FLOW_MAX_RADIUS: Final = 0.08
+_FLOW_MIN_RADIUS: Final = 0.004
+_FLOW_BOW: Final = 0.15
+_FLOW_ARC_POINTS: Final = 17
+
+#: The views :func:`build_brain_scene` composes.
+VIEWS: Final = ("circuit", "flow")
 
 #: Qualitative palette a cell type's colour is deterministically drawn from,
 #: via :func:`type_color`. Okabe-Ito colour-blind-safe eight, extended with a
@@ -206,6 +226,139 @@ def circuit_neurons(kg: ConnectomeKG, specs: Sequence[str]) -> list[str]:
     return sorted(ids)
 
 
+@dataclass(frozen=True)
+class NeuropilFlow:
+    """Neuropil positions and the signal flow between them (view C).
+
+    Flow from neuropil A to B is carried by neurons: each neuron's output
+    synapses in B, apportioned by the share of its input synapses that lie in
+    A, summed over neurons, with A = B excluded. See
+    kgrag_priv/docs/CONNECTOME_VIZ3D_PLAN.md section 3.C.
+
+    :param names: Neuropil abbreviations, e.g. ``"ME_R"``, sorted.
+    :param bases: Each neuropil's side-free base, e.g. ``"ME"``, same order.
+    :param centroids_nm: ``(n, 3)`` synapse-weighted centroid of the marked
+        points of every neuron in each neuropil; a row is NaN when no neuron
+        in it has coordinates.
+    :param n_synapses: ``(n,)`` each neuropil's synapse count.
+    :param pairs: ``(source, target, flow)`` for every directed pair with
+        nonzero flow, strongest first, ties broken by name.
+    """
+
+    names: list[str]
+    bases: list[str]
+    centroids_nm: np.ndarray
+    n_synapses: np.ndarray
+    pairs: list[tuple[str, str, float]]
+
+
+def neuropil_flow(store: GraphStore, neuron_ids: Iterable[str] | None = None) -> NeuropilFlow:
+    """Aggregate ``IN_NEUROPIL`` evidence into neuropil centroids and flow.
+
+    Centroids always use every neuron, so neuropils sit in the same place in
+    every flow render; only the flow sum is restricted by *neuron_ids*.
+
+    :param store: The graph store.
+    :param neuron_ids: Neuron node ids whose flow is summed; ``None`` sums
+        every neuron.
+    :return: The :class:`NeuropilFlow`.
+    """
+    con = store.con
+    np_rows = con.execute(
+        "SELECT id, name, json_extract(metadata,'$.base'), json_extract(metadata,'$.n_synapses') "
+        "FROM nodes WHERE kind='neuropil' ORDER BY name"
+    ).fetchall()
+    names = [r[1] for r in np_rows]
+    name_of = {r[0]: r[1] for r in np_rows}
+    index = {name: i for i, name in enumerate(names)}
+
+    positions = {
+        r[0]: (r[1], r[2], r[3])
+        for r in con.execute(
+            f"SELECT id, json_extract(metadata,'$.x'), json_extract(metadata,'$.y'), "
+            f"json_extract(metadata,'$.z') FROM nodes WHERE {_SQL_NEURON_XYZ}"
+        )
+    }
+    by_neuron: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+    for nid, np_id, pre, post in con.execute(
+        "SELECT src, dst, json_extract(evidence,'$.pre'), json_extract(evidence,'$.post') "
+        "FROM edges WHERE rel='IN_NEUROPIL'"
+    ):
+        if np_id in name_of:
+            by_neuron[nid].append((name_of[np_id], int(pre or 0), int(post or 0)))
+
+    weighted = np.zeros((len(names), 3), dtype=np.float64)
+    weights = np.zeros(len(names), dtype=np.float64)
+    for nid, rows in by_neuron.items():
+        pos = positions.get(nid)
+        if pos is None:
+            continue
+        for name, pre, post in rows:
+            i = index[name]
+            weighted[i] += (pre + post) * np.asarray(pos, dtype=np.float64)
+            weights[i] += pre + post
+    with np.errstate(invalid="ignore", divide="ignore"):
+        centroids = weighted / weights[:, None]
+    centroids[weights == 0] = np.nan
+
+    selected = (
+        by_neuron if neuron_ids is None else {n: by_neuron[n] for n in neuron_ids if n in by_neuron}
+    )
+    flow: dict[tuple[str, str], float] = defaultdict(float)
+    for rows in selected.values():
+        total_post = sum(post for _, _, post in rows)
+        if total_post == 0:
+            continue
+        for source, _, post in rows:
+            if post == 0:
+                continue
+            share = post / total_post
+            for target, pre, _ in rows:
+                if pre and target != source:
+                    flow[(source, target)] += pre * share
+
+    pairs = sorted(((a, b, w) for (a, b), w in flow.items()), key=lambda p: (-p[2], p[0], p[1]))
+    return NeuropilFlow(
+        names=names,
+        bases=[r[2] or r[1] for r in np_rows],
+        centroids_nm=centroids,
+        n_synapses=np.asarray([r[3] or 0 for r in np_rows], dtype=np.float64),
+        pairs=pairs,
+    )
+
+
+def flow_arc(
+    start: np.ndarray,
+    end: np.ndarray,
+    *,
+    bow: float = _FLOW_BOW,
+    n_points: int = _FLOW_ARC_POINTS,
+) -> np.ndarray:
+    """A quadratic arc from *start* to *end*, bowed to one side of its direction.
+
+    The bow points along ``direction x world-up`` (world ``+x`` when the
+    direction is vertical), so the arc for A -> B and the arc for B -> A bow to
+    opposite sides instead of overdrawing.
+
+    :param start: ``(3,)`` world start point.
+    :param end: ``(3,)`` world end point.
+    :param bow: Control point offset as a fraction of the chord length.
+    :param n_points: Points along the arc, including both ends.
+    :return: ``(n_points, 3)`` world points.
+    """
+    start = np.asarray(start, dtype=np.float64)
+    end = np.asarray(end, dtype=np.float64)
+    chord = end - start
+    length = float(np.linalg.norm(chord))
+    side = np.cross(chord, (0.0, 0.0, 1.0))
+    if np.linalg.norm(side) < 1e-9 * max(length, 1.0):
+        side = np.array([1.0, 0.0, 0.0])
+    side = side / np.linalg.norm(side)
+    control = (start + end) / 2 + side * bow * length
+    t = np.linspace(0.0, 1.0, n_points)[:, None]
+    return (1 - t) ** 2 * start + 2 * (1 - t) * t * control + t**2 * end
+
+
 @dataclass
 class SceneInfo:
     """What a composed brain scene contains.
@@ -221,6 +374,9 @@ class SceneInfo:
         fallback sphere at the marked point instead.
     :param soma_fallbacks: Circuit neurons whose skeleton had no ``Label 1``
         row, so the soma sphere sits at the root point instead.
+    :param view: The view composed, one of :data:`VIEWS`.
+    :param n_flow_pairs: Flow arcs drawn (view C).
+    :param n_flow_total: Directed neuropil pairs with nonzero flow (view C).
     """
 
     title: str
@@ -230,6 +386,9 @@ class SceneInfo:
     n_skeletons: int
     missing_skeletons: list[int]
     soma_fallbacks: int
+    view: str = "circuit"
+    n_flow_pairs: int = 0
+    n_flow_total: int = 0
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -264,40 +423,116 @@ def _segments_to_polydata(segs: np.ndarray) -> pv.PolyData:
     return mesh
 
 
+def _draw_flow(
+    plotter: pv.Plotter,
+    kg: ConnectomeKG,
+    specs: Sequence[str],
+    frame: WorldFrame,
+    top: int,
+    world_points: list[np.ndarray],
+    say: Callable[[str], None],
+) -> tuple[int, int]:
+    """Draw neuropil spheres and the *top* flow arcs (view C) into *plotter*.
+
+    One sphere actor per neuropil (``neuropil:<name>``) and one tube actor per
+    source neuropil (``flow:<name>``), coloured by the neuropil's side-free
+    base so a left/right pair matches.
+
+    :return: ``(arcs drawn, directed pairs with nonzero flow)``.
+    """
+    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
+
+    neuron_ids: set[str] | None = None
+    if specs:
+        neuron_ids = set()
+        for spec in specs:
+            neuron_ids.update(kg.neurons_of(spec))
+    say(f"neuropil flow over {'all' if neuron_ids is None else len(neuron_ids)} neurons")
+    flow = neuropil_flow(kg.store, neuron_ids)
+
+    index = {name: i for i, name in enumerate(flow.names)}
+    placed = ~np.isnan(flow.centroids_nm).any(axis=1)
+    centers = np.full_like(flow.centroids_nm, np.nan)
+    if placed.any():
+        centers[placed] = frame.to_world(flow.centroids_nm[placed])
+
+    drawn = [(a, b, w) for a, b, w in flow.pairs if placed[index[a]] and placed[index[b]]][:top]
+    active = {name for a, b, _ in drawn for name in (a, b)}
+
+    max_syn = float(flow.n_synapses.max()) if len(flow.n_synapses) else 0.0
+    for i, name in enumerate(flow.names):
+        if not placed[i]:
+            continue
+        rel = np.cbrt(flow.n_synapses[i] / max_syn) if max_syn > 0 else 1.0
+        radius = max(_NEUROPIL_MAX_RADIUS * float(rel), _FLOW_MIN_RADIUS)
+        color = type_color(flow.bases[i])
+        if name not in active:
+            radius *= 0.5
+            rgb = np.clip(np.asarray(_hex_to_rgb(color)) * _CONTEXT_DIM, 0, 255)
+            color = "#{:02X}{:02X}{:02X}".format(*(int(c) for c in rgb))
+        plotter.add_mesh(
+            pv.Sphere(radius=radius, center=centers[i]), color=color, name=f"neuropil:{name}"
+        )
+    world_points.append(centers[placed])
+
+    say(f"drawing {len(drawn)} flow arcs")
+    max_flow = drawn[0][2] if drawn else 0.0
+    tubes_by_source: dict[str, list[pv.PolyData]] = defaultdict(list)
+    for source, target, weight in drawn:
+        arc = flow_arc(centers[index[source]], centers[index[target]])
+        radius = max(_FLOW_MAX_RADIUS * float(np.sqrt(weight / max_flow)), _FLOW_MIN_RADIUS)
+        tubes_by_source[source].append(pv.lines_from_points(arc).tube(radius=radius, n_sides=8))
+        world_points.append(arc)
+    for source, meshes in tubes_by_source.items():
+        mesh = meshes[0] if len(meshes) == 1 else pv.merge(meshes)
+        plotter.add_mesh(mesh, color=type_color(flow.bases[index[source]]), name=f"flow:{source}")
+    return len(drawn), len(flow.pairs)
+
+
 def build_brain_scene(
     plotter: pv.Plotter,
     kg: ConnectomeKG,
     *,
     specs: Sequence[str] = (),
+    view: str = "circuit",
     data_dir: str | Path | None = None,
     color_by: str = "super_class",
     skeleton_step: int = 4,
     tubes: bool = False,
+    top: int = 100,
     progress: Callable[[str], None] | None = None,
 ) -> SceneInfo:
-    """Compose the whole-brain context cloud plus a spec's circuit into *plotter*.
+    """Compose the whole-brain context cloud plus a circuit or neuropil flow into *plotter*.
 
     :param plotter: PyVista plotter to compose into; actors are cleared first.
     :param kg: An open ``ConnectomeKG``.
-    :param specs: Specs resolved and unioned via :func:`circuit_neurons` for
-        the circuit view (view B). Empty draws the context cloud alone.
+    :param specs: For ``view="circuit"``, specs resolved and unioned via
+        :func:`circuit_neurons` for the circuit view (view B); empty draws the
+        context cloud alone. For ``view="flow"``, specs whose neurons the flow
+        sum is restricted to, with no neuron cap; empty sums every neuron.
+    :param view: ``"circuit"`` (view B) or ``"flow"`` (view C).
     :param data_dir: Skeleton download root (``fafb_v783``); without it every
-        circuit neuron falls back to a marked-point sphere.
+        circuit neuron falls back to a marked-point sphere. Unused by the
+        flow view.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
     :param skeleton_step: Skeleton simplification stride, bounded to
         ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
+    :param top: Flow arcs drawn, strongest first, bounded to
+        ``[1, MAX_FLOW_PAIRS]``.
     :param progress: Called with a short message at each stage; ``None`` (the
         default) keeps the build silent. The same
         ``Callable[[str], None]`` contract as ``ConnectomeExtractor``'s, so
         the CLI and the viewer share it.
     :return: The composed :class:`SceneInfo`.
-    :raises ValueError: On an out-of-range argument, an unknown ``color_by``,
-        or a circuit over :data:`connectomekg.validation.MAX_SCENE_NEURONS`.
+    :raises ValueError: On an out-of-range argument, an unknown ``view`` or
+        ``color_by``, or a circuit over :data:`connectomekg.validation.MAX_SCENE_NEURONS`.
     """
     import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
 
+    view = require_choice("view", view, VIEWS)
     skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
+    top = bounded_int("top", top, 1, MAX_FLOW_PAIRS)
 
     def _say(message: str) -> None:
         if progress is not None:
@@ -309,6 +544,12 @@ def build_brain_scene(
 
     _say("context point cloud")
     ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
+    point_size = _CONTEXT_POINT_SIZE
+    if view == "flow":
+        ctx_ids = ctx_ids[::_FLOW_CONTEXT_STRIDE]
+        ctx_points_nm = ctx_points_nm[::_FLOW_CONTEXT_STRIDE]
+        ctx_colors = ctx_colors[::_FLOW_CONTEXT_STRIDE]
+        point_size = _FLOW_CONTEXT_POINT_SIZE
     n_context = len(ctx_ids)
     if n_context:
         ctx_world = frame.to_world(ctx_points_nm)
@@ -319,11 +560,36 @@ def build_brain_scene(
             cloud,
             scalars="rgb",
             rgb=True,
-            point_size=_CONTEXT_POINT_SIZE,
+            point_size=point_size,
             render_points_as_spheres=True,
             name="context",
         )
         world_points.append(ctx_world)
+
+    ds_row = kg.store.con.execute("SELECT name FROM nodes WHERE kind='dataset'").fetchone()
+    dataset_name = ds_row[0] if ds_row else "connectome"
+
+    if view == "flow":
+        n_pairs, n_total = _draw_flow(plotter, kg, specs, frame, top, world_points, _say)
+        points = np.concatenate(world_points, axis=0) if world_points else np.zeros((1, 3))
+        scope = f" via {', '.join(specs)}" if specs else ""
+        title = (
+            f"{dataset_name} | neuropil flow{scope}: top {n_pairs} of {n_total} pairs "
+            f"context={n_context}"
+        )
+        _say("scene composed")
+        return SceneInfo(
+            title=title,
+            points=points,
+            n_context=n_context,
+            n_circuit=0,
+            n_skeletons=0,
+            missing_skeletons=[],
+            soma_fallbacks=0,
+            view=view,
+            n_flow_pairs=n_pairs,
+            n_flow_total=n_total,
+        )
 
     circuit_ids = circuit_neurons(kg, specs) if specs else []
     n_circuit = len(circuit_ids)
@@ -398,8 +664,6 @@ def build_brain_scene(
             world_points.append(arr)
 
     points = np.concatenate(world_points, axis=0) if world_points else np.zeros((1, 3))
-    ds_row = kg.store.con.execute("SELECT name FROM nodes WHERE kind='dataset'").fetchone()
-    dataset_name = ds_row[0] if ds_row else "connectome"
     title = f"{dataset_name} | context={n_context} circuit={n_circuit} skeletons={n_skeletons}"
     _say("scene composed")
     return SceneInfo(
@@ -415,11 +679,15 @@ def build_brain_scene(
 
 __all__ = [
     "NM_PER_WORLD_UNIT",
+    "VIEWS",
+    "NeuropilFlow",
     "SceneInfo",
     "WorldFrame",
     "build_brain_scene",
     "circuit_neurons",
     "context_points",
+    "flow_arc",
+    "neuropil_flow",
     "type_color",
     "world_frame",
 ]

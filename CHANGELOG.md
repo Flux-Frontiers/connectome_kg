@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--view flow` on `connkg quilt` and `connkg viz3d`: neuropil flow in 3-D.**
+  Neuropils are drawn as spheres at the synapse-weighted centroid of their
+  neurons' marked points, sized by synapse count. The `--top` strongest
+  directed pairs (default 100, capped at `MAX_FLOW_PAIRS` = 500) are drawn
+  as tubes, coloured by source neuropil and bowed to one side so A -> B and
+  B -> A stay apart. Flow is carried by neurons, not synapses. Flow A -> B is
+  each neuron's output synapses in B, split by the share of its input
+  synapses in A, summed over neurons, with A = B left out. The new
+  `connectomekg.scene.neuropil_flow` computes it from `IN_NEUROPIL` evidence
+  alone, about 1.5 s for all of FAFB v783 (5,786 pairs across 79 neuropils),
+  so nothing new is stored at build time. SPEC(s) become optional in this
+  view and limit the sum to their neurons. The context cloud is thinned to
+  every 10th neuron so it does not hide the neuropils.
+
 - **`connkg quilt` and `connkg viz3d`, real-geometry 3-D views of a connectome**
   (the new `viz3d` extra). Unlike the fleet's other viz3d consumers, this
   graph already has space: view A is every neuron's marked point as a dim

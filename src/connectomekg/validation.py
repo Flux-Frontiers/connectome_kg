@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 
 __all__ = [
+    "MAX_FLOW_PAIRS",
     "MAX_HOP",
     "MAX_K",
     "MAX_LABEL_PATTERN",
@@ -59,6 +60,9 @@ MAX_SCENE_NEURONS = 500
 #: Above this a "simplified" skeleton would drop nearly everything but its
 #: structural points.
 MAX_SKELETON_STEP = 50
+#: Neuropil-to-neuropil flow arcs drawn in one viz3d flow scene. FAFB v783 has
+#: 5,786 directed pairs; the top 200 already carry two thirds of all flow.
+MAX_FLOW_PAIRS = 500
 
 
 def bounded_int(name: str, value: int, minimum: int, maximum: int) -> int:

@@ -3,7 +3,7 @@
 Interactive 3-D viewer for a connectome scene: a ``QMainWindow`` wrapping a
 ``pyvistaqt.QtInteractor``, showing what
 :func:`connectomekg.scene.build_brain_scene` composes -- the whole-brain
-context cloud plus a spec's circuit skeletons.
+context cloud plus a spec's circuit skeletons, or the neuropil flow.
 
 Deliberately small, mirroring ``genealogy_kg``'s own ``viz3d.py`` (~140
 lines): no custom picking, no info popups, no filter toggles.
@@ -27,21 +27,24 @@ from PyQt5.QtWidgets import QAction, QMainWindow, QMessageBox, QToolBar
 from pyvistaqt import QtInteractor
 
 from connectomekg import scene as render3d
-from connectomekg.cli.cmd_viz3d import QUILTS_DIR, sanitize_specs
+from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
 
 
 class BrainSceneWindow(QMainWindow):
-    """Main window: whole-brain context plus a circuit, orbit/zoom/pan, one Cast action.
+    """Main window: whole-brain context plus a circuit or flow, orbit/zoom/pan, one Cast action.
 
     :param kg: An open ``ConnectomeKG``.
-    :param specs: Specs resolved into the circuit view (view B).
+    :param specs: Specs resolved into the circuit view (view B), or restricting
+        the flow view (view C).
+    :param view: ``"circuit"`` or ``"flow"``.
     :param data_dir: Skeleton download root, or ``None`` for marked-point
         fallback spheres on every circuit neuron.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
+    :param top: Flow arcs drawn, strongest first.
     :param preset: Quilt preset name for the Cast action.
     """
 
@@ -50,19 +53,23 @@ class BrainSceneWindow(QMainWindow):
         kg: ConnectomeKG,
         specs: Sequence[str],
         *,
+        view: str = "circuit",
         data_dir: str | Path | None = None,
         color_by: str = "super_class",
         skeleton_step: int = 4,
         tubes: bool = False,
+        top: int = 100,
         preset: str = DEFAULT_QUILT_PRESET,
     ) -> None:
         super().__init__()
         self._kg = kg
         self._specs = specs
+        self._view = view
         self._data_dir = data_dir
         self._color_by = color_by
         self._skeleton_step = skeleton_step
         self._tubes = tubes
+        self._top = top
         self._preset = preset
 
         self.plotter = QtInteractor(self)
@@ -72,10 +79,12 @@ class BrainSceneWindow(QMainWindow):
             self.plotter,
             kg,
             specs=specs,
+            view=view,
             data_dir=data_dir,
             color_by=color_by,
             skeleton_step=skeleton_step,
             tubes=tubes,
+            top=top,
         )
         self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
 
@@ -96,22 +105,24 @@ class BrainSceneWindow(QMainWindow):
         from quiltwright import QUILT_PRESETS  # noqa: PLC0415 - viz3d-only import
 
         spec = QUILT_PRESETS[self._preset]
-        kg, specs = self._kg, self._specs
+        kg, specs, view = self._kg, self._specs, self._view
         data_dir, color_by = self._data_dir, self._color_by
-        skeleton_step, tubes = self._skeleton_step, self._tubes
+        skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
 
         def build(plotter) -> None:
             render3d.build_brain_scene(
                 plotter,
                 kg,
                 specs=specs,
+                view=view,
                 data_dir=data_dir,
                 color_by=color_by,
                 skeleton_step=skeleton_step,
                 tubes=tubes,
+                top=top,
             )
 
-        out_stem = QUILTS_DIR / f"{sanitize_specs(tuple(specs))}_cast"
+        out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
         result = cast_scene_to_looking_glass(build, self.plotter.camera_position, out_stem, spec)
         box = QMessageBox.information if result.path else QMessageBox.warning
         box(self, "Cast to Looking Glass", result.message)
@@ -121,24 +132,28 @@ def launch(
     root: str | Path,
     specs: Sequence[str],
     *,
+    view: str = "circuit",
     data_dir: str | Path | None = None,
     color_by: str = "super_class",
     skeleton_step: int = 4,
     tubes: bool = False,
+    top: int = 100,
     preset: str = DEFAULT_QUILT_PRESET,
     dataset_id: str | None = None,
     width: int = 1400,
     height: int = 900,
 ) -> None:
-    """Open the interactive viewer for SPEC(s)' circuit inside the whole-brain context.
+    """Open the interactive viewer for SPEC(s)' circuit or the neuropil flow.
 
     :param root: Directory that owns ``.connectomekg/``.
-    :param specs: Specs resolved into the circuit view.
+    :param specs: Specs resolved into the circuit view, or restricting the flow view.
+    :param view: ``"circuit"`` or ``"flow"``.
     :param data_dir: Skeleton download root, or ``None`` for marked-point
         fallback spheres.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
+    :param top: Flow arcs drawn, strongest first.
     :param preset: Quilt preset name for the Cast action.
     :param dataset_id: Dataset id; ``"fafb783"`` selects the FAFB v783 record.
     :param width: Window width in pixels.
@@ -153,10 +168,12 @@ def launch(
         window = BrainSceneWindow(
             kg,
             specs,
+            view=view,
             data_dir=data_dir,
             color_by=color_by,
             skeleton_step=skeleton_step,
             tubes=tubes,
+            top=top,
             preset=preset,
         )
         window.resize(width, height)

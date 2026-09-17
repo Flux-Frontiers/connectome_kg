@@ -104,6 +104,100 @@ def test_type_color_is_deterministic_and_valid_hex():
     assert a in scene._TYPE_PALETTE
 
 
+class _FlowStore:
+    """An in-memory store with the nodes/edges columns neuropil_flow reads."""
+
+    def __init__(self, neurons, neuropils, in_neuropil) -> None:
+        import json  # noqa: PLC0415
+        import sqlite3  # noqa: PLC0415
+
+        self.con = sqlite3.connect(":memory:")
+        self.con.execute("CREATE TABLE nodes (id TEXT, kind TEXT, name TEXT, metadata TEXT)")
+        self.con.execute("CREATE TABLE edges (src TEXT, rel TEXT, dst TEXT, evidence TEXT)")
+        for nid, xyz in neurons.items():
+            meta = dict(zip("xyz", xyz, strict=True))
+            self.con.execute(
+                "INSERT INTO nodes VALUES (?,'neuron',?,?)", (nid, nid, json.dumps(meta))
+            )
+        for name, n_syn in neuropils.items():
+            meta = {"base": name.split("_")[0], "n_synapses": n_syn}
+            self.con.execute(
+                "INSERT INTO nodes VALUES (?,'neuropil',?,?)",
+                (f"np:{name}", name, json.dumps(meta)),
+            )
+        for nid, name, pre, post in in_neuropil:
+            self.con.execute(
+                "INSERT INTO edges VALUES (?,'IN_NEUROPIL',?,?)",
+                (nid, f"np:{name}", json.dumps({"pre": pre, "post": post})),
+            )
+
+
+def _two_neuron_store() -> _FlowStore:
+    # n1: input 30 in A and 10 in B; output 20 in B and 40 in C.
+    # n2: input only in C (5); output 50 in A. n2 has no coordinates.
+    return _FlowStore(
+        neurons={"n1": (0.0, 0.0, 0.0)},
+        neuropils={"A_L": 100, "B_L": 50, "C_R": 10},
+        in_neuropil=[
+            ("n1", "A_L", 0, 30),
+            ("n1", "B_L", 20, 10),
+            ("n1", "C_R", 40, 0),
+            ("n2", "C_R", 0, 5),
+            ("n2", "A_L", 50, 0),
+        ],
+    )
+
+
+def test_neuropil_flow_apportions_output_by_input_share():
+    flow = scene.neuropil_flow(_two_neuron_store())
+    pairs = {(a, b): w for a, b, w in flow.pairs}
+    # n1: 3/4 of its input is in A, 1/4 in B.
+    assert pairs[("A_L", "B_L")] == pytest.approx(20 * 0.75)
+    assert pairs[("A_L", "C_R")] == pytest.approx(40 * 0.75)
+    assert pairs[("B_L", "C_R")] == pytest.approx(40 * 0.25)
+    assert pairs[("C_R", "A_L")] == pytest.approx(50.0)  # all of n2's input is in C
+    assert ("B_L", "B_L") not in pairs  # intrinsic flow is excluded
+    assert [w for _, _, w in flow.pairs] == sorted((w for _, _, w in flow.pairs), reverse=True)
+
+
+def test_neuropil_flow_restricts_the_sum_but_not_the_centroids():
+    store = _two_neuron_store()
+    everyone = scene.neuropil_flow(store)
+    only_n2 = scene.neuropil_flow(store, ["n2"])
+    assert only_n2.pairs == [("C_R", "A_L", 50.0)]
+    np.testing.assert_array_equal(only_n2.centroids_nm, everyone.centroids_nm)
+
+
+def test_neuropil_flow_centroids_skip_neurons_without_coordinates():
+    flow = scene.neuropil_flow(_two_neuron_store())
+    assert flow.names == ["A_L", "B_L", "C_R"]
+    assert flow.bases == ["A", "B", "C"]
+    # Every neuropil has n1 (at the origin) in it, so every centroid is the origin.
+    np.testing.assert_allclose(flow.centroids_nm, np.zeros((3, 3)))
+    np.testing.assert_array_equal(flow.n_synapses, [100, 50, 10])
+
+
+def test_neuropil_flow_on_the_fixture_is_well_formed(kg):
+    flow = scene.neuropil_flow(kg.store)
+    assert flow.pairs
+    assert all(a != b and w > 0 for a, b, w in flow.pairs)
+    assert set(flow.names) >= {name for a, b, _ in flow.pairs for name in (a, b)}
+
+
+def test_flow_arc_ends_on_its_endpoints_and_opposite_directions_bow_apart():
+    start, end = np.array([0.0, 0.0, 0.0]), np.array([2.0, 0.0, 0.0])
+    forward = scene.flow_arc(start, end, n_points=9)
+    backward = scene.flow_arc(end, start, n_points=9)
+    np.testing.assert_allclose(forward[0], start)
+    np.testing.assert_allclose(forward[-1], end)
+    assert forward[4, 1] * backward[4, 1] < 0  # midpoints on opposite sides
+
+
+def test_flow_arc_vertical_chord_still_bows():
+    arc = scene.flow_arc(np.zeros(3), np.array([0.0, 0.0, 1.0]), n_points=5)
+    assert abs(arc[2, 0]) > 0
+
+
 # ---------------------------------------------------------------------------
 # Scene composition -- needs the viz3d extra
 # ---------------------------------------------------------------------------
@@ -228,3 +322,33 @@ def test_progress_callback_is_invoked(kg):
     plotter = pv.Plotter(off_screen=True)
     scene.build_brain_scene(plotter, kg, specs=["LC4"], progress=messages.append)
     assert messages
+
+
+def test_build_brain_scene_flow_view(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, view="flow", top=5)
+    assert info.view == "flow"
+    assert info.n_flow_pairs == min(5, info.n_flow_total)
+    assert info.n_flow_pairs > 0
+    assert "context" in plotter.actors
+    assert any(name.startswith("flow:") for name in plotter.actors)
+    assert any(name.startswith("neuropil:") for name in plotter.actors)
+
+
+def test_build_brain_scene_flow_view_restricted_by_spec(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    everyone = scene.build_brain_scene(plotter, kg, view="flow")
+    lc4 = scene.build_brain_scene(plotter, kg, view="flow", specs=["LC4"])
+    assert lc4.n_flow_total <= everyone.n_flow_total
+    assert "LC4" in lc4.title
+
+
+def test_build_brain_scene_rejects_bad_view_and_top(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    with pytest.raises(ValueError, match="view"):
+        scene.build_brain_scene(plotter, kg, view="mood")
+    with pytest.raises(ValueError, match="top must be between 1 and 500"):
+        scene.build_brain_scene(plotter, kg, view="flow", top=501)

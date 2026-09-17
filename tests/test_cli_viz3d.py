@@ -84,9 +84,24 @@ def test_viz3d_missing_extra_shows_install_hint(kg, monkeypatch):
     assert 'pip install "connectome-kg[viz3d]"' in result.output
 
 
-def test_quilt_requires_at_least_one_spec():
-    result = CliRunner().invoke(cli, ["quilt"])
+@pytest.mark.parametrize("command", ["quilt", "viz3d"])
+def test_circuit_view_requires_at_least_one_spec(command):
+    result = CliRunner().invoke(cli, [command])
     assert result.exit_code == 2
+    assert "--view circuit needs at least one SPEC" in result.output
+
+
+def test_quilt_rejects_top_over_the_bound(kg):
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg.repo_root), "quilt", "--view", "flow", "--top", "501"]
+    )
+    assert result.exit_code == 2
+
+
+def test_scene_stem_names_flow_renders():
+    assert mod.scene_stem("circuit", ("LC4",)) == "LC4"
+    assert mod.scene_stem("flow", ()) == "flow"
+    assert mod.scene_stem("flow", ("LC4",)) == "flow_LC4"
 
 
 def test_quilt_rejects_oversized_skeleton_step(kg):

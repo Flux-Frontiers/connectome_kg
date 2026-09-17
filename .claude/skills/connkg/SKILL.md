@@ -183,10 +183,21 @@ back to a larger sphere at its marked point instead of a traced shape.
   traced point.
 - Output lands under `renders/` (`stills/` for a `--preview` PNG, `quilts/`
   for the quilt itself), none of it committed.
+- `--view flow` draws neuropil flow instead of a circuit: neuropils as spheres
+  at the synapse-weighted centroid of their neurons, linked by arcs for the
+  `--top` strongest directed pairs (default 100, capped at `MAX_FLOW_PAIRS` =
+  500). Flow A -> B is summed over neurons: a neuron's output synapses in B,
+  split by the share of its input synapses in A. SPEC(s) are optional and
+  restrict the sum to their neurons, with no neuron cap. The largest v783
+  flows are ME -> LO, LA -> ME, LO -> LOP and LO -> PVLP. Each arc bows to one
+  side, so A -> B and B -> A do not overlap. The context cloud is thinned to
+  every 10th neuron in this view.
 
 ```bash
 poetry run connkg --root . quilt DNp01 --preview renders/stills/dnp01.png
 poetry run connkg --root . viz3d LC4 DNp01
+poetry run connkg --root . quilt --view flow --top 60 --preview flow.png
+poetry run connkg --root . viz3d --view flow LC4
 ```
 
 ## MCP server

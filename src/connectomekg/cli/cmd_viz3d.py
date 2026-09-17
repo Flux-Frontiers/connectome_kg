@@ -1,7 +1,8 @@
 """``connkg quilt``/``viz3d`` -- real-geometry 3-D views of a connectome.
 
 ``quilt`` composes the whole-brain context cloud plus a circuit's skeletons
-(see :mod:`connectomekg.scene`) and renders it to a Looking Glass quilt;
+(``--view circuit``) or the neuropil flow (``--view flow``), see
+:mod:`connectomekg.scene`, and renders it to a Looking Glass quilt;
 ``viz3d`` opens the same scene in an interactive viewer. Both need the
 ``viz3d`` extra, and the renderer is imported inside each command: this
 module loads whenever the CLI starts, and PyVista/Qt/quiltwright only arrive
@@ -25,7 +26,7 @@ import click
 
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import open_kg, usage_errors
-from connectomekg.validation import MAX_SKELETON_STEP
+from connectomekg.validation import MAX_FLOW_PAIRS, MAX_SKELETON_STEP
 
 _VIZ3D_EXTRA = 'pip install "connectome-kg[viz3d]"'
 
@@ -57,6 +58,22 @@ def resolve_preview_path(preview: str) -> Path:
 
 def _missing_modules(*names: str) -> list[str]:
     return [name for name in names if importlib.util.find_spec(name) is None]
+
+
+def require_specs_for_view(view: str, specs: tuple[str, ...]) -> None:
+    """Raise a usage error when ``--view circuit`` has no SPEC to draw.
+
+    :param view: The ``--view`` value.
+    :param specs: The SPEC arguments.
+    :raises click.UsageError: For ``circuit`` with no SPEC.
+    """
+    if view == "circuit" and not specs:
+        raise click.UsageError("--view circuit needs at least one SPEC")
+
+
+def scene_stem(view: str, specs: tuple[str, ...]) -> str:
+    """A default output stem: the specs for a circuit, ``flow_<specs>`` for a flow."""
+    return sanitize_specs(specs) if view == "circuit" else sanitize_specs(("flow", *specs))
 
 
 def sanitize_specs(specs: tuple[str, ...]) -> str:
@@ -96,17 +113,34 @@ preset_option = click.option(
     show_default=True,
     help="Looking Glass quilt preset.",
 )
+view_option = click.option(
+    "--view",
+    type=click.Choice(["circuit", "flow"]),
+    default="circuit",
+    show_default=True,
+    help="circuit: SPEC(s)' skeletons; flow: signal flow between neuropils, "
+    "optionally carried only by SPEC(s)' neurons.",
+)
+top_option = click.option(
+    "--top",
+    default=100,
+    show_default=True,
+    type=click.IntRange(1, MAX_FLOW_PAIRS),
+    help="Flow view: strongest neuropil pairs drawn.",
+)
 dataset_id_option = click.option(
     "--dataset-id", default=None, help="Dataset id; fafb783 selects FAFB v783."
 )
 
 
 @cli.command("quilt")
-@click.argument("specs", nargs=-1, required=True)
+@click.argument("specs", nargs=-1)
+@view_option
 @data_dir_option
 @color_by_option
 @skeleton_step_option
 @tubes_option
+@top_option
 @preset_option
 @click.option(
     "--fov",
@@ -138,10 +172,12 @@ dataset_id_option = click.option(
 def quilt(
     ctx: click.Context,
     specs: tuple[str, ...],
+    view: str,
     data_dir: str,
     color_by: str,
     skeleton_step: int,
     tubes: bool,
+    top: int,
     preset: str,
     fov: float,
     zoom: float,
@@ -150,12 +186,15 @@ def quilt(
     cast: bool,
     dataset_id: str | None,
 ) -> None:
-    """Render SPEC(s)' circuit inside the whole-brain context as a Looking Glass quilt.
+    """Render SPEC(s)' circuit or the neuropil flow in the whole brain as a Looking Glass quilt.
 
     Each SPEC is a cell type, root id, neuron node id or ``label:<regex>``
-    (see ``ConnectomeKG.neurons_of``); their union is the circuit drawn at
-    full brightness, capped at ``MAX_SCENE_NEURONS`` neurons.
+    (see ``ConnectomeKG.neurons_of``). With ``--view circuit`` their union is
+    the circuit drawn at full brightness, capped at ``MAX_SCENE_NEURONS``
+    neurons. With ``--view flow`` SPECs are optional and restrict the flow to
+    their neurons.
     """
+    require_specs_for_view(view, specs)
     missing = _missing_modules("pyvista", "quiltwright")
     if missing:
         raise click.UsageError(
@@ -180,17 +219,22 @@ def quilt(
             plotter,
             kg,
             specs=specs,
+            view=view,
             data_dir=data_dir,
             color_by=color_by,
             skeleton_step=skeleton_step,
             tubes=tubes,
+            top=top,
             progress=lambda m: click.echo(f"  {m}", err=True),
         )
 
-    click.echo(
-        f"Scene: {info.title} (missing skeletons: {len(info.missing_skeletons)}, "
-        f"soma fallbacks: {info.soma_fallbacks})"
-    )
+    if view == "circuit":
+        click.echo(
+            f"Scene: {info.title} (missing skeletons: {len(info.missing_skeletons)}, "
+            f"soma fallbacks: {info.soma_fallbacks})"
+        )
+    else:
+        click.echo(f"Scene: {info.title}")
 
     frame = frame_tree(info.points, fov=fov)
     plotter.camera.position = frame.position
@@ -207,7 +251,7 @@ def quilt(
 
     out_dir = out_dir or QUILTS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = out_dir / sanitize_specs(specs)
+    stem = out_dir / scene_stem(view, specs)
     click.echo(
         f"Rendering {spec_obj.n_views} views at {spec_obj.tile_width}x{spec_obj.tile_height}..."
     )
@@ -226,11 +270,13 @@ def quilt(
 
 
 @cli.command("viz3d")
-@click.argument("specs", nargs=-1, required=True)
+@click.argument("specs", nargs=-1)
+@view_option
 @data_dir_option
 @color_by_option
 @skeleton_step_option
 @tubes_option
+@top_option
 @preset_option
 @click.option("--width", default=1400, show_default=True, type=int, help="Window width, pixels.")
 @click.option("--height", default=900, show_default=True, type=int, help="Window height, pixels.")
@@ -239,20 +285,23 @@ def quilt(
 def viz3d(
     ctx: click.Context,
     specs: tuple[str, ...],
+    view: str,
     data_dir: str,
     color_by: str,
     skeleton_step: int,
     tubes: bool,
+    top: int,
     preset: str,
     width: int,
     height: int,
     dataset_id: str | None,
 ) -> None:
-    """Launch an interactive 3-D viewer of SPEC(s)' circuit inside the whole-brain context.
+    """Launch an interactive 3-D viewer of SPEC(s)' circuit or the neuropil flow.
 
     Orbit/zoom/pan with the mouse. The toolbar's "Cast to Looking Glass"
     button sends the current view to Bridge.
     """
+    require_specs_for_view(view, specs)
     missing = _missing_modules("pyvista", "pyvistaqt", "PyQt5", "quiltwright")
     if missing:
         raise click.UsageError(
@@ -266,10 +315,12 @@ def viz3d(
         viewer.launch(
             root,
             list(specs),
+            view=view,
             data_dir=data_dir,
             color_by=color_by,
             skeleton_step=skeleton_step,
             tubes=tubes,
+            top=top,
             preset=preset,
             dataset_id=dataset_id,
             width=width,
