@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from connectomekg import ConnectomeKG
 from connectomekg.cli import cli
 from connectomekg.manifest import FAFB_783_FILES, verify_dir
 from connectomekg.readers.synthetic import write_codex_dir
@@ -123,3 +124,25 @@ def test_package_is_runnable_without_installing(tmp_path):
         check=True,
     )
     assert "neurons.csv.gz" in out.stdout
+
+
+def test_a_built_store_queries_without_its_source_data(tables, tmp_path):
+    """Reopening a built store the way kg-rag and ``connkg query`` do -- the
+    default ``source="codex"`` and no ``data_dir`` -- must still query it.
+
+    ``KGModule.index`` builds an extractor just to ask which node kinds are
+    embedded. The extractor used to load its tables eagerly, so a query against
+    a finished graph failed with ``source='codex' needs data_dir`` unless the
+    34 GB Codex release was on hand. ``test_query_needs_semantic_extra`` never
+    saw it because its module is constructed with in-memory tables.
+    """
+    pytest.importorskip("sentence_transformers")
+    ConnectomeKG(tmp_path, tables=tables).build(wipe=True)
+
+    reopened = ConnectomeKG(tmp_path)
+    res = reopened.query("looming detector giant fibre escape", k=5, hop=1)
+    assert {n["name"] for n in res.nodes} & {"LC4", "LPLC2", "DNp01"}
+
+    out = CliRunner().invoke(cli, ["--root", str(tmp_path), "query", "giant fibre escape"])
+    assert out.exit_code == 0, out.output
+    assert "needs data_dir" not in out.output
