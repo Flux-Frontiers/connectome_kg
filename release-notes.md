@@ -1,28 +1,21 @@
-# Release Notes -- v0.3.0
+# Release Notes -- v0.3.1
 
 > Released: 2026-09-18
 
-Each connectome now gets its own knowledge graph. A second release -- another FAFB version, MANC, hemibrain -- is built beside the first instead of on top of it. A built graph can also be queried without the 34 GB Codex download it came from.
+ConnectomeKG is on PyPI. `pip install "connectome-kg[semantic]"` replaces cloning the repository.
 
 ## What changed
 
-**One graph per connectome.** Graphs live in `<root>/connectomes/<dataset_id>/.connectomekg/`, each with its own vector index and snapshot history. This is the layout GutenbergKG uses for books. `--dataset ID` goes before the command and picks one. A build without it writes to `fafb783`, and every other command uses the only built dataset, or stops and lists them when there are several. `connkg-mcp` takes the same option, and `connkg datasets` lists what is built. KGRAG's registry scan finds each dataset as a separate KG.
+**Published to PyPI.** Every tagged release now uploads the same wheel and sdist that are attached to its GitHub Release, using trusted publishing, so the repository stores no PyPI token. kg-rag's connectome adapter needed a versioned dependency to point at, which is why this is happening now.
 
-**`--dataset` replaces `--dataset-id`.** This breaks scripts that passed `--dataset-id`, which is why this is a minor release rather than a patch.
+**The README works on PyPI.** Its links to the download guide, the rendering guide, the changelog and the licence were relative, and PyPI serves the README without those files. They now point at GitHub. The project page also links the documentation site, the issue tracker and the changelog.
 
-**Querying a built graph no longer needs the source data.** `connkg query`, and anything else that opened an existing graph, including kg-rag's connectome adapter, failed with `source='codex' needs data_dir` unless the Codex release was on hand. The tables now load only when a build needs them.
+No code changed since 0.3.0.
 
 ## Upgrading
 
-Move a graph built by an earlier version into the new layout, from the directory you pass as `--root`:
-
-```bash
-mkdir -p connectomes/fafb783/.connectomekg
-mv .connectomekg/*.sqlite* connectomes/fafb783/.connectomekg/
-```
-
-Until you do, commands stop and print that command. Replace `--dataset-id X` in scripts with `--dataset X`, placed before the command. A KGRAG registry entry that points at the old path needs registering again.
+Nothing to do for an existing clone. A new install can use pip: `pip install "connectome-kg[semantic]"`, with `[viz3d]` for the 3-D views.
 
 ---
 
-_Full changelog: [CHANGELOG.md](CHANGELOG.md)_
+_Full changelog: [CHANGELOG.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/CHANGELOG.md)_

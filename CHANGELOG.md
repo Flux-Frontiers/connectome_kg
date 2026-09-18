@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-18
+
+### Added
+
+- **Published to PyPI** as `connectome-kg`: `pip install "connectome-kg[semantic]"`.
+  The release workflow gains a `publish` job that uploads the wheel and sdist
+  the release job built, byte for byte, using trusted publishing (OIDC) under
+  the `pypi` environment, so no API token is stored. kg-rag's connectome
+  adapter needs a versioned dependency, which is why this is happening now.
+- `Documentation`, `Issues` and `Changelog` project URLs.
+
+### Fixed
+
+- **README links work on PyPI.** The seven relative links (to
+  `docs/DOWNLOAD.md`, `docs/rendering.md`, `CHANGELOG.md` and `LICENSE`)
+  now point at GitHub, since PyPI serves the README without the files beside it.
+
 ## [0.3.0] - 2026-09-18
 
 ### Changed

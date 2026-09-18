@@ -46,7 +46,7 @@ packages = [{ include = "connectomekg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "connectome-kg"
-version = "0.3.0"
+version = "0.3.1"
 description = "Connectomes (FlyWire, hemibrain, MaleCNS) as KGModule knowledge graphs"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -111,6 +111,9 @@ viz3d = [
 [project.urls]
 Homepage   = "https://github.com/Flux-Frontiers/connectome_kg"
 Repository = "https://github.com/Flux-Frontiers/connectome_kg"
+Documentation = "https://flux-frontiers.github.io/connectome_kg/"
+Issues = "https://github.com/Flux-Frontiers/connectome_kg/issues"
+Changelog = "https://github.com/Flux-Frontiers/connectome_kg/blob/main/CHANGELOG.md"
 
 [project.scripts]
 connkg     = "connectomekg.cli:cli"

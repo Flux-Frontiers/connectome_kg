@@ -1,10 +1,10 @@
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
 [![CI](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22817369-blue.svg)](https://doi.org/10.5281/zenodo.22817369)
-[![Data: FlyWire FAFB v783](https://img.shields.io/badge/data-FlyWire%20FAFB%20v783-orange.svg)](docs/DOWNLOAD.md)
+[![Data: FlyWire FAFB v783](https://img.shields.io/badge/data-FlyWire%20FAFB%20v783-orange.svg)](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md)
 
 # ConnectomeKG -- Connectomes as Knowledge Graphs
 
@@ -20,7 +20,7 @@ Everything runs on your laptop. A full v783 build without the vector index takes
 
 *Author: Eric G. Suchanek, PhD -- Flux-Frontiers, Liberty TWP, OH*
 
-> **Status: pre-alpha (0.3.0).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS) and the LIF what-if simulation. The KGRAG adapter is merged into kg-rag and ships in its next release.
+> **Status: pre-alpha (0.3.1).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS) and the LIF what-if simulation. The KGRAG adapter is merged into kg-rag and ships in its next release.
 
 ---
 
@@ -43,7 +43,11 @@ All of them build on **[kgmodule-utils](https://github.com/Flux-Frontiers/KG_uti
 
 **Requirements:** Python >= 3.12, < 3.14
 
-ConnectomeKG is not on PyPI yet. Install from a clone:
+```bash
+pip install "connectome-kg[semantic]"
+```
+
+To work on it, install from a clone instead:
 
 ```bash
 git clone https://github.com/Flux-Frontiers/connectome_kg.git
@@ -53,11 +57,11 @@ pip install -e ".[semantic]"      # or: poetry install --with dev --extras seman
 
 The `semantic` extra adds the embedding model for `connkg query`. Without it, everything except semantic search works; pass `--no-index` to `build`.
 
-The `viz3d` extra (`pip install -e ".[viz3d]"`) adds PyVista, PyQt5, pyvistaqt
+The `viz3d` extra (`pip install "connectome-kg[viz3d]"`) adds PyVista, PyQt5, pyvistaqt
 and [quiltwright](https://flux-frontiers.github.io/quiltwright/) for `connkg quilt` and `connkg viz3d`: real-geometry 3-D
 views of the whole brain plus a circuit's traced skeletons or the signal flow
 between neuropils, rendered to a Looking Glass quilt or opened in an
-interactive viewer. [docs/rendering.md](docs/rendering.md) explains both views
+interactive viewer. [docs/rendering.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/rendering.md) explains both views
 and how each is drawn.
 
 No install at all also works from the clone root: `PYTHONPATH=src python -m connectomekg <arguments>`. With Poetry, prefix commands with `poetry run`.
@@ -76,7 +80,7 @@ connkg --root /tmp/kg analyze
 
 ### Build the real FlyWire brain
 
-The Codex portal needs a Google sign-in and lists display labels instead of file names, so the download is a manual step. [docs/DOWNLOAD.md](docs/DOWNLOAD.md) walks through it, including which three files are required (about 71 MB) and the Safari `.gz` trap.
+The Codex portal needs a Google sign-in and lists display labels instead of file names, so the download is a manual step. [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) walks through it, including which three files are required (about 71 MB) and the Safari `.gz` trap.
 
 ```bash
 connkg files                                   # portal label -> file name
@@ -231,8 +235,8 @@ synapse edges; later calls reuse them.
 
 | Doc | What it covers |
 |---|---|
-| [docs/DOWNLOAD.md](docs/DOWNLOAD.md) | Getting FAFB v783 from Codex, file names, checksum drift, reproducible snapshots, build footprint |
-| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) | Getting FAFB v783 from Codex, file names, checksum drift, reproducible snapshots, build footprint |
+| [CHANGELOG.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/CHANGELOG.md) | Release history |
 
 ---
 
@@ -240,7 +244,7 @@ synapse edges; later calls reuse them.
 
 The FlyWire data is free for non-commercial use under **CC BY-NC-SA 4.0**. A graph built from it is a derived work under the same licence. Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository (`.gitignore` already does) and out of anything commercial.
 
-The Codex portal is synchronised with the live FlyWire database, so its files drift from the October 2024 published release. For a build that has to be reproducible, use the static no-login snapshots listed in [docs/DOWNLOAD.md](docs/DOWNLOAD.md) and record which one you used.
+The Codex portal is synchronised with the live FlyWire database, so its files drift from the October 2024 published release. For a build that has to be reproducible, use the static no-login snapshots listed in [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) and record which one you used.
 
 If you use FlyWire data, cite the data papers:
 
@@ -256,7 +260,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 
 **APA**
 
-> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.3.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
+> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.3.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
 
 **BibTeX**
 
@@ -264,7 +268,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 @software{suchanek_connectome_kg,
   author    = {Suchanek, Eric G.},
   title     = {{ConnectomeKG}: Connectomes as Knowledge Graphs},
-  version   = {0.3.0},
+  version   = {0.3.1},
   year      = {2026},
   publisher = {Flux-Frontiers},
   doi       = {10.5281/zenodo.22817369},
@@ -276,7 +280,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 
 ## License
 
-[Elastic License 2.0](LICENSE) -- free for non-commercial and internal use; commercial redistribution or hosting requires a license from Flux-Frontiers. This covers the software only. The connectome data keeps its own licence (see above).
+[Elastic License 2.0](https://github.com/Flux-Frontiers/connectome_kg/blob/main/LICENSE) -- free for non-commercial and internal use; commercial redistribution or hosting requires a license from Flux-Frontiers. This covers the software only. The connectome data keeps its own licence (see above).
 
 ---
 
