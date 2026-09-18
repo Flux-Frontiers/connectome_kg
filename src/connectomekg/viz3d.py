@@ -146,13 +146,13 @@ def launch(
     floor: bool = False,
     elevation: float = 0.0,
     preset: str = DEFAULT_QUILT_PRESET,
-    dataset_id: str | None = None,
+    dataset: str | None = None,
     width: int = 1400,
     height: int = 900,
 ) -> None:
     """Open the interactive viewer for SPEC(s)' circuit or the neuropil flow.
 
-    :param root: Directory that owns ``.connectomekg/``.
+    :param root: Directory holding ``connectomes/``.
     :param specs: Specs resolved into the circuit view, or restricting the flow view.
     :param view: ``"circuit"`` or ``"flow"``.
     :param data_dir: Skeleton download root, or ``None`` for marked-point
@@ -164,7 +164,7 @@ def launch(
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
-    :param dataset_id: Dataset id; ``"fafb783"`` selects the FAFB v783 record.
+    :param dataset: Dataset id, or ``None`` for the only built dataset.
     :param width: Window width in pixels.
     :param height: Window height in pixels.
     :raises ValueError: Propagated from ``ConnectomeKG`` / ``build_brain_scene``,
@@ -172,7 +172,7 @@ def launch(
     """
     from PyQt5.QtWidgets import QApplication  # noqa: PLC0415 - viz3d-only import
 
-    with open_kg(str(root), dataset_id=dataset_id) as kg:
+    with open_kg(str(root), dataset=dataset) as kg:
         app = QApplication.instance() or QApplication([])
         window = BrainSceneWindow(
             kg,

@@ -27,13 +27,14 @@ release record does not depend on which graph happened to be built last.
 
 ```bash
 poetry install --only-root
-connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-index --wipe
-connkg --root . snapshot save <version> --subject corpus:fafb783 --force
-ls .connectomekg/snapshots/<version>.json
+connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-index --wipe
+connkg --root . --dataset fafb783 snapshot save <version> --subject corpus:fafb783 --force
+ls connectomes/fafb783/.connectomekg/snapshots/<version>.json
 ```
 
 - **The graph must be the real FAFB v783 build.** A synthetic fixture graph in
-  `.connectomekg/` would be recorded as the release. The build takes about 4
+  `connectomes/fafb783/` would be recorded as the release. Always pass
+  `--dataset fafb783` so another built dataset can never be picked up. The build takes about 4
   minutes; the maintainer runs it and watches it rather than an agent running
   it in the background.
 - **Reinstall before snapshotting.** `version` and `tool_version` come from the
@@ -47,5 +48,5 @@ ls .connectomekg/snapshots/<version>.json
   which is right between releases and wrong for one. The git tree hash is
   recorded as provenance and is never the key.
 
-`.connectomekg/snapshots/` is **tracked** (the rest of `.connectomekg/` is not),
+`connectomes/fafb783/.connectomekg/snapshots/` is **tracked** (the databases beside it are not),
 so stage it with the release in Step 6.

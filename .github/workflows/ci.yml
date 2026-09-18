@@ -242,10 +242,11 @@ jobs:
         run: |
           cd /tmp
           /tmp/smoke/bin/connkg fixture --out /tmp/synth --n 1000 --seed 1
-          /tmp/smoke/bin/connkg --root /tmp/kg build --data-dir /tmp/synth \
-            --dataset-id synthetic1k --no-index --wipe
-          test -f /tmp/kg/.connectomekg/graph.sqlite || { echo "no graph.sqlite"; exit 1; }
-          /tmp/smoke/bin/connkg --root /tmp/kg path --dataset-id synthetic1k \
+          /tmp/smoke/bin/connkg --root /tmp/kg --dataset synthetic1k build \
+            --data-dir /tmp/synth --no-index --wipe
+          test -f /tmp/kg/connectomes/synthetic1k/.connectomekg/graph.sqlite \
+            || { echo "no graph.sqlite"; exit 1; }
+          /tmp/smoke/bin/connkg --root /tmp/kg path \
             --from GRN_sugar --to MN9 | tee /tmp/path.out
           grep -q "MN9/" /tmp/path.out \
             || { echo "path query did not reach the planted motor neuron"; exit 1; }

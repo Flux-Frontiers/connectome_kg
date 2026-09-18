@@ -18,9 +18,18 @@ import click
     default=".",
     show_default=True,
     type=click.Path(file_okay=False),
-    help="Directory that owns .connectomekg/.",
+    help="Directory holding connectomes/<dataset>/.connectomekg/.",
+)
+@click.option(
+    "--dataset",
+    default=None,
+    metavar="ID",
+    help=(
+        "Dataset to work on, e.g. fafb783. Default: for build, fafb783 (synthetic "
+        "with --source synthetic); otherwise the only built dataset."
+    ),
 )
 @click.pass_context
-def cli(ctx: click.Context, root: str) -> None:
+def cli(ctx: click.Context, root: str, dataset: str | None) -> None:
     """connkg -- connectomes as fleet knowledge graphs."""
-    ctx.obj = {"root": root}
+    ctx.obj = {"root": root, "dataset": dataset}

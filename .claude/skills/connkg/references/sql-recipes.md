@@ -5,7 +5,7 @@ SQLite with JSON1 in WAL mode. Open it plainly and run only SELECTs, never
 while a build is writing:
 
 ```bash
-sqlite3 .connectomekg/graph.sqlite
+sqlite3 connectomes/fafb783/.connectomekg/graph.sqlite
 ```
 
 Not `sqlite3 -readonly`: with no other connection open there is no `-shm`

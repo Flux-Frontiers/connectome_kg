@@ -80,8 +80,8 @@ def test_module_methods_enforce_the_bounds(kg):
         kg.strongest_path("label:(", "MN9")
 
 
-def test_cli_reports_a_bad_spec_as_a_usage_error(kg):
+def test_cli_reports_a_bad_spec_as_a_usage_error(kg, kg_root):
     res = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "path", "--from", "label:(", "--to", "MN9"]
+        cli, ["--root", str(kg_root), "path", "--from", "label:(", "--to", "MN9"]
     )
     assert res.exit_code == 2 and "not a valid regex" in res.output

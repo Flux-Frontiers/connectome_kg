@@ -1,6 +1,6 @@
 # Rendered output
 
-Output, not source. Everything here regenerates from `.connectomekg/graph.sqlite`
+Output, not source. Everything here regenerates from `connectomes/<dataset>/.connectomekg/graph.sqlite`
 plus `connkg quilt` / `connkg viz3d` -- see
 [docs/rendering.md](../docs/rendering.md). Layout follows
 [quiltwright](https://github.com/Flux-Frontiers/quiltwright)'s own `renders/`.

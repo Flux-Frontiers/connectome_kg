@@ -149,8 +149,8 @@ used on the dataset node.
 
    ```bash
    connkg verify --data-dir /path/to/fafb_v783
-   connkg --root . build --data-dir /path/to/fafb_v783 --dataset-id fafb783 --no-index
-   connkg --root . analyze --dataset-id fafb783
+   connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783 --no-index
+   connkg --root . analyze
    ```
 
    `verify` hashes every file against the SHA-256 values recorded in
@@ -165,7 +165,7 @@ used on the dataset node.
    250,000 synaptic pairs, then ends with "writing to SQLite". The write that
    follows has no progress of its own and is most of the run; to watch it,
    follow the write-ahead log in another shell with
-   `while sleep 2; do ls -lh .connectomekg/graph.sqlite-wal; done`. Use
+   `while sleep 2; do ls -lh connectomes/fafb783/.connectomekg/graph.sqlite-wal; done`. Use
    `--wipe` when restarting after an interrupted build, or the new graph is
    written on top of the partial one.
 
@@ -186,8 +186,8 @@ used on the dataset node.
    the options, each input file's SHA-256 against the manifest, time per
    extraction stage, the counts written, and peak resident memory. The reports
    are gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
-   records the built graph's metrics in `.connectomekg/snapshots/`, which is
-   tracked.
+   records the built graph's metrics in
+   `connectomes/fafb783/.connectomekg/snapshots/`, which is tracked.
 
 ## If Codex offers something other than what you expected
 
@@ -202,7 +202,7 @@ to see what it detects before building.
 ## Licence reminder
 
 The built index over FlyWire data is a derived work under CC BY-NC-SA 4.0.
-Keep the download and the `.connectomekg/` directory out of the repository
+Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository
 (`.gitignore` already does) and out of anything commercial. Cite
 Dorkenwald et al. 2024, Schlegel et al. 2024 and Eckstein et al. 2024 for
 the data.

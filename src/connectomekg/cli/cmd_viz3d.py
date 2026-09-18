@@ -165,9 +165,6 @@ elevation_option = click.option(
     help="Degrees to tilt the camera up from the front view, so it looks down. "
     "Default 25 with --floor, else 0.",
 )
-dataset_id_option = click.option(
-    "--dataset-id", default=None, help="Dataset id; fafb783 selects FAFB v783."
-)
 
 
 @cli.command("quilt")
@@ -219,7 +216,6 @@ dataset_id_option = click.option(
     help="Also write one plain PNG of the framed view (bare filename -> renders/stills/).",
 )
 @click.option("--cast", is_flag=True, help="Send the finished quilt to Looking Glass Bridge.")
-@dataset_id_option
 @click.pass_context
 def quilt(
     ctx: click.Context,
@@ -240,7 +236,6 @@ def quilt(
     still: bool,
     preview: str | None,
     cast: bool,
-    dataset_id: str | None,
 ) -> None:
     """Render SPEC(s)' circuit or the neuropil flow in the whole brain as a Looking Glass quilt.
 
@@ -280,7 +275,7 @@ def quilt(
         spec_obj = spec_obj.still(height=STILL_HEIGHT)
 
     plotter = pv.Plotter(off_screen=True)
-    with open_kg(ctx.obj["root"], dataset_id=dataset_id) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
         info = render3d.build_brain_scene(
             plotter,
             kg,
@@ -355,7 +350,6 @@ def quilt(
 @preset_option
 @click.option("--width", default=1400, show_default=True, type=int, help="Window width, pixels.")
 @click.option("--height", default=900, show_default=True, type=int, help="Window height, pixels.")
-@dataset_id_option
 @click.pass_context
 def viz3d(
     ctx: click.Context,
@@ -371,7 +365,6 @@ def viz3d(
     preset: str,
     width: int,
     height: int,
-    dataset_id: str | None,
 ) -> None:
     """Launch an interactive 3-D viewer of SPEC(s)' circuit or the neuropil flow.
 
@@ -401,7 +394,7 @@ def viz3d(
             floor=floor,
             elevation=resolve_elevation(floor, elevation),
             preset=preset,
-            dataset_id=dataset_id,
+            dataset=ctx.obj["dataset"],
             width=width,
             height=height,
         )

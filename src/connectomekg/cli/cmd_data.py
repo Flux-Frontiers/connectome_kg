@@ -1,13 +1,15 @@
-"""``connkg fixture``, ``files`` and ``verify`` -- getting and checking a release."""
+"""``connkg fixture``, ``files``, ``verify`` and ``datasets`` -- getting, checking and listing releases."""
 
 from __future__ import annotations
 
+import sqlite3
 import sys
 from pathlib import Path
 
 import click
 
 from connectomekg.cli.group import cli
+from connectomekg.datasets import DATASETS_DIR, graph_path, scan_datasets
 from connectomekg.manifest import STATIC_ARCHIVES, portal_guide, verify_dir
 from connectomekg.readers.synthetic import synthetic_tables, write_codex_dir
 
@@ -57,3 +59,25 @@ def verify(data_dir: str, no_checksums: bool) -> None:
         click.echo(portal_guide())
     if not report.ok:
         sys.exit(1)
+
+
+@cli.command("datasets")
+@click.pass_context
+def datasets(ctx: click.Context) -> None:
+    """List the datasets built under --root, one graph each."""
+    root = ctx.obj["root"]
+    ids = scan_datasets(root)
+    if not ids:
+        click.echo(f"no datasets built under {Path(root) / DATASETS_DIR}")
+        return
+    click.echo(f"{'dataset':<16} {'graph':>9}  name")
+    for dataset_id in ids:
+        db = graph_path(root, dataset_id)
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            row = con.execute("SELECT name FROM nodes WHERE kind = 'dataset'").fetchone()
+        finally:
+            con.close()
+        n = db.stat().st_size
+        size = f"{n / 1e9:.1f} GB" if n >= 1e9 else f"{n / 1e6:.1f} MB"
+        click.echo(f"{dataset_id:<16} {size:>9}  {row[0] if row else '?'}")

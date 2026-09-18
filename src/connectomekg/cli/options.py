@@ -8,8 +8,13 @@ from typing import Any
 
 import click
 
+from connectomekg.datasets import dataset_dir, resolve_dataset
 from connectomekg.module import ConnectomeKG
+from connectomekg.readers.synthetic import SYNTHETIC
 from connectomekg.schema import FAFB_783, DatasetInfo
+
+#: Provenance records for the dataset ids connkg knows by name.
+_KNOWN_DATASETS = {d.dataset_id: d for d in (FAFB_783, SYNTHETIC)}
 
 #: Starting bounds from the fleet boundary-validation standard; widen if a real
 #: query needs more.
@@ -29,7 +34,6 @@ _SOURCE_OPTIONS = (
         show_default=True,
         type=click.Choice(["codex", "synthetic"]),
     ),
-    click.option("--dataset-id", default=None, help="Dataset id; fafb783 selects FAFB v783."),
     click.option(
         "--n",
         default=1000,
@@ -77,9 +81,10 @@ def usage_errors() -> Iterator[None]:
 def open_kg(
     root: str,
     *,
+    dataset: str | None = None,
+    building: bool = False,
     data_dir: str | None = None,
     source: str = "codex",
-    dataset_id: str | None = None,
     n: int = 1000,
     seed: int = 1,
     min_syn: int = 1,
@@ -90,10 +95,16 @@ def open_kg(
     """Construct a ConnectomeKG from ``--root`` and :func:`source_options`, for
     use as ``with open_kg(...) as kg:`` so ``close()`` always runs.
 
-    :param root: Directory that owns ``.connectomekg/``.
+    The graph lives in ``<root>/connectomes/<dataset>/.connectomekg/``; see
+    :func:`connectomekg.datasets.resolve_dataset` for how an omitted
+    ``dataset`` is chosen.
+
+    :param root: Directory holding ``connectomes/``.
+    :param dataset: Dataset id, the ``--dataset`` option.
+    :param building: The caller is ``connkg build``, so an omitted dataset
+        defaults from ``source`` rather than from what is already built.
     :param data_dir: Codex release directory.
     :param source: ``"codex"`` or ``"synthetic"``.
-    :param dataset_id: Dataset id; ``"fafb783"`` selects the FAFB v783 record.
     :param n: Synthetic neuron count.
     :param seed: Synthetic seed.
     :param min_syn: Drop connections below this synapse count.
@@ -101,9 +112,12 @@ def open_kg(
     :param embed_neurons: Also embed neuron nodes.
     :param progress: Called with a message at each extraction stage.
     :return: A new ``ConnectomeKG``.
+    :raises click.UsageError: When the dataset id is invalid or cannot be chosen.
     """
+    with usage_errors():
+        dataset_id = resolve_dataset(root, dataset, build_source=source if building else None)
     return ConnectomeKG(
-        root,
+        dataset_dir(root, dataset_id),
         data_dir=data_dir,
         source=source,
         dataset=_dataset(dataset_id),
@@ -116,11 +130,9 @@ def open_kg(
     )
 
 
-def _dataset(dataset_id: str | None) -> DatasetInfo | None:
-    if not dataset_id:
-        return None
-    if dataset_id == "fafb783":
-        return FAFB_783
+def _dataset(dataset_id: str) -> DatasetInfo:
+    if dataset_id in _KNOWN_DATASETS:
+        return _KNOWN_DATASETS[dataset_id]
     return DatasetInfo(
         dataset_id=dataset_id,
         name=dataset_id,

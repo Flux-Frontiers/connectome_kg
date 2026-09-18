@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One graph per connectome.** Each dataset now lives in its own directory,
+  `<root>/connectomes/<dataset_id>/.connectomekg/`, holding its own graph,
+  vector index and snapshot history. This follows GutenbergKG's
+  one-graph-per-book layout. A second release (another FAFB version, MANC,
+  hemibrain) no longer overwrites the first, and KGRAG's registry scan finds
+  each dataset as a separate KG. New module `connectomekg.datasets`
+  (`scan_datasets`, `resolve_dataset`, `dataset_dir`).
+- **`--dataset ID` replaces `--dataset-id`**, and moves from individual
+  commands to the group: `connkg --root . --dataset fafb783 build ...`.
+  `connkg build` without it writes to `fafb783`, or to `synthetic` with
+  `--source synthetic`. Every other command uses the only built dataset, and
+  stops with a list when there are several. Ids are restricted to lowercase
+  letters, digits, `_`, `.` and `-`, so an id can never name a path outside
+  `connectomes/`.
+- **`connkg-mcp --dataset ID`** picks the dataset the server serves, with the
+  same default. Serve two datasets as two server entries.
+- The tracked FAFB v783 snapshots moved to
+  `connectomes/fafb783/.connectomekg/snapshots/`.
+
+### Added
+
+- **`connkg datasets`** lists the datasets built under `--root`, with each
+  graph's size and dataset name.
+
+### Migration
+
+A graph built before this change is in `<root>/.connectomekg/`. Commands
+that find it say so and print the move:
+
+```bash
+mkdir -p connectomes/fafb783/.connectomekg
+mv .connectomekg/*.sqlite* connectomes/fafb783/.connectomekg/
+```
+
+A KGRAG registry entry that points at the old path needs registering again.
+
 ### Fixed
 
 - **A built store can be queried without its source data.** `connkg query`,

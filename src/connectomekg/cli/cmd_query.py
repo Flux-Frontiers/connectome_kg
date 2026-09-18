@@ -19,7 +19,7 @@ from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, us
 @click.pass_context
 def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
     """Semantic query with graph expansion."""
-    with open_kg(ctx.obj["root"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
         try:
             result = kg.query(q, k=k, hop=hop)
         except FileNotFoundError as exc:
@@ -34,7 +34,7 @@ def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
 @click.pass_context
 def path(ctx: click.Context, src: str, dst: str, **source: Any) -> None:
     """Strongest synaptic path between two specs."""
-    with open_kg(ctx.obj["root"], **source) as kg:
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
         with usage_errors():
             res = kg.strongest_path(src, dst)
         if res is None:
@@ -69,7 +69,7 @@ def cone(
     ctx: click.Context, spec: str, hops: int, direction: str, limit: int, **source: Any
 ) -> None:
     """Downstream or upstream cone of a spec."""
-    with open_kg(ctx.obj["root"], **source) as kg:
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
         with usage_errors():
             reached = kg.cone(spec, hops=hops, min_syn=source["min_syn"], direction=direction)
         by_hop: dict[int, list[str]] = {}

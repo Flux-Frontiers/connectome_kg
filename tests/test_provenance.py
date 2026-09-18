@@ -26,11 +26,11 @@ def built(tables, tmp_path_factory):
     _run(
         "--root",
         str(root),
+        "--dataset",
+        "synthetic",
         "build",
         "--data-dir",
         str(data),
-        "--dataset-id",
-        "synthetic",
         "--no-index",
         "--wipe",
     )
@@ -101,10 +101,8 @@ def test_snapshot_save_matches_the_fleet_cli_contract():
 def test_snapshot_keys_on_version_or_timestamp_never_the_tree_hash(tables, tmp_path):
     data = write_codex_dir(tables, tmp_path / "codex")
     root = str(tmp_path / "root")
-    _run(
-        "--root", root, "build", "--data-dir", str(data), "--dataset-id", "synthetic", "--no-index"
-    )
-    snaps = tmp_path / "root" / ".connectomekg" / "snapshots"
+    _run("--root", root, "--dataset", "synthetic", "build", "--data-dir", str(data), "--no-index")
+    snaps = tmp_path / "root" / "connectomes" / "synthetic" / ".connectomekg" / "snapshots"
 
     _run("--root", root, "snapshot", "save", "0.2.0", "--force")
     tagged = json.loads((snaps / "0.2.0.json").read_text())

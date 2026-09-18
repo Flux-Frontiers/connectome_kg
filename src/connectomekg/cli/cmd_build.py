@@ -37,7 +37,13 @@ def build(ctx: click.Context, wipe: bool, no_index: bool, **source: Any) -> None
     db_path: Path | None = None
     error: Exception | None = None
     try:
-        with open_kg(ctx.obj["root"], progress=progress, **source) as kg:
+        with open_kg(
+            ctx.obj["root"],
+            dataset=ctx.obj["dataset"],
+            building=True,
+            progress=progress,
+            **source,
+        ) as kg:
             db_path = kg.db_path
             stats = kg.build_graph(wipe=wipe) if no_index else kg.build(wipe=wipe)
             dataset = kg.tables().dataset

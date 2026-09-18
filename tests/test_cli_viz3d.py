@@ -56,36 +56,34 @@ def test_help(command):
     assert result.exit_code == 0, result.output
 
 
-def test_quilt_unknown_preset_is_a_usage_error(kg):
+def test_quilt_unknown_preset_is_a_usage_error(kg, kg_root):
     # The preset is checked after the extra's own import check.
     pytest.importorskip("pyvista")
     pytest.importorskip("quiltwright")
-    result = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--preset", "nope"]
-    )
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "quilt", "LC4", "--preset", "nope"])
     assert result.exit_code == 2, result.output
     assert "Unknown quilt preset" in result.output
 
 
-def test_quilt_over_the_cap_is_a_usage_error(kg, monkeypatch):
+def test_quilt_over_the_cap_is_a_usage_error(kg, monkeypatch, kg_root):
     pytest.importorskip("pyvista")
     pytest.importorskip("quiltwright")
     monkeypatch.setattr(scene_mod, "MAX_SCENE_NEURONS", 1)
-    result = CliRunner().invoke(cli, ["--root", str(kg.repo_root), "quilt", "LC4"])
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "quilt", "LC4"])
     assert result.exit_code == 2, result.output
     assert "over the cap of 1" in result.output
 
 
-def test_quilt_missing_extra_shows_install_hint(kg, monkeypatch):
+def test_quilt_missing_extra_shows_install_hint(kg, monkeypatch, kg_root):
     monkeypatch.setattr(mod.importlib.util, "find_spec", lambda name: None)
-    result = CliRunner().invoke(cli, ["--root", str(kg.repo_root), "quilt", "LC4"])
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "quilt", "LC4"])
     assert result.exit_code == 2, result.output
     assert 'pip install "connectome-kg[viz3d]"' in result.output
 
 
-def test_viz3d_missing_extra_shows_install_hint(kg, monkeypatch):
+def test_viz3d_missing_extra_shows_install_hint(kg, monkeypatch, kg_root):
     monkeypatch.setattr(mod.importlib.util, "find_spec", lambda name: None)
-    result = CliRunner().invoke(cli, ["--root", str(kg.repo_root), "viz3d", "LC4"])
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "viz3d", "LC4"])
     assert result.exit_code == 2, result.output
     assert 'pip install "connectome-kg[viz3d]"' in result.output
 
@@ -97,9 +95,9 @@ def test_circuit_view_requires_at_least_one_spec(command):
     assert "--view circuit needs at least one SPEC" in result.output
 
 
-def test_quilt_rejects_top_over_the_bound(kg):
+def test_quilt_rejects_top_over_the_bound(kg, kg_root):
     result = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "quilt", "--view", "flow", "--top", "501"]
+        cli, ["--root", str(kg_root), "quilt", "--view", "flow", "--top", "501"]
     )
     assert result.exit_code == 2
 
@@ -110,9 +108,9 @@ def test_scene_stem_names_flow_renders():
     assert mod.scene_stem("flow", ("LC4",)) == "flow_LC4"
 
 
-def test_quilt_rejects_oversized_skeleton_step(kg):
+def test_quilt_rejects_oversized_skeleton_step(kg, kg_root):
     result = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--skeleton-step", "1000"]
+        cli, ["--root", str(kg_root), "quilt", "LC4", "--skeleton-step", "1000"]
     )
     assert result.exit_code == 2
 
@@ -123,23 +121,19 @@ def test_resolve_elevation_defaults_to_a_look_down_only_with_a_floor():
     assert mod.resolve_elevation(True, 10.0) == 10.0
 
 
-def test_quilt_still_with_cast_is_a_usage_error(kg):
-    result = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "quilt", "LC4", "--still", "--cast"]
-    )
+def test_quilt_still_with_cast_is_a_usage_error(kg, kg_root):
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "quilt", "LC4", "--still", "--cast"])
     assert result.exit_code == 2, result.output
     assert "cannot be combined with --still" in result.output
 
 
 @pytest.mark.parametrize("command", ["quilt", "viz3d"])
-def test_elevation_out_of_range_is_a_usage_error(kg, command):
-    result = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), command, "LC4", "--elevation", "95"]
-    )
+def test_elevation_out_of_range_is_a_usage_error(kg, command, kg_root):
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), command, "LC4", "--elevation", "95"])
     assert result.exit_code == 2, result.output
 
 
-def test_quilt_still_writes_one_flat_image_with_a_floor(kg, tmp_path, monkeypatch):
+def test_quilt_still_writes_one_flat_image_with_a_floor(kg, tmp_path, monkeypatch, kg_root):
     pytest.importorskip("pyvista")
     pytest.importorskip("quiltwright")
     monkeypatch.setattr(mod, "STILL_HEIGHT", 90)
@@ -147,7 +141,7 @@ def test_quilt_still_writes_one_flat_image_with_a_floor(kg, tmp_path, monkeypatc
         cli,
         [
             "--root",
-            str(kg.repo_root),
+            str(kg_root),
             "quilt",
             "--view",
             "flow",
@@ -163,7 +157,7 @@ def test_quilt_still_writes_one_flat_image_with_a_floor(kg, tmp_path, monkeypatc
     assert "adjacent-view disparity" not in result.output  # no depth report for a still
 
 
-def test_quilt_with_floor_reports_depth_and_writes_a_quilt(kg, tmp_path, monkeypatch):
+def test_quilt_with_floor_reports_depth_and_writes_a_quilt(kg, tmp_path, monkeypatch, kg_root):
     pytest.importorskip("pyvista")
     quiltwright = pytest.importorskip("quiltwright")
     tiny = quiltwright.QuiltSpec(
@@ -174,7 +168,7 @@ def test_quilt_with_floor_reports_depth_and_writes_a_quilt(kg, tmp_path, monkeyp
         cli,
         [
             "--root",
-            str(kg.repo_root),
+            str(kg_root),
             "quilt",
             "--view",
             "flow",

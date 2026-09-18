@@ -12,6 +12,7 @@ from click.testing import CliRunner
 
 from connectomekg import ConnectomeKG
 from connectomekg.cli import cli
+from connectomekg.datasets import dataset_dir
 from connectomekg.manifest import FAFB_783_FILES, verify_dir
 from connectomekg.readers.synthetic import write_codex_dir
 
@@ -43,13 +44,13 @@ def test_cli_fixture_build_path(tmp_path):
     built = run(
         "--root",
         str(root),
+        "--dataset",
+        "synthetic400",
         "build",
         "--data-dir",
         str(data),
         "--source",
         "codex",
-        "--dataset-id",
-        "synthetic400",
         "--no-index",
         "--wipe",
     )
@@ -58,16 +59,16 @@ def test_cli_fixture_build_path(tmp_path):
     out = run(
         "--root",
         str(root),
-        "path",
-        "--dataset-id",
+        "--dataset",
         "synthetic400",
+        "path",
         "--from",
         "GRN_sugar",
         "--to",
         "MN9",
     )
     assert "SEZ_IN1" in out and "MN9" in out
-    run("--root", str(root), "stats", "--dataset-id", "synthetic400")
+    run("--root", str(root), "--dataset", "synthetic400", "stats")
 
 
 def test_cli_rejects_out_of_range_options():
@@ -137,9 +138,10 @@ def test_a_built_store_queries_without_its_source_data(tables, tmp_path):
     saw it because its module is constructed with in-memory tables.
     """
     pytest.importorskip("sentence_transformers")
-    ConnectomeKG(tmp_path, tables=tables).build(wipe=True)
+    home = dataset_dir(tmp_path, "synthetic")
+    ConnectomeKG(home, tables=tables).build(wipe=True)
 
-    reopened = ConnectomeKG(tmp_path)
+    reopened = ConnectomeKG(home)
     res = reopened.query("looming detector giant fibre escape", k=5, hop=1)
     assert {n["name"] for n in res.nodes} & {"LC4", "LPLC2", "DNp01"}
 
