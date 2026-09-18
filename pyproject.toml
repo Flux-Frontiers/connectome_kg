@@ -71,7 +71,7 @@ dependencies = [
     # import time. Lift only alongside a port to fastmcp.
     "mcp>=1.0.0,<2",
     # Floor is the release this prototype was written against.
-    "kgmodule-utils>=0.21.0",
+    "kgmodule-utils>=0.22.0",
     "numpy>=1.24.0",
     "pandas>=2.2.0",
     "pyarrow>=15.0.0",
@@ -79,13 +79,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-semantic = ["kgmodule-utils[semantic]>=0.21.0"]
+semantic = ["kgmodule-utils[semantic]>=0.22.0"]
 # 2-D views of a cell type (connkg viz): src/connectomekg/viz.py, imported only
 # inside cli/cmd_viz.py. pyvis is not hand-listed: the network renderer is
 # kg_utils.viz.build_graph_html, so this extra asks the SDK for it by name, as
 # FLEET_STANDARDS.md requires. plotly draws the partners chart.
 viz = [
-    "kgmodule-utils[viz]>=0.21.0",
+    "kgmodule-utils[viz]>=0.22.0",
     "plotly>=5.14.0",
 ]
 # Real-geometry 3-D views (connkg quilt / connkg viz3d): src/connectomekg/
@@ -101,7 +101,7 @@ viz = [
 # QtInteractor missing. genealogy_kg's viz3d extra carries the same explicit
 # line for the same reason.
 viz3d = [
-    "kgmodule-utils[viz3d-render,viz3d-qt]>=0.21.0",
+    "kgmodule-utils[viz3d-render,viz3d-qt]>=0.22.0",
     "pyvistaqt>=0.11.0",
     # 0.14.1: frame_and_focus(spec=) frames at the display aspect render_quilt
     # captures views at, not whatever the window was sized to.
