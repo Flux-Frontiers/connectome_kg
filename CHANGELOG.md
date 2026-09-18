@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A built store can be queried without its source data.** `connkg query`,
+  and anything else that opens an existing graph -- kg-rag's federation
+  adapter among them -- failed with `source='codex' needs data_dir` unless
+  the 34 GB Codex release was on hand. `KGModule.index` builds an extractor
+  only to ask which node kinds are embedded, and `ConnectomeExtractor` loaded
+  its tables eagerly to do it, so every semantic query read the whole release
+  first, or failed without it. The extractor now loads its tables on first
+  use, and `make_extractor()` passes the loader rather than calling it. The
+  existing semantic-query test never saw this, because its module is built
+  from in-memory tables; the new regression test reopens a built store the
+  way a user does.
+
 ## [0.2.1] - 2026-09-17
 
 ### Changed

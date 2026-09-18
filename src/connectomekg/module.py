@@ -125,7 +125,7 @@ class ConnectomeKG(KGModule):
         return ConnectomeExtractor(
             self.repo_root,
             {
-                "tables": self.tables(),
+                "tables": self.tables,  # called on first use, not here
                 "embed_neurons": self.embed_neurons,
                 "min_syn": self.min_syn,
                 "progress": self.progress,

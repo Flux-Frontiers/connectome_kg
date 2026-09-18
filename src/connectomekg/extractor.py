@@ -88,7 +88,8 @@ class ConnectomeExtractor(KGExtractor):
     """Emit nodes and edges for one connectome.
 
     :param repo_path: Corpus root (unused for ids; kept for the SDK contract).
-    :param config: ``tables`` (a :class:`ConnectomeTables`), optional
+    :param config: ``tables`` (a :class:`ConnectomeTables`, or a zero-argument
+        callable returning one, which is called on first use), optional
         ``embed_neurons`` (bool, default False), ``min_syn`` (int, default 1),
         ``top_k`` (int, partners listed per type, default 5), ``progress``
         (a callable taking one message string, default None for silence).
@@ -96,12 +97,30 @@ class ConnectomeExtractor(KGExtractor):
 
     def __init__(self, repo_path: Path, config: dict[str, Any] | None = None) -> None:
         super().__init__(repo_path, config)
-        self.tables: ConnectomeTables = self.config["tables"]
+        # Loaded lazily: KGModule.index builds an extractor only to ask
+        # meaningful_node_kinds(), which needs no data, and a query against a
+        # built store must not require the raw Codex release to be present.
+        self._tables_source: ConnectomeTables | Callable[[], ConnectomeTables] = self.config[
+            "tables"
+        ]
+        self._tables: ConnectomeTables | None = None
         self.embed_neurons: bool = bool(self.config.get("embed_neurons", False))
         self.min_syn: int = int(self.config.get("min_syn", 1))
         self.top_k: int = int(self.config.get("top_k", 5))
         self.progress: Callable[[str], None] | None = self.config.get("progress")
-        self.prefix = f"connectome:{self.tables.dataset.dataset_id}"
+
+    @property
+    def tables(self) -> ConnectomeTables:
+        """The normalised tables, loaded on first use."""
+        if self._tables is None:
+            source = self._tables_source
+            self._tables = source if isinstance(source, ConnectomeTables) else source()
+        return self._tables
+
+    @property
+    def prefix(self) -> str:
+        """Node-id prefix, ``connectome:<dataset_id>``."""
+        return f"connectome:{self.tables.dataset.dataset_id}"
 
     # ------------------------------------------------------------------ ids
     def dataset_id(self) -> str:
