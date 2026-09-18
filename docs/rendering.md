@@ -218,8 +218,8 @@ You need the following:
     pip install -e ".[viz3d]"      # or: poetry install --extras viz3d
     ```
 
-- A built graph in `.connectomekg/graph.sqlite`. See the README for
-  `connkg build`.
+- A built graph in `connectomes/<dataset>/.connectomekg/graph.sqlite`. See
+  the README for `connkg build` and `--dataset`.
 - For the circuit view, the skeleton download in
   `fafb_v783/sk_lod1_783_healed/`, which holds one `.swc` file per neuron
   (about 31 GB). Without it, each circuit neuron is drawn as a sphere at its
@@ -637,7 +637,7 @@ from connectomekg import ConnectomeKG
 from connectomekg.scene import FLOOR_ELEVATION, add_floor, aim_camera, build_brain_scene
 
 spec = QUILT_PRESETS["16-landscape"].still(height=2160)
-kg = ConnectomeKG(".")  # the directory that holds .connectomekg/
+kg = ConnectomeKG("connectomes/fafb783")  # the dataset directory that holds .connectomekg/
 plotter = pv.Plotter(
     off_screen=True, window_size=(round(spec.tile_height * spec.aspect), spec.tile_height)
 )

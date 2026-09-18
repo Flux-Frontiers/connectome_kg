@@ -69,17 +69,17 @@ def test_unknown_type_is_an_error_that_suggests_near_names(kg):
 
 
 @pytest.mark.parametrize("view", ["network", "partners"])
-def test_cli_writes_a_self_contained_file(kg, tmp_path, view):
+def test_cli_writes_a_self_contained_file(kg, tmp_path, view, kg_root):
     out = tmp_path / f"lc4_{view}.html"
     res = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "viz", "LC4", "--view", view, "-o", str(out)]
+        cli, ["--root", str(kg_root), "viz", "LC4", "--view", view, "-o", str(out)]
     )
     assert res.exit_code == 0, res.output
     assert out.stat().st_size > 10_000 and "LC4" in out.read_text()
 
 
-def test_cli_reports_an_unknown_type_as_a_usage_error(kg, tmp_path):
+def test_cli_reports_an_unknown_type_as_a_usage_error(kg, tmp_path, kg_root):
     res = CliRunner().invoke(
-        cli, ["--root", str(kg.repo_root), "viz", "NOPE", "-o", str(tmp_path / "x.html")]
+        cli, ["--root", str(kg_root), "viz", "NOPE", "-o", str(tmp_path / "x.html")]
     )
     assert res.exit_code == 2 and "no cell type named 'NOPE'" in res.output

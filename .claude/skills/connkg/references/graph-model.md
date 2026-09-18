@@ -1,6 +1,6 @@
 # ConnectomeKG graph model
 
-Read this before writing SQL against `.connectomekg/graph.sqlite` or reading
+Read this before writing SQL against `connectomes/<dataset>/.connectomekg/graph.sqlite` or reading
 node metadata. Every node id starts with `connectome:<dataset id>`, written
 `P` below (`connectome:fafb783` for the real brain, `connectome:synthetic`
 for the fixture).

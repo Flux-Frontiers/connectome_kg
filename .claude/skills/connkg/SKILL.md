@@ -12,7 +12,7 @@ description: >
   sign, ontology term or labels. Also use for the connkg CLI (build, verify,
   files, fixture, stats, analyze, query, path, cone, snapshot), downloading and
   checking the Codex files, build reports, snapshots, SQL against
-  .connectomekg/graph.sqlite, the connkg-mcp server and its tools, the synthetic
+  connectomes/<dataset>/.connectomekg/graph.sqlite, the connkg-mcp server and its tools, the synthetic
   fixture, or troubleshooting ConnectomeKG.
 ---
 
@@ -28,7 +28,8 @@ ConnectomeKG is the connectome member of the KGRAG fleet (kgmodule-utils
 microscopy; the semantic layer is the human vocabulary on top of it.
 
 - Repo: `~/repos/connectome_kg` (branch `develop` for ongoing work)
-- Store: `.connectomekg/graph.sqlite` (about 2.1 GB for FAFB v783)
+- Store: one per dataset, `connectomes/<dataset>/.connectomekg/graph.sqlite`;
+  FAFB v783's is about 2.1 GB. `connkg datasets` lists what is built.
 - Download: `fafb_v783/` in the repo root, gitignored
 - Download guide: `docs/DOWNLOAD.md`
 
@@ -37,8 +38,9 @@ microscopy; the semantic layer is the human vocabulary on top of it.
 From the repo root, `poetry run connkg ...`. With nothing installed:
 `PYTHONPATH=src python -m connectomekg ...`.
 
-**`--root` goes before the command**: `connkg --root . path ...`, not
-`connkg path --root .`. It names the directory that owns `.connectomekg/`.
+**`--root` and `--dataset` go before the command**: `connkg --root . path ...`,
+not `connkg path --root .`. `--root` names the directory holding `connectomes/`;
+`--dataset ID` picks the dataset and can be omitted when only one is built.
 
 Start by confirming a graph exists and which dataset it holds:
 
@@ -78,7 +80,7 @@ more than a couple of queries, use one Python session instead:
 ```python
 from connectomekg import ConnectomeKG
 
-kg = ConnectomeKG(".")                      # repo root that owns .connectomekg/
+kg = ConnectomeKG("connectomes/fafb783")    # the dataset dir that owns .connectomekg/
 res = kg.strongest_path("LPLC2", "DNp01")   # PathResult | None: .strength, .net_sign, .hops
 reach = kg.cone("LC4", hops=2, min_syn=10)  # {neuron node id: hop}
 kg.neurons_of("label:giant fib")            # resolve a spec to neuron ids
@@ -87,7 +89,7 @@ kg.close()
 ```
 
 **Semantic search** (`connkg query`, `kg.query`, `kg.pack`) needs
-`.connectomekg/vectors.sqlite`, which exists only after a build without
+`connectomes/fafb783/.connectomekg/vectors.sqlite`, which exists only after a build without
 `--no-index`, with the `semantic` extra installed. The reference build uses
 `--no-index`, so check for the file first. Without it, search docstrings and
 labels in SQL (`lower(docstring) LIKE '%giant fib%'` on `cell_type` and `label`
@@ -101,7 +103,7 @@ real Codex names (`LC4` 104 neurons, `LPLC2` 210, `DNp01` 2, `KCg-m`, `PAM01`,
 `T4a`, `Mi1`). When unsure, look the name up:
 `SELECT name FROM nodes WHERE kind='cell_type' AND name LIKE 'DNp%';`
 
-Open the store with plain `sqlite3 .connectomekg/graph.sqlite` and only run
+Open the store with plain `sqlite3 connectomes/fafb783/.connectomekg/graph.sqlite` and only run
 SELECTs, never during a build. `sqlite3 -readonly` fails with "unable to open
 database file" whenever no other connection is open: the store is in WAL mode
 and a read-only open cannot create the `-shm` file.
@@ -132,7 +134,7 @@ names; `connkg verify --data-dir fafb_v783` checks the directory.
 ## Building
 
 ```bash
-poetry run connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-index --wipe
+poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-index --wipe
 ```
 
 - **Do not start a real FAFB build yourself.** It takes about 4 minutes and
@@ -145,7 +147,8 @@ poetry run connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-
   partial one.
 - For tests and experiments without the download:
   `connkg fixture --out /tmp/synth --n 1000 --seed 1`, then build with
-  `--data-dir /tmp/synth --dataset-id synthetic` into a scratch `--root`.
+  `connkg --root /tmp/kg --dataset synthetic build --data-dir /tmp/synth` into a
+  scratch `--root`.
 
 ## Provenance
 
@@ -160,7 +163,7 @@ poetry run connkg --root . build --data-dir fafb_v783 --dataset-id fafb783 --no-
   `corpus:fafb783` (the graph measures a connectome release, not this
   package's code). At release, reinstall first and pass `--force`, as the
   repo's `.claude/skills/release/SKILL.md` describes.
-  `.connectomekg/snapshots/` is tracked in git.
+  Each dataset has its own history; `connectomes/fafb783/.connectomekg/snapshots/` is tracked in git.
 
 ## 3-D views
 
@@ -221,7 +224,7 @@ poetry run connkg --root . viz3d --view flow LC4
 
 ## MCP server
 
-`connkg-mcp --root <dir>` serves the graph over stdio (`--transport sse` for
+`connkg-mcp --root <dir> [--dataset ID]` serves one dataset's graph over stdio (`--transport sse` for
 SSE). When its tools are connected, prefer them to shelling out to the CLI:
 
 | tool | use for |

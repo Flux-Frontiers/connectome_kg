@@ -1,6 +1,6 @@
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
 [![CI](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22817369-blue.svg)](https://doi.org/10.5281/zenodo.22817369)
@@ -20,7 +20,7 @@ Everything runs on your laptop. A full v783 build without the vector index takes
 
 *Author: Eric G. Suchanek, PhD -- Flux-Frontiers, Liberty TWP, OH*
 
-> **Status: pre-alpha (0.2.0).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS), the LIF what-if simulation, and the KGRAG adapter.
+> **Status: pre-alpha (0.2.1).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS), the LIF what-if simulation, and the KGRAG adapter.
 
 ---
 
@@ -68,10 +68,10 @@ No download needed. The fixture is a seeded connectome shaped like v783 (populat
 
 ```bash
 connkg fixture --out /tmp/synth1k --n 1000 --seed 1
-connkg --root /tmp/kg build --data-dir /tmp/synth1k --dataset-id synthetic1k --no-index --wipe
-connkg --root /tmp/kg path --dataset-id synthetic1k --from GRN_sugar --to MN9
-connkg --root /tmp/kg cone --dataset-id synthetic1k LC4 --min-syn 5
-connkg --root /tmp/kg analyze --dataset-id synthetic1k
+connkg --root /tmp/kg --dataset synthetic1k build --data-dir /tmp/synth1k --no-index --wipe
+connkg --root /tmp/kg path --from GRN_sugar --to MN9
+connkg --root /tmp/kg cone LC4 --min-syn 5
+connkg --root /tmp/kg analyze
 ```
 
 ### Build the real FlyWire brain
@@ -81,8 +81,8 @@ The Codex portal needs a Google sign-in and lists display labels instead of file
 ```bash
 connkg files                                   # portal label -> file name
 connkg verify --data-dir /path/to/fafb_v783    # check the download
-connkg --root . build --data-dir /path/to/fafb_v783 --dataset-id fafb783 --no-index
-connkg --root . analyze --dataset-id fafb783
+connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783 --no-index
+connkg --root . analyze
 ```
 
 Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint.
@@ -143,6 +143,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Check a download before building** | `connkg verify --data-dir DIR` |
 | **Make a test connectome** | `connkg fixture --out DIR` |
 | **Build the graph** | `connkg build` |
+| **List the connectomes built under a root** | `connkg datasets` |
 | **Count nodes and edges** | `connkg stats` |
 | **Get a Markdown report: hubs, top type-to-type links, neuropils, coverage** | `connkg analyze` |
 | **Search types, neuropils and labels** | `connkg query "..."` |
@@ -154,9 +155,28 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Draw the signal flow between neuropils in 3-D, for the whole brain or one population** | `connkg quilt --view flow [SPEC...]`, `connkg viz3d --view flow [SPEC...]` (the `viz3d` extra) |
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
-| **Give an AI agent the graph** | `connkg-mcp --root DIR` |
+| **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |
 
-`--root` comes before the command and names the directory that owns `.connectomekg/`. Run `connkg <command> --help` for every option.
+`--root` and `--dataset` come before the command. Run `connkg <command> --help` for every option.
+
+### One graph per connectome
+
+Each connectome release is built into its own directory, the way GutenbergKG keeps one graph per book:
+
+```text
+<root>/connectomes/
+  fafb783/.connectomekg/     graph.sqlite, vectors.sqlite, snapshots/
+  synthetic/.connectomekg/
+```
+
+Releases never share a graph, a vector index or a snapshot history. `--dataset ID` picks one. Without it, `connkg build` writes to `fafb783` (`synthetic` with `--source synthetic`), and every other command uses the only built dataset, or stops and lists them when there are several. Dataset ids are 1-64 lowercase letters, digits, `_`, `.` or `-`.
+
+A graph built before this layout sat in `<root>/.connectomekg/`. Move it with:
+
+```bash
+mkdir -p connectomes/fafb783/.connectomekg
+mv .connectomekg/*.sqlite* connectomes/fafb783/.connectomekg/
+```
 
 ### From Python
 
@@ -173,16 +193,17 @@ with ConnectomeKG("/tmp/kg", source="synthetic", n_neurons=1000, seed=1) as kg:
 ### As an MCP server
 
 `connkg-mcp` serves the graph to MCP clients (Claude Code, Claude Desktop,
-Cursor) over stdio, or SSE with `--transport sse`. Point it at the directory
-that owns `.connectomekg/`. In a project's `.mcp.json`, which holds absolute
-paths and is gitignored:
+Cursor) over stdio, or SSE with `--transport sse`. Point `--root` at the
+directory holding `connectomes/`, and add `--dataset ID` when more than one
+dataset is built. Serve two datasets as two entries. In a project's
+`.mcp.json`, which holds absolute paths and is gitignored:
 
 ```json
 {
   "mcpServers": {
     "connkg": {
       "command": "/path/to/connectome_kg/.venv/bin/connkg-mcp",
-      "args": ["--root", "/path/to/connectome_kg"]
+      "args": ["--root", "/path/to/connectome_kg", "--dataset", "fafb783"]
     }
   }
 }
@@ -217,7 +238,7 @@ synapse edges; later calls reuse them.
 
 ## Data and licensing
 
-The FlyWire data is free for non-commercial use under **CC BY-NC-SA 4.0**. A graph built from it is a derived work under the same licence. Keep the download and `.connectomekg/` out of the repository (`.gitignore` already does) and out of anything commercial.
+The FlyWire data is free for non-commercial use under **CC BY-NC-SA 4.0**. A graph built from it is a derived work under the same licence. Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository (`.gitignore` already does) and out of anything commercial.
 
 The Codex portal is synchronised with the live FlyWire database, so its files drift from the October 2024 published release. For a build that has to be reproducible, use the static no-login snapshots listed in [docs/DOWNLOAD.md](docs/DOWNLOAD.md) and record which one you used.
 
@@ -235,7 +256,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 
 **APA**
 
-> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.2.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
+> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.2.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
 
 **BibTeX**
 
@@ -243,7 +264,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 @software{suchanek_connectome_kg,
   author    = {Suchanek, Eric G.},
   title     = {{ConnectomeKG}: Connectomes as Knowledge Graphs},
-  version   = {0.2.0},
+  version   = {0.2.1},
   year      = {2026},
   publisher = {Flux-Frontiers},
   doi       = {10.5281/zenodo.22817369},

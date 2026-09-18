@@ -1,6 +1,7 @@
 """``connkg snapshot`` -- save, list, show, diff and prune graph snapshots.
 
-Snapshots live in ``<root>/.connectomekg/snapshots/`` and are tracked in git.
+Snapshots live in ``<root>/connectomes/<dataset>/.connectomekg/snapshots/``,
+one history per dataset, and are tracked in git.
 ``save`` follows the fleet CLI contract, ``snapshot save [OPTIONS] VERSION``:
 the snapshot is keyed on VERSION (the release tag), or on a UTC timestamp when
 it is omitted. The git tree hash is recorded as provenance and is never the
@@ -11,20 +12,20 @@ connectome release, not this package's code.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import click
 
 from connectomekg.cli.group import cli
-from connectomekg.cli.options import open_kg
+from connectomekg.cli.options import open_kg, usage_errors
+from connectomekg.datasets import STORE_DIR, dataset_dir, resolve_dataset
 from connectomekg.snapshots import SnapshotManager
 
 
 def _manager(ctx: click.Context) -> SnapshotManager:
-    root = Path(ctx.obj["root"])
-    return SnapshotManager(
-        root / ".connectomekg" / "snapshots", db_path=root / ".connectomekg" / "graph.sqlite"
-    )
+    root = ctx.obj["root"]
+    with usage_errors():
+        store = dataset_dir(root, resolve_dataset(root, ctx.obj["dataset"])) / STORE_DIR
+    return SnapshotManager(store / "snapshots", db_path=store / "graph.sqlite")
 
 
 @cli.group("snapshot")
@@ -62,7 +63,7 @@ def save(ctx: click.Context, version: str, subject: str | None, force: bool) -> 
     mgr = _manager(ctx)
     if mgr.db_path is None or not mgr.db_path.exists():
         raise click.ClickException(f"no graph at {mgr.db_path}; run `connkg build` first")
-    with open_kg(ctx.obj["root"]) as kg:
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
         stats = kg.store.stats()
         row = kg.store.con.execute("SELECT qualname FROM nodes WHERE kind='dataset'").fetchone()
     snap = mgr.capture(

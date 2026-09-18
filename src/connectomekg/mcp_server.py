@@ -45,6 +45,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from connectomekg.datasets import STORE_DIR, dataset_dir, resolve_dataset
 from connectomekg.module import ConnectomeKG
 from connectomekg.snapshots import SnapshotManager
 from connectomekg.validation import MAX_LIMIT, bounded_int, normalize_node_id
@@ -335,10 +336,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--repo",
         dest="root",
         default=".",
-        help="Directory that owns .connectomekg/ (--repo is accepted for fleet configs).",
+        help="Directory holding connectomes/<dataset>/ (--repo is accepted for fleet configs).",
     )
     p.add_argument(
-        "--db", default=None, help="Graph path (default: <root>/.connectomekg/graph.sqlite)"
+        "--dataset",
+        default=None,
+        help="Dataset id, e.g. fafb783 (default: the only built dataset under --root).",
+    )
+    p.add_argument(
+        "--db",
+        default=None,
+        help="Graph path (default: <root>/connectomes/<dataset>/.connectomekg/graph.sqlite)",
     )
     p.add_argument("--transport", choices=["stdio", "sse"], default="stdio")
     return p.parse_args(argv)
@@ -353,8 +361,12 @@ def main(argv: list[str] | None = None) -> None:
 
     args = _parse_args(argv)
     root = Path(args.root).resolve()
-    _kg = ConnectomeKG(root, db_path=args.db)
-    _snapshot_mgr = SnapshotManager(root / ".connectomekg" / "snapshots", db_path=_kg.db_path)
+    try:
+        home = dataset_dir(root, resolve_dataset(root, args.dataset))
+    except ValueError as exc:
+        raise SystemExit(f"connkg-mcp: {exc}") from exc
+    _kg = ConnectomeKG(home, db_path=args.db)
+    _snapshot_mgr = SnapshotManager(home / STORE_DIR / "snapshots", db_path=_kg.db_path)
     mcp.run(transport=args.transport)
 
 

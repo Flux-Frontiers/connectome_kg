@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-09-17T17:08:15.189360+00:00",
+  "last_update": "2026-09-18T00:10:08.993374+00:00",
   "snapshots": [
     {
       "key": "2026-09-17T01:22:59.856225+00:00",
@@ -71,14 +71,14 @@
       }
     },
     {
-      "key": "0.2.0",
+      "key": "0.2.1",
       "branch": "main",
-      "timestamp": "2026-09-17T17:08:15.188208+00:00",
-      "version": "0.2.0",
+      "timestamp": "2026-09-18T00:10:08.992399+00:00",
+      "version": "0.2.1",
       "subject": "corpus:fafb783",
       "tool": "connectome-kg",
-      "tool_version": "0.2.0",
-      "file": "0.2.0.json",
+      "tool_version": "0.2.1",
+      "file": "0.2.1.json",
       "metrics": {
         "db_path": ".connectomekg/graph.sqlite",
         "total_nodes": 157698,
@@ -118,7 +118,7 @@
         "function_count": 0,
         "method_count": 0,
         "docstring_coverage": 0.0,
-        "snapshot_count": 1,
+        "snapshot_count": 2,
         "dataset_id": "fafb783",
         "dataset_version": "783",
         "n_neurons": 139255,
@@ -134,7 +134,10 @@
         }
       },
       "deltas": {
-        "vs_previous": null,
+        "vs_previous": {
+          "nodes": 0,
+          "edges": 0
+        },
         "vs_baseline": {
           "nodes": 0,
           "edges": 0

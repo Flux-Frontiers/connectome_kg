@@ -31,7 +31,7 @@
 # Build a graph from the synthetic fixture
 # ----------------------------------------
 #   connkg fixture --out /tmp/synth1k --n 1000 --seed 1
-#   connkg build --data-dir /tmp/synth1k --dataset-id synthetic1k --no-index
+#   connkg --dataset synthetic1k build --data-dir /tmp/synth1k --no-index
 #   connkg path --from GRN_sugar --to MN9
 
 [build-system]
@@ -46,7 +46,7 @@ packages = [{ include = "connectomekg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "connectome-kg"
-version = "0.2.0"
+version = "0.2.1"
 description = "Connectomes (FlyWire, hemibrain, MaleCNS) as KGModule knowledge graphs"
 readme = "README.md"
 license = "Elastic-2.0"

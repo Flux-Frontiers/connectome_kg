@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from connectomekg import ConnectomeKG
+from connectomekg.datasets import dataset_dir
 from connectomekg.readers.synthetic import synthetic_tables
 
 
@@ -16,8 +17,13 @@ def tables():
 
 
 @pytest.fixture(scope="session")
-def kg(tmp_path_factory, tables) -> ConnectomeKG:
-    root: Path = tmp_path_factory.mktemp("kg")
-    module = ConnectomeKG(root, tables=tables)
+def kg_root(tmp_path_factory) -> Path:
+    """The ``--root`` of the session graph: it holds ``connectomes/synthetic/``."""
+    return tmp_path_factory.mktemp("kg")
+
+
+@pytest.fixture(scope="session")
+def kg(kg_root, tables) -> ConnectomeKG:
+    module = ConnectomeKG(dataset_dir(kg_root, "synthetic"), tables=tables)
     module.build_graph(wipe=True)
     return module

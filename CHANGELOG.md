@@ -9,6 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One graph per connectome.** Each dataset now lives in its own directory,
+  `<root>/connectomes/<dataset_id>/.connectomekg/`, holding its own graph,
+  vector index and snapshot history. This follows GutenbergKG's
+  one-graph-per-book layout. A second release (another FAFB version, MANC,
+  hemibrain) no longer overwrites the first, and KGRAG's registry scan finds
+  each dataset as a separate KG. New module `connectomekg.datasets`
+  (`scan_datasets`, `resolve_dataset`, `dataset_dir`).
+- **`--dataset ID` replaces `--dataset-id`**, and moves from individual
+  commands to the group: `connkg --root . --dataset fafb783 build ...`.
+  `connkg build` without it writes to `fafb783`, or to `synthetic` with
+  `--source synthetic`. Every other command uses the only built dataset, and
+  stops with a list when there are several. Ids are restricted to lowercase
+  letters, digits, `_`, `.` and `-`, so an id can never name a path outside
+  `connectomes/`.
+- **`connkg-mcp --dataset ID`** picks the dataset the server serves, with the
+  same default. Serve two datasets as two server entries.
+- The tracked FAFB v783 snapshots moved to
+  `connectomes/fafb783/.connectomekg/snapshots/`.
+
+### Added
+
+- **`connkg datasets`** lists the datasets built under `--root`, with each
+  graph's size and dataset name.
+
+### Migration
+
+A graph built before this change is in `<root>/.connectomekg/`. Commands
+that find it say so and print the move:
+
+```bash
+mkdir -p connectomes/fafb783/.connectomekg
+mv .connectomekg/*.sqlite* connectomes/fafb783/.connectomekg/
+```
+
+A KGRAG registry entry that points at the old path needs registering again.
+
+### Fixed
+
+- **A built store can be queried without its source data.** `connkg query`,
+  and anything else that opens an existing graph -- kg-rag's federation
+  adapter among them -- failed with `source='codex' needs data_dir` unless
+  the 34 GB Codex release was on hand. `KGModule.index` builds an extractor
+  only to ask which node kinds are embedded, and `ConnectomeExtractor` loaded
+  its tables eagerly to do it, so every semantic query read the whole release
+  first, or failed without it. The extractor now loads its tables on first
+  use, and `make_extractor()` passes the loader rather than calling it. The
+  existing semantic-query test never saw this, because its module is built
+  from in-memory tables; the new regression test reopens a built store the
+  way a user does.
+
+## [0.2.1] - 2026-09-17
+
+### Changed
+
 - **`kgmodule-utils` floor raised to `>=0.22.0`** (was `>=0.21.0`), across the
   base dependency and the `semantic`, `viz` and `viz3d` extras. 0.22.0 makes
   the Cast button sweep quiltwright's standard 35-degree view cone instead of

@@ -64,7 +64,7 @@ def viz(
     from connectomekg import viz as render  # noqa: PLC0415 - arrives with the viz extra
 
     path = Path(output or f"{cell_type}_{view}.html".replace("/", "_"))
-    with open_kg(ctx.obj["root"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
         if view == "network":
             path.write_text(render.type_network_html(kg, cell_type, limit=limit), encoding="utf-8")
         else:
