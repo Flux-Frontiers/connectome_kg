@@ -89,6 +89,19 @@ connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783
 connkg --root . analyze
 ```
 
+For the 3-D views, two more one-time passes fill in the anatomy:
+
+```bash
+connkg --root . --dataset fafb783 meshes                                  # 78 neuropil surfaces, ~1 MB
+connkg --root . --dataset fafb783 skeletons --data-dir /path/to/fafb_v783 -j 12
+```
+
+`skeletons` needs the 31 GB skeleton download, and is the only thing that
+does: it caches every neuron's simplified skeleton (2.5 GB) and writes each
+neuron's real soma into the graph. `-j` is the worker count and defaults to 1,
+so pass your core count -- 2m 39s across twelve on FAFB v783, against 19m 30s
+on one.
+
 Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint. The vector index for `connkg query` adds 25 seconds (16,861 vectors, 29 MB; Apple M5 Max, September 2026); `--no-index` skips it.
 
 ---
@@ -159,7 +172,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Open a circuit inside the whole brain in an interactive 3-D viewer** | `connkg viz3d SPEC [SPEC...]` (the `viz3d` extra) |
 | **Draw the signal flow between neuropils in 3-D, for the whole brain or one population** | `connkg quilt --view flow [SPEC...]`, `connkg viz3d --view flow [SPEC...]` (the `viz3d` extra) |
 | **Draw the brain's 78 neuropil surfaces in the 3-D views** | `connkg meshes` once, then any `quilt` or `viz3d` (FAFB v783) |
-| **Cache simplified skeletons and give every neuron a soma** | `connkg skeletons --data-dir fafb_v783` once; the circuit view then renders without the 31 GB download, and the whole-brain cloud shows cell bodies |
+| **Cache simplified skeletons and give every neuron a soma** | `connkg skeletons --data-dir fafb_v783 -j 12` once (2m 39s on v783); the circuit view then renders without the 31 GB download, and the whole-brain cloud shows cell bodies |
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |

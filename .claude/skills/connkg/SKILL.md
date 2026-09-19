@@ -141,12 +141,14 @@ command.
 | file | written by | what it saves |
 |---|---|---|
 | `neuropil_meshes.npz` | `connkg meshes` | the 78 v783 neuropil surfaces, about 1 MB |
-| `skeletons.parquet` | `connkg skeletons --data-dir fafb_v783` | every neuron's simplified skeleton, about 3.5 GB against the download's 31 GB; the same pass back-fills somas into the graph |
+| `skeletons/` | `connkg skeletons --data-dir fafb_v783 -j 12` | every neuron's simplified skeleton, one `part-NNNN.parquet` per worker, 2.5 GB against the download's 31 GB; the same pass back-fills somas into the graph |
 | `synapse_graph.npz` | automatically, by the first `connkg path` or `connkg cone` | the neuron-level synapse matrix, 14 MB; an 8-second load of 3.7 M edges becomes under one |
 
-`connkg skeletons` is a ~25-minute maintainer pass over the 31 GB download --
-give the command, do not run it. `--step` (default 4) trades detail for size,
-and `--no-somas` writes the cache without touching the graph.
+`connkg skeletons` is a maintainer pass over the 31 GB download -- give the
+command, do not run it. On v783 it is 19m 30s on one core and 2m 39s at
+`-j 12`, which produces a byte-identical cache; `-j` defaults to 1, so always
+suggest a core count. `--step` (default 4) trades detail for size, and
+`--no-somas` writes the cache without touching the graph.
 
 ## Building
 
@@ -201,7 +203,7 @@ poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --wipe
 `viz3d` extra (`pip install "connectome-kg[viz3d]"`) and draw two things at
 once: every neuron as a dim whole-brain cloud, plus the given spec(s)'
 circuit at full brightness, drawn from **real traced skeletons**. Skeletons
-come from `.connectomekg/skeletons.parquet` (written by `connkg skeletons`)
+come from `.connectomekg/skeletons/` (written by `connkg skeletons`)
 first, and from `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever the
 cache does not hold. With neither -- no cache, and no `--data-dir` (default
 `fafb_v783`) or a missing file -- a neuron falls back to a larger sphere at

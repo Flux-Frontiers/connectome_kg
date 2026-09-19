@@ -90,6 +90,13 @@ root id. The Synapse Table and Neuron Skeletons are the two downloads that
 time out: Safari reports `NSURLErrorDomain -1001` and leaves a `.download`
 bundle that does not resume. Restart the download rather than waiting.
 
+Once the graph is built, read the skeletons in with
+`connkg skeletons --data-dir fafb_v783 -j 12`. It writes the 2.5 GB cache the
+3-D circuit view draws from and gives every neuron its soma, and it is the
+only thing that needs those 31 GB -- 2m 39s across twelve cores, or 19m 30s
+on one if `-j` is left at its default. See
+[Rendering in 3-D](rendering.md#the-skeleton-cache).
+
 ### Classification no longer carries `cell_type`
 
 Current exports of `classification.csv.gz` have no `cell_type` column; the

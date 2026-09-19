@@ -74,12 +74,22 @@ class BuildRun:
 
 
 def peak_rss_bytes() -> int:
-    """Peak resident set size of this process so far, in bytes.
+    """Peak resident set size of this process and its finished children, in bytes.
+
+    Children count because ``connkg skeletons -j`` does its reading in a pool:
+    reporting the parent alone would say 230 MB for a pass whose real
+    footprint was several gigabytes. ``RUSAGE_CHILDREN`` covers only children
+    already reaped, which is every worker by the time a report is written, and
+    is the peak of any one of them rather than their sum -- so this is the
+    high-water mark of the largest single process, not of the machine.
 
     ``ru_maxrss`` is reported in bytes on macOS and in kilobytes on Linux.
     """
-    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return rss if sys.platform == "darwin" else rss * 1024
+    usage = max(
+        resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+        resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
+    )
+    return usage if sys.platform == "darwin" else usage * 1024
 
 
 def write_build_report(
@@ -251,6 +261,7 @@ def write_skeletons_report(
             f"| fell back to a root point | {cache.n_cached - cache.n_soma:,} |",
             f"| no skeleton file | {cache.n_missing:,} |",
             f"| unreadable skeleton file | {cache.n_unreadable:,} |",
+            f"| shards written | {cache.n_shards:,} |",
             "",
             f"{rate:.0f} skeletons per second.",
         ]
