@@ -13,6 +13,7 @@ from kg_utils.pipeline import KGModule
 from kg_utils.specs import QueryResult, SnippetPack
 
 from connectomekg.extractor import DEFAULT_RELS, EDGE_KINDS, NODE_KINDS, ConnectomeExtractor
+from connectomekg.neuroglancer import SPEC_COLORS, neuroglancer_url
 from connectomekg.paths import PathResult, SynapseGraph
 from connectomekg.readers.codex import read_codex
 from connectomekg.readers.synthetic import synthetic_tables
@@ -195,9 +196,9 @@ class ConnectomeKG(KGModule):
     # --------------------------------------------------------- navigation
     @property
     def graph(self) -> SynapseGraph:
-        """Neuron-level synapse graph of the built store (lazy)."""
+        """Neuron-level synapse graph of the built store (lazy, cached on disk)."""
         if self._graph is None:
-            self._graph = SynapseGraph.from_store(self.store)
+            self._graph = SynapseGraph.from_store(self.store, cache_for=self.db_path)
         return self._graph
 
     def neurons_of(self, spec: str) -> list[str]:
@@ -262,6 +263,37 @@ class ConnectomeKG(KGModule):
         direction = require_choice("direction", direction, ("down", "up"))
         seeds = self.neurons_of(spec)
         return self.graph.cone(seeds, hops=hops, min_syn=min_syn, direction=direction)
+
+    def neuroglancer_link(self, specs: list[str], *, limit: int = 200) -> dict[str, Any]:
+        """A Neuroglancer URL showing each spec's neurons as meshes, one colour per spec.
+
+        :param specs: One to seven specs (see :meth:`neurons_of`).
+        :param limit: Neurons shown per spec, 1-500; ``count`` is always the full total.
+        :return: ``{"url", "specs": [{spec, count, shown, color}]}``.
+        :raises ValueError: On an out-of-range argument, a dataset with no
+            public segmentation, or specs that match no neurons.
+        """
+        if isinstance(specs, str) or not specs:
+            raise ValueError("specs must be a non-empty list of specs")
+        bounded_int("specs", len(specs), 1, len(SPEC_COLORS))
+        limit = bounded_int("limit", limit, 1, MAX_LIMIT)
+        row = self.store.con.execute("SELECT qualname FROM nodes WHERE kind='dataset'").fetchone()
+        dataset_id = row[0] if row else ""
+        groups, found = [], []
+        for i, spec in enumerate(specs):
+            ids = self.neurons_of(spec)
+            groups.append([int(nid.rsplit(":", 1)[1]) for nid in ids[:limit]])
+            found.append(
+                {
+                    "spec": spec,
+                    "count": len(ids),
+                    "shown": len(groups[-1]),
+                    "color": SPEC_COLORS[i],
+                }
+            )
+        if not any(groups):
+            raise ValueError(f"no neurons match {', '.join(specs)}")
+        return {"url": neuroglancer_url(dataset_id, groups), "specs": found}
 
     def describe(self, node_id: str) -> dict[str, Any] | None:
         """A node with its metadata decoded.

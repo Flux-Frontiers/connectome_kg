@@ -19,6 +19,8 @@ strongest_path(source, target)
     Strongest synaptic path between two specs.
 cone(spec, hops, min_syn, direction, limit)
     Downstream or upstream cone of a spec, by hop.
+neuroglancer_link(specs, limit)
+    A Neuroglancer URL showing specs' neurons as meshes in the browser.
 query_connectome(q, k, hop)
     Semantic search with graph expansion (needs the vector index).
 pack_connectome(q, k, hop, max_nodes)
@@ -109,6 +111,8 @@ mcp = FastMCP(
         "- Everything downstream or upstream: cone('LC4', hops=2, min_syn=10).\n"
         "- A neuron's neuropils, a column's neurons, a type's ontology terms: "
         "node_edges(node_id, rel=...).\n"
+        "- See neurons as meshes: neuroglancer_link(['LPLC2', 'DNp01']) returns a URL "
+        "that opens them in Neuroglancer, one colour per spec, no login.\n"
         "- Concept search: query_connectome or pack_connectome, only when the vector "
         "index was built; otherwise they return an error saying so.\n\n"
         "A spec (strongest_path, cone, neurons_of) is an exact, case-sensitive cell type "
@@ -252,6 +256,20 @@ def cone(
         names = [(kg.store.node(i) or {}).get("qualname") or i for i in ids[:limit]]
         out[str(h)] = {"count": len(ids), "neurons": names}
     return _json(out)
+
+
+@mcp.tool()
+def neuroglancer_link(specs: list[str], limit: int = 200) -> str:
+    """A Neuroglancer URL showing each spec's neurons as FlyWire meshes, one colour per spec.
+
+    Opens in a browser with no login, on the dataset's public segmentation
+    (FAFB v783 only). Give the URL to the user; do not fetch it.
+
+    :param specs: One to seven specs, e.g. ``["LPLC2", "DNp01"]``.
+    :param limit: Neurons shown per spec, 1-500; ``count`` is always the full total.
+    :return: JSON {url, specs: [{spec, count, shown, color}]}.
+    """
+    return _json(_get_kg().neuroglancer_link(specs, limit=limit))
 
 
 @mcp.tool()

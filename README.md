@@ -85,11 +85,11 @@ The Codex portal needs a Google sign-in and lists display labels instead of file
 ```bash
 connkg files                                   # portal label -> file name
 connkg verify --data-dir /path/to/fafb_v783    # check the download
-connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783 --no-index
+connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783
 connkg --root . analyze
 ```
 
-Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint.
+Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint. The vector index for `connkg query` adds 25 seconds (16,861 vectors, 29 MB; Apple M5 Max, September 2026); `--no-index` skips it.
 
 ---
 
@@ -153,10 +153,13 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
+| **Open neurons as FlyWire meshes in the browser, no login** | `connkg link SPEC [SPEC...]` (FAFB v783) |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |
 | **Open a circuit inside the whole brain in an interactive 3-D viewer** | `connkg viz3d SPEC [SPEC...]` (the `viz3d` extra) |
 | **Draw the signal flow between neuropils in 3-D, for the whole brain or one population** | `connkg quilt --view flow [SPEC...]`, `connkg viz3d --view flow [SPEC...]` (the `viz3d` extra) |
+| **Draw the brain's 78 neuropil surfaces in the 3-D views** | `connkg meshes` once, then any `quilt` or `viz3d` (FAFB v783) |
+| **Cache simplified skeletons and give every neuron a soma** | `connkg skeletons --data-dir fafb_v783` once; the circuit view then renders without the 31 GB download, and the whole-brain cloud shows cell bodies |
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |
@@ -219,6 +222,7 @@ dataset is built. Serve two datasets as two entries. In a project's
 | `find_nodes`, `get_node`, `node_edges` | find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
 | `neurons_of`, `type_partners` | resolve a spec to neurons; a type's partner types by synapses |
 | `strongest_path`, `cone` | the strongest synaptic route; everything within N hops |
+| `neuroglancer_link` | a Neuroglancer URL showing up to seven specs as meshes, one colour each |
 | `query_connectome`, `pack_connectome` | semantic search (needs a build with the vector index) |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | saved metric snapshots |
 

@@ -12,8 +12,9 @@ Two views are available:
 - **Flow** (`--view flow`) draws neuropils as spheres, linked by tubes
   weighted by how much signal the brain's neurons carry between them.
 
-Both views draw the whole brain as a context cloud behind the subject, and
-both render either as a Looking Glass quilt or in an interactive viewer.
+Both views draw the whole brain as a context cloud behind the subject, and,
+once fetched with `connkg meshes`, the brain's neuropils as faint surfaces.
+Both render either as a Looking Glass quilt or in an interactive viewer.
 
 ![The two DNp01 descending neurons inside the whole-brain context cloud](images/circuit_dnp01.png)
 
@@ -53,7 +54,8 @@ matters.
 
 The background is a flat grey, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`. It carries no data.
 
-Each small dot is one neuron at its marked point.
+Each small dot is one neuron, at its soma once `connkg skeletons` has
+back-filled somas, and at its marked point otherwise.
 
 In the **circuit view**, all 139,255 neurons are drawn, and a dot's colour is
 the neuron's super class, muted toward the background (the swatches show the
@@ -220,10 +222,22 @@ You need the following:
 
 - A built graph in `connectomes/<dataset>/.connectomekg/graph.sqlite`. See
   the README for `connkg build` and `--dataset`.
-- For the circuit view, the skeleton download in
-  `fafb_v783/sk_lod1_783_healed/`, which holds one `.swc` file per neuron
-  (about 31 GB). Without it, each circuit neuron is drawn as a sphere at its
-  marked point. The flow view does not read skeletons.
+- For the circuit view, skeletons -- from either source, the cache first:
+    - **The skeleton cache**, `.connectomekg/skeletons.parquet`, written once
+      by `connkg skeletons --data-dir fafb_v783`. It holds every neuron's
+      simplified skeleton and is about 3.5 GB, so a render needs neither the
+      31 GB nor an SWC parse. See [The skeleton cache](#the-skeleton-cache).
+    - **The skeleton download** in `fafb_v783/sk_lod1_783_healed/`, one `.swc`
+      file per neuron, about 31 GB. Any neuron the cache does not hold is read
+      from here when `--data-dir` is given.
+
+    With neither, each circuit neuron is drawn as a sphere at its marked
+    point. The flow view does not read skeletons.
+- For the neuropil surfaces, the mesh cache. Fetch it once with
+  `connkg meshes`, which downloads the 78 FAFB v783 neuropil meshes from
+  FlyWire's public bucket (no sign-in, about 1 MB) into
+  `connectomes/<dataset>/.connectomekg/neuropil_meshes.npz`. Without it,
+  both views are drawn without surfaces. See [Neuropil meshes](#neuropil-meshes).
 
 ## Render a view
 
@@ -277,6 +291,8 @@ Quilts are never committed.
 | `--skeleton-step` | circuit | `4` | keep every Nth skeleton point, 1 to 50 |
 | `--tubes` | circuit | off | draw skeletons as tubes instead of lines |
 | `--top` | flow | `100` | strongest neuropil pairs drawn, 1 to 500 |
+| `--neuropils` / `--no-neuropils` | both | on | draw the neuropil surfaces, when `connkg meshes` has fetched them |
+| `--cloud` / `--no-cloud` | both | on, unless the surfaces are drawn | draw the context cloud |
 | `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
 | `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
@@ -297,12 +313,14 @@ plotter, the viewer passes its Qt widget, and **Cast to Looking Glass**
 rebuilds the scene in a fresh off-screen plotter. All three therefore draw
 the same thing.
 
-The function works in four steps:
+The function works in five steps:
 
 1. Set the background to a muted grey (`scene.BACKGROUND`, `#5A5D62`).
 2. Compute the world frame from the neuron positions.
-3. Draw the context cloud.
-4. Draw the circuit or the flow.
+3. Draw the neuropil meshes, when cached and `neuropils=True`.
+4. Draw the context cloud, unless meshes were drawn (`cloud=None`, the
+   default) or `cloud=False`.
+5. Draw the circuit or the flow.
 
 The module is split so most of it runs without PyVista. `world_frame`,
 `context_points`, `circuit_neurons`, `neuropil_flow` and `flow_arc` are
@@ -312,11 +330,12 @@ NumPy and SQL only. The tests exercise them without the `viz3d` extra.
 
 | data | source | read by |
 |---|---|---|
-| neuron positions | `x`, `y`, `z` in each neuron node's metadata (the Codex marked point, in nm) | world frame, context cloud, flow centroids |
+| neuron positions | `soma_x`, `soma_y`, `soma_z` in each neuron node's metadata where `connkg skeletons` back-filled one, else `x`, `y`, `z`, the Codex marked point, in nm | world frame, context cloud, flow centroids |
 | super class and sign | neuron node metadata | context cloud colour |
-| skeletons | `fafb_v783/sk_lod1_783_healed/<root_id>.swc` | circuit |
+| skeletons | `.connectomekg/skeletons.parquet` (written by `connkg skeletons`), then `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever it does not hold | circuit |
 | per-neuron neuropil synapse counts | `IN_NEUROPIL` edge evidence, `{"pre": n, "post": m}` | flow |
 | neuropil synapse totals | neuropil node metadata, `n_synapses` | flow sphere size |
+| neuropil surfaces | `.connectomekg/neuropil_meshes.npz`, written by `connkg meshes` | both |
 
 ## World coordinates
 
@@ -363,9 +382,15 @@ brain already spans the width of the frame.
 
 ## The context cloud
 
-The context cloud draws each neuron as a small sphere at its marked point.
-The cloud shows the outline of the brain: optic lobes, central brain and
-the gaps between regions.
+The context cloud draws each neuron as a small sphere. The cloud shows the
+outline of the brain: optic lobes, central brain and the gaps between
+regions.
+
+Each sphere sits at the neuron's **soma** where the graph has one --
+`soma_x`/`soma_y`/`soma_z`, written by `connkg skeletons` -- and at its
+**marked point** otherwise. A graph without the back-fill draws the
+marked-point cloud it always did. The scene's title says which: `somas=N`
+once any of the dots is a real cell body, `context=N` while none is.
 
 Three choices keep it visible without covering the subject:
 
@@ -391,9 +416,100 @@ Three choices keep it visible without covering the subject:
 [Background and context cloud](#background-and-context-cloud) lists every
 colour.
 
-A marked point is not a cell body. It can be tens of microns from the
-soma. The cloud shows where neurons are, not where their
-cell bodies are.
+A marked point is not a cell body: FlyWire's anchor can sit tens of microns
+from the soma, so a cloud drawn from marked points shows where neurons are
+rather than where their cell bodies are. `connkg skeletons` is what replaces
+them -- see [The skeleton cache](#the-skeleton-cache).
+
+## Neuropil meshes
+
+The neuropil meshes are the surfaces of the volumes FlyWire used to assign
+each v783 synapse to a neuropil: the JFRC2 template neuropils (Ito et al.
+2014) mapped into FlyWire space. So a mesh encloses the synapses that the
+graph's `IN_NEUROPIL` edges count for that neuropil. FlyWire publishes them
+as Neuroglancer precomputed meshes at
+`gs://flywire_neuropil_meshes/neuropils/neuropil_mesh_v141_v6`. That source
+numbers the meshes 0 to 77 and does not name them.
+
+`connectomekg.neuropil_meshes.FAFB_783_MESH_NAMES` names them. It was built
+by matching every v6 mesh, vertex set for vertex set, against the named copy
+fafbseg packages from the same source: all 78 match exactly, to 78 distinct
+names. The one v783 neuropil without a mesh is `UNASGD`, the synapses no
+volume claimed. fafbseg's `volume_name_dict.json` looks like the answer but
+is not: it numbers the synapse-assignment volume, and matches none of these
+meshes.
+
+The views draw the meshes like this:
+
+- **Circuit view:** pale neutral shells, `#C8CCD2` at 10% opacity, so the
+  circuit's cell-type colours stay the only colour in the scene.
+- **Flow view:** each surface tinted with its brain region's colour at 15%
+  opacity, the colour its sphere already carries, so the spheres and tubes
+  read as sitting inside their neuropils.
+
+Meshes of one colour are merged into one actor (`neuropils` in the circuit
+view, `neuropils:<colour>` in the flow view), so the 78 surfaces cost a
+handful of draw calls. Depth peeling is on so translucent surfaces composite
+in the right order. On FAFB v783 a 48-view quilt of LPLC2 and DNp01 with
+meshes renders in about 5 seconds.
+
+The surfaces are the one translucent layer in the scene. Everything else is
+opaque, because alpha blending can ghost between views in a light-field
+render. The shells render correctly in every quilt tile, but have not been
+judged on a Looking Glass display yet. If they ghost, `--no-neuropils` turns
+them off.
+
+With the meshes drawn, the context cloud is redundant: the surfaces show the
+brain's outline more plainly than 139,255 dots. So drawing the surfaces turns
+the cloud off, leaving the subject inside the anatomy. Pass `--cloud` for
+both at once, which is worth it when the dots' own colouring is the point
+(`--color-by sign`, say). Without a mesh cache, nothing changes: the cloud
+draws as it always did.
+
+## The skeleton cache
+
+The Codex skeleton download is 31 GB of SWC text, one file per neuron. Two
+things in it are worth keeping and the rest is not, so `connkg skeletons`
+reads every file once and writes both:
+
+```bash
+connkg --root . --dataset fafb783 skeletons --data-dir fafb_v783
+```
+
+- **`.connectomekg/skeletons.parquet`**, every neuron's skeleton simplified at
+  `--step` (4 by default, the circuit view's own default). About 3.5 GB on
+  FAFB v783, and the circuit view reads it in place of the download.
+- **A soma in every neuron node**, as `soma_x`, `soma_y`, `soma_z` and
+  `has_soma`. The context cloud draws somas from then on, and so does any
+  query over the graph. This half writes to `graph.sqlite`; `--no-somas`
+  leaves the graph untouched.
+
+The pass takes about 25 minutes on a laptop and is a one-time maintainer job:
+nothing else in the module needs the download afterwards. Run it again to
+refresh either product, or after a rebuild. A larger `--step` trades detail
+for size, roughly 2.2 GB at `--step 8`.
+
+Every pass writes `reports/skeletons_<timestamp>.md`, the same per-run
+provenance record `connkg build` writes: versions and git commit, options,
+host, what was read, what was written, timings and peak memory. A failed or
+interrupted pass writes one too, marked FAILED, and removes its own partial
+cache. Because the soma back-fill changes an already-built graph, take a fresh
+`connkg snapshot save` afterwards -- one taken before the pass measures a
+graph with no `soma_*` keys in it.
+
+What the cache holds is not the whole skeleton. It carries no radii, which the
+renderer does not use, and its only SWC label is the soma's -- branch points
+and tips are recomputed from the parent links, which is where the renderer
+took them from in the first place. What it does carry round-trips exactly:
+a cached skeleton drawn whole is the same geometry as the downloaded one drawn
+at the cache's stride, to float32 (under 0.03 nm, against a 4 nm imaging
+voxel). Every measurement above is FAFB v783: 104 LC4 neurons render from the
+cache in 0.8 s against 1.7 s from the download, with the same 379,096 points.
+
+Both caches beside the graph -- this one and `neuropil_meshes.npz` -- are
+derived data, gitignored, and safe to delete. So is `synapse_graph.npz`, which
+`connkg path` and `connkg cone` write the first time they load the brain's
+3.7 M synapse edges, turning an 8-second load into under one.
 
 ## The circuit view
 
@@ -405,14 +521,18 @@ brightness:
    `MAX_SCENE_NEURONS` (500) neurons. Above that, the render stops with an
    error that names the count, because a silently sampled circuit looks
    complete when it is not. Narrow the spec instead.
-2. **Load skeletons.** `connectomekg.skeletons.read_swc` parses each
-   neuron's SWC file. SWC coordinates share the graph's nanometre frame, so
+2. **Load skeletons.** The cache is read first, and `--data-dir` covers
+   whatever it does not hold: `connectomekg.skeletons.read_swc` parses those
+   neurons' SWC files. Both sources are in the graph's own nanometre frame, so
    skeletons and the cloud line up without a transform.
 3. **Simplify.** `--skeleton-step N` keeps every Nth point along each
    unbranched run. Roots, the soma, and every branch point and tip are always
    kept, so the branching shape stays intact at any step. Branch points and
    tips come from the parent links, not from the SWC labels, which real
-   skeletons do not apply consistently.
+   skeletons do not apply consistently. A cached skeleton is already
+   simplified at the cache's own stride, so the requested stride is divided by
+   it rather than applied again, and a request below it draws the cache as it
+   stands.
 4. **Draw.** All the neurons of one cell type share a single line mesh
    (`skeleton:<type>`), so a 100-neuron type costs one draw call. A sphere
    marks each soma (`soma:<type>`).
@@ -616,11 +736,16 @@ the CLI and the Python API:
 
 ## Known limits
 
-- **No neuropil geometry.** Regions show only as the density of the context
-  cloud and as flow centroids. Drawing neuropil surfaces needs a mesh source
-  that the Codex download does not include.
-- **Marked points are not somas.** The cloud and the flow centroids use
-  marked points. Only the circuit view reads real somas, from skeletons.
+- **Neuropil surfaces are FAFB v783 only.** `connkg meshes` knows one mesh
+  source. Another dataset renders without surfaces until its source is added
+  to `connectomekg.neuropil_meshes`.
+- **Flow centroids still use marked points.** The context cloud uses somas
+  once `connkg skeletons` has back-filled them, and the circuit view has
+  always read each soma from its skeleton, but the neuropil centroids in the
+  flow view are still weighted over marked points.
+- **The soma back-fill needs the 31 GB download.** A graph built without it
+  draws the marked-point cloud, and `connkg skeletons` is the only thing that
+  changes that.
 - **Large circuits are refused, not sampled.** Narrow a SPEC that resolves
   to more than 500 neurons.
 

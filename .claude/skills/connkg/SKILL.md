@@ -90,8 +90,9 @@ kg.close()
 
 **Semantic search** (`connkg query`, `kg.query`, `kg.pack`) needs
 `connectomes/fafb783/.connectomekg/vectors.sqlite`, which exists only after a build without
-`--no-index`, with the `semantic` extra installed. The reference build uses
-`--no-index`, so check for the file first. Without it, search docstrings and
+`--no-index`, with the `semantic` extra installed. The reference build
+includes it, but a graph built with `--no-index` has none, so check for the
+file first. Without it, search docstrings and
 labels in SQL (`lower(docstring) LIKE '%giant fib%'` on `cell_type` and `label`
 nodes finds DNp01). Community labels are the only free text in the graph:
 a concept nobody wrote into a label, such as "looming" on FAFB, is found by
@@ -131,11 +132,31 @@ names; `connkg verify --data-dir fafb_v783` checks the directory.
   `visual_neuron_types`, `column_assignment`, `connectivity_tags`,
   `processed_labels`.
 
+### Caches beside the graph
+
+Three derived files can sit in `.connectomekg/` next to `graph.sqlite`. All
+are gitignored and safe to delete; each is rebuilt on demand or by its own
+command.
+
+| file | written by | what it saves |
+|---|---|---|
+| `neuropil_meshes.npz` | `connkg meshes` | the 78 v783 neuropil surfaces, about 1 MB |
+| `skeletons.parquet` | `connkg skeletons --data-dir fafb_v783` | every neuron's simplified skeleton, about 3.5 GB against the download's 31 GB; the same pass back-fills somas into the graph |
+| `synapse_graph.npz` | automatically, by the first `connkg path` or `connkg cone` | the neuron-level synapse matrix, 14 MB; an 8-second load of 3.7 M edges becomes under one |
+
+`connkg skeletons` is a ~25-minute maintainer pass over the 31 GB download --
+give the command, do not run it. `--step` (default 4) trades detail for size,
+and `--no-somas` writes the cache without touching the graph.
+
 ## Building
 
 ```bash
-poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-index --wipe
+poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --wipe
 ```
+
+- The index step after the graph takes about 25 seconds on v783. `build`
+  refuses to start without the `semantic` extra unless given `--no-index`, and
+  `--no-index` warns when it leaves an older `vectors.sqlite` in place.
 
 - **Do not start a real FAFB build yourself.** It takes about 4 minutes and
   2.1 GB (keep 4 GB free for the write-ahead log). Give the maintainer the
@@ -152,11 +173,20 @@ poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-ind
 
 ## Provenance
 
-- **Build reports.** Every build, including a failed one, writes
-  `reports/build_<UTC timestamp>.md`: versions and git commit, options, each
-  input's SHA-256 against the manifest, time per stage, counts, database size,
-  peak resident memory. Reports are gitignored; `git add -f` one worth keeping.
-  Read the newest report before guessing why a build was slow or wrong.
+- **Run reports.** Every `connkg build` and every `connkg skeletons`,
+  including a failed one, writes a Markdown record into `reports/`:
+  `build_<UTC timestamp>.md` and `skeletons_<UTC timestamp>.md`. Both carry
+  versions and git commit, options, host, timings and peak resident memory; a
+  build adds each input's SHA-256 against the manifest and the counts written,
+  and a skeletons pass adds what it read (file count and total size -- the
+  download has no recorded checksums) and what it wrote, including how many
+  neuron nodes gained a soma. Reports are gitignored; `git add -f` one worth
+  keeping. Read the newest before guessing why a pass was slow or wrong.
+- **A skeletons pass changes what a snapshot measures.** The soma back-fill
+  writes into an already-built `graph.sqlite`, so a snapshot taken before it
+  describes a graph without `soma_*` keys. Its report is the only record of
+  which download those somas came from, and at which step. Re-snapshot after
+  the pass.
 - **Snapshots** follow the fleet contract. `connkg snapshot save [OPTIONS]
   VERSION` keys on VERSION, or on a UTC timestamp when omitted, and never on
   the git tree hash, which is recorded only as provenance. The subject is
@@ -169,11 +199,15 @@ poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-ind
 
 `connkg quilt SPEC [SPEC...]` and `connkg viz3d SPEC [SPEC...]` need the
 `viz3d` extra (`pip install "connectome-kg[viz3d]"`) and draw two things at
-once: every neuron's marked point as a dim whole-brain context cloud, plus
-the given spec(s)' circuit at full brightness, drawn from **real traced
-skeletons** read from `fafb_v783/sk_lod1_783_healed/<root_id>.swc`. Without
-`--data-dir` (default `fafb_v783`) or a missing skeleton file, a neuron falls
-back to a larger sphere at its marked point instead of a traced shape.
+once: every neuron as a dim whole-brain cloud, plus the given spec(s)'
+circuit at full brightness, drawn from **real traced skeletons**. Skeletons
+come from `.connectomekg/skeletons.parquet` (written by `connkg skeletons`)
+first, and from `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever the
+cache does not hold. With neither -- no cache, and no `--data-dir` (default
+`fafb_v783`) or a missing file -- a neuron falls back to a larger sphere at
+its marked point instead of a traced shape. The cloud's dots are somas where
+`connkg skeletons` has back-filled them and marked points otherwise; the
+scene title says which (`somas=N` against `context=N`).
 
 - **Do not start a real quilt render, cast, or the viewer yourself.** These
   are the maintainer's to run and watch, like a real build. Give the command;
@@ -183,7 +217,9 @@ back to a larger sphere at its marked point instead of a traced shape.
   expecting the cap to be raised.
 - `--skeleton-step` (default 4, capped at `MAX_SKELETON_STEP` = 50)
   simplifies a skeleton's point count for rendering; step 1 draws every
-  traced point.
+  traced point. A skeleton from the cache is already simplified at the
+  cache's own stride, so the requested stride is divided by it rather than
+  applied again, and a request below it draws the cache as it stands.
 - Output lands under `renders/` (`stills/` for a `--preview` PNG, `quilts/`
   for the quilt itself), none of it committed.
 - `--view flow` draws neuropil flow instead of a circuit: neuropils as spheres
@@ -251,10 +287,13 @@ Do not claim or try these; they are planned, not built:
 
 - KGRAG registration or federated queries across KGs
 - other datasets (hemibrain, MANC, BANC) or a neuPrint reader
-- activity simulation, and neuropil meshes (no mesh source in the download;
-  a neuropil is visible only as the density of the 3-D context cloud)
-- soma positions in the graph itself: neuron `x`/`y`/`z` metadata is a marked
-  point, not necessarily the soma. `connkg quilt`/`viz3d` read each neuron's
-  real soma from its skeleton file when one exists (falling back to the
-  skeleton's root point otherwise); nothing has back-filled the soma into the
-  graph's own `x`/`y`/`z` metadata
+- activity simulation
+- neuropil meshes for any dataset but FAFB v783 (`connkg meshes` fetches
+  v783's 78 surfaces; the 3-D views draw them once cached)
+- somas for a graph that has not had `connkg skeletons` run over it. That
+  command back-fills `soma_x`/`soma_y`/`soma_z`/`has_soma` into every neuron
+  node from the skeleton download; until it has run, a neuron's `x`/`y`/`z`
+  is FlyWire's marked point, not the cell body. Note the back-fill adds the
+  soma alongside `x`/`y`/`z` rather than overwriting them.
+- somas in the flow view's neuropil centroids, which are still weighted over
+  marked points even after the back-fill

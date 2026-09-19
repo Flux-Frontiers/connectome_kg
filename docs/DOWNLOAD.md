@@ -149,7 +149,7 @@ used on the dataset node.
 
    ```bash
    connkg verify --data-dir /path/to/fafb_v783
-   connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783 --no-index
+   connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783
    connkg --root . analyze
    ```
 
@@ -169,9 +169,16 @@ used on the dataset node.
    `--wipe` when restarting after an interrupted build, or the new graph is
    written on top of the partial one.
 
-   `--no-index` builds the SQLite graph only. Drop it (with the `semantic`
-   extra installed) to also embed the cell types, neuropils, labels and taxa;
-   that is about 20k short texts and takes a few minutes on CPU.
+   After the graph, `build` embeds the cell types, neuropils, labels, taxa and
+   the other named nodes into the vector index that `connkg query` searches:
+   16,861 short texts, 25 seconds and 29 MB on an Apple M5 Max (September
+   2026). This needs the `semantic` extra; without it `build` stops before
+   doing anything and says so. `--no-index` builds the SQLite graph only.
+
+   `--no-index` does not delete an index from an earlier build, so `build`
+   warns when it leaves one in place. That index was built from the previous
+   graph and may not match the new one; rebuild without `--no-index` to
+   refresh it.
 
 6. Measured footprint, `--no-index` on the real v783 release with every
    optional file present (Apple silicon, September 2026): **3 minutes 57
@@ -184,10 +191,13 @@ used on the dataset node.
 
    Every build writes `reports/build_<timestamp>.md`: versions and git commit,
    the options, each input file's SHA-256 against the manifest, time per
-   extraction stage, the counts written, and peak resident memory. The reports
-   are gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
+   extraction stage, the counts written, and peak resident memory. `connkg
+   skeletons` writes `reports/skeletons_<timestamp>.md` the same way. Both are
+   gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
    records the built graph's metrics in
-   `connectomes/fafb783/.connectomekg/snapshots/`, which is tracked.
+   `connectomes/fafb783/.connectomekg/snapshots/`, which is tracked -- take a
+   snapshot after a skeletons pass as well as after a build, since the soma
+   back-fill changes the graph the snapshot measures.
 
 ## If Codex offers something other than what you expected
 

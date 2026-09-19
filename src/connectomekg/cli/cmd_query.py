@@ -1,4 +1,4 @@
-"""``connkg query``, ``path`` and ``cone`` -- asking the graph things."""
+"""``connkg query``, ``path``, ``cone`` and ``link`` -- asking the graph things."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import click
 
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, usage_errors
+from connectomekg.validation import MAX_LIMIT
 
 
 @cli.command("query")
@@ -80,3 +81,24 @@ def cone(
             click.echo(f"hop {h}: {len(by_hop[h])} neurons")
             for q in sorted(by_hop[h])[:limit]:
                 click.echo(f"  {q}")
+
+
+@cli.command("link")
+@source_options
+@click.argument("specs", nargs=-1, required=True)
+@click.option(
+    "--limit",
+    default=200,
+    show_default=True,
+    type=click.IntRange(1, MAX_LIMIT),
+    help="Neurons shown per spec.",
+)
+@click.pass_context
+def link(ctx: click.Context, specs: tuple[str, ...], limit: int, **source: Any) -> None:
+    """Neuroglancer URL showing each spec's neurons as meshes, one colour per spec."""
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+        res = kg.neuroglancer_link(list(specs), limit=limit)
+    for s in res["specs"]:
+        more = f", first {s['shown']} shown" if s["shown"] < s["count"] else ""
+        click.echo(f"{s['color']}  {s['spec']}: {s['count']} neurons{more}", err=True)
+    click.echo(res["url"])

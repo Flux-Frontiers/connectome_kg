@@ -11,7 +11,7 @@ import pytest
 from click.testing import CliRunner
 
 from connectomekg import ConnectomeKG
-from connectomekg.cli import cli
+from connectomekg.cli import cli, cmd_build
 from connectomekg.datasets import dataset_dir
 from connectomekg.manifest import FAFB_783_FILES, verify_dir
 from connectomekg.readers.synthetic import write_codex_dir
@@ -148,3 +148,24 @@ def test_a_built_store_queries_without_its_source_data(tables, tmp_path):
     out = CliRunner().invoke(cli, ["--root", str(tmp_path), "query", "giant fibre escape"])
     assert out.exit_code == 0, out.output
     assert "needs data_dir" not in out.output
+
+
+def test_build_without_the_semantic_extra_stops_before_any_work(tmp_path, monkeypatch):
+    monkeypatch.setattr(cmd_build, "missing_semantic", lambda: ["sentence_transformers"])
+    res = CliRunner().invoke(cli, ["--root", str(tmp_path), "build", "--source", "synthetic"])
+    assert res.exit_code == 2
+    assert "needs the semantic extra (missing sentence_transformers)" in res.output
+    assert "--no-index" in res.output
+    assert not (tmp_path / "connectomes").exists()
+
+
+def test_build_no_index_warns_about_an_index_it_kept(tmp_path):
+    args = ["--root", str(tmp_path), "build", "--source", "synthetic", "--n", "400", "--no-index"]
+    first = CliRunner().invoke(cli, args)
+    assert first.exit_code == 0, first.output
+    assert "kept the vector index" not in first.stderr
+
+    (tmp_path / "connectomes" / "synthetic" / ".connectomekg" / "vectors.sqlite").touch()
+    second = CliRunner().invoke(cli, [*args, "--wipe"])
+    assert second.exit_code == 0, second.output
+    assert "warning: kept the vector index from an earlier build" in second.stderr
