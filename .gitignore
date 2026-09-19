@@ -15,6 +15,8 @@ htmlcov/
 # input digests, stage timings, peak memory), so keep the ones worth keeping
 # deliberately:  git add -f reports/build_<date>.md
 reports/build_*.md
+# the same for `connkg skeletons`, which writes one per pass
+reports/skeletons_*.md
 # real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
 data/
 fafb_v783/
@@ -62,9 +64,12 @@ renders/*
 **/.connectomekg/models
 # neuropil mesh cache (connkg meshes) and synapse-graph cache -- derived
 **/.connectomekg/*.npz
-# simplified skeleton cache (connkg skeletons) -- derived from FlyWire data
+# simplified skeleton cache (connkg skeletons) -- derived from FlyWire data.
+# The cache is a DIRECTORY of part-NNNN.parquet shards, so the shards sit one
+# level deeper than every other pattern here and need their own rule.
 **/.connectomekg/*.parquet
-# the partial a cache is written to before it is renamed into place; an
+**/.connectomekg/skeletons/
+# the partial a cache is built in before it is moved into place; an
 # interrupted run removes its own, but a killed process cannot
 **/.connectomekg/*.part
 

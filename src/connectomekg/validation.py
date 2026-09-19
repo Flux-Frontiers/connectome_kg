@@ -30,6 +30,7 @@ __all__ = [
     "MAX_MIN_SYN",
     "MAX_QUERY_LEN",
     "MAX_SCENE_NEURONS",
+    "MAX_SKELETON_JOBS",
     "MAX_SKELETON_STEP",
     "bounded_int",
     "normalize_node_id",
@@ -60,6 +61,11 @@ MAX_SCENE_NEURONS = 500
 #: Above this a "simplified" skeleton would drop nearly everything but its
 #: structural points.
 MAX_SKELETON_STEP = 50
+
+#: Worker processes `connkg skeletons` will start. Past the core count the
+#: shards only get smaller and the pool gets slower, and a bound keeps a typo
+#: from forking hundreds of processes that each open a Parquet writer.
+MAX_SKELETON_JOBS = 64
 #: Neuropil-to-neuropil flow arcs drawn in one viz3d flow scene. FAFB v783 has
 #: 5,786 directed pairs; the top 200 already carry two thirds of all flow.
 MAX_FLOW_PAIRS = 500

@@ -22,7 +22,7 @@ from connectomekg.skeleton_cache import (
     skeleton_cache_path,
     write_somas,
 )
-from connectomekg.validation import MAX_SKELETON_STEP
+from connectomekg.validation import MAX_SKELETON_JOBS, MAX_SKELETON_STEP
 
 
 @cli.command("fixture")
@@ -104,16 +104,29 @@ def meshes(ctx: click.Context) -> None:
     type=click.IntRange(1, MAX_SKELETON_STEP),
     help="Keep every Nth skeleton point; the circuit view's own default.",
 )
+@click.option(
+    "--jobs",
+    "-j",
+    default=1,
+    show_default=True,
+    type=click.IntRange(1, MAX_SKELETON_JOBS),
+    help="Worker processes reading SWC files in parallel.",
+)
 @click.option("--no-somas", is_flag=True, help="Write the cache without touching the graph.")
 @click.pass_context
-def skeletons(ctx: click.Context, data_dir: str, step: int, no_somas: bool) -> None:
+def skeletons(ctx: click.Context, data_dir: str, step: int, jobs: int, no_somas: bool) -> None:
     """Cache simplified skeletons and back-fill somas, in one pass over the SWC download.
 
-    Reads every neuron's .swc file once -- about 25 minutes on the 139,255 of
-    FAFB v783 -- and writes two things: skeletons.parquet beside the graph,
-    which the 3-D circuit view then draws from instead of the 31 GB download,
-    and each neuron's real soma into its node metadata, which turns the
-    whole-brain cloud from marked points into somas. Run again to refresh.
+    Reads every neuron's .swc file once and writes two things: the skeletons/
+    cache beside the graph, which the 3-D circuit view then draws from instead
+    of the 31 GB download, and each neuron's real soma into its node metadata,
+    which turns the whole-brain cloud from marked points into somas. Run again
+    to refresh.
+
+    Parsing SWC is pure Python and holds the GIL, so the default pegs one core
+    and leaves the rest idle: on the 139,255 neurons of FAFB v783 that is
+    19m 30s, against 2m 39s at -j 12 for an identical cache. Pass your core
+    count.
     """
     run = BuildRun(
         root=Path(ctx.obj["root"]),
@@ -122,6 +135,7 @@ def skeletons(ctx: click.Context, data_dir: str, step: int, no_somas: bool) -> N
             "dataset": ctx.obj["dataset"] or "(resolved)",
             "data_dir": str(Path(data_dir).resolve()),
             "step": step,
+            "jobs": jobs,
             "no_somas": no_somas,
         },
     )
@@ -147,6 +161,7 @@ def skeletons(ctx: click.Context, data_dir: str, step: int, no_somas: bool) -> N
                 root_ids,
                 cache_path,
                 step=step,
+                jobs=jobs,
                 progress=lambda m: click.echo(m, err=True),
             )
             click.echo(str(cache))

@@ -10,16 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **A skeleton cache and a soma for every neuron.** `connkg skeletons
-  --data-dir fafb_v783` reads the 31 GB SWC download once (about 25 minutes
-  on FAFB v783) and writes two things. `.connectomekg/skeletons.parquet`
-  holds every neuron's skeleton simplified at `--step` (4 by default, the
-  circuit view's own default), about 3.5 GB, and the circuit view now reads
-  it in place of the download: 104 LC4 neurons render in 0.8 s rather than
-  1.7 s, with the same geometry, and no download needed at all. Each neuron
-  node also gains `soma_x`, `soma_y`, `soma_z` and `has_soma`, so the graph
-  answers for the cell body rather than only for FlyWire's marked point;
-  `--no-somas` writes the cache without touching the graph. The new
+  --data-dir fafb_v783` reads the 31 GB SWC download once and writes two
+  things. `.connectomekg/skeletons/` holds every neuron's skeleton simplified
+  at `--step` (4 by default, the circuit view's own default) -- 212,351,918
+  points in 2.5 GB on FAFB v783 -- and the circuit view now reads it in place
+  of the download: 104 LC4 neurons render in 1.0 s rather than 1.7 s, with
+  the same geometry, and no download needed at all. Each neuron node also
+  gains `soma_x`, `soma_y`, `soma_z` and `has_soma`, so the graph answers for
+  the cell body rather than only for FlyWire's marked point; `--no-somas`
+  writes the cache without touching the graph. The new
   `connectomekg.skeleton_cache` holds both halves.
+- **`connkg skeletons -j N` reads in parallel.** Parsing SWC is pure Python
+  and holds the GIL, so the pass pegged one core and left the rest idle. `-j`
+  splits the root ids into contiguous ranges, one worker and one Parquet
+  shard each, after `proteusPy`'s `DisulfideExtractor_mp`. On FAFB v783 and
+  an 18-core laptop: **19m 30s at `-j 1`, 2m 39s at `-j 12`, a 7.4x
+  speed-up**, for a cache verified identical -- same point count, same
+  134,675 somas, same SHA-256 over a sampled 199 neurons' coordinates,
+  parents and labels, and a bit-identical soma back-fill across all 139,255
+  neuron nodes. Shards hold disjoint root-id ranges, so a filtered read still
+  skips the ones that cannot match, and `-j 1` starts no pool at all.
+- **`coverage.soma` in the graph snapshot.** The soma back-fill writes
+  metadata and never a node or an edge, so every metric a snapshot recorded
+  was identical with or without it -- a 0.4 snapshot would have been
+  indistinguishable from 0.3.2 on the one thing 0.4 adds. The new metric reads
+  0.967 on FAFB v783 (134,675 of 139,255) and 0 on a graph that has not had
+  `connkg skeletons` run over it.
 - **A run report for `connkg skeletons`**, in `reports/skeletons_<timestamp>.md`,
   the same per-run provenance record `connkg build` has written all along:
   versions and git commit, options, host, the download read (file count and
@@ -63,10 +79,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **An interrupted `connkg skeletons` pass removes its own partial cache.** It
-  writes to `skeletons.part` and renames at the end; a Ctrl-C part way through
-  a 25-minute read used to strand hundreds of megabytes there, and a failure
-  renaming it into place did too. Both now clean up, and `*.part` under
-  `.connectomekg/` is gitignored for the case a process is killed outright.
+  builds in `skeletons.part/` and moves it into place at the end; a Ctrl-C part
+  way through a long read used to strand hundreds of megabytes there, and a
+  failure moving it into place did too. Both now clean up, the pool is
+  terminated rather than joined so an interrupt actually interrupts, and
+  `*.part` under `.connectomekg/` is gitignored for the case a process is
+  killed outright.
+- **A run report's peak memory counts the worker processes**, not just the
+  parent. A parallel pass reported 230 MB for a run whose real footprint was
+  several gigabytes.
 - **The context cloud draws somas where the graph has them.** Each dot sits
   at the neuron's `soma_x`/`soma_y`/`soma_z` once `connkg skeletons` has
   back-filled one, and at its marked point otherwise, so a graph without the
