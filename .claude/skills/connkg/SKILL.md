@@ -132,6 +132,22 @@ names; `connkg verify --data-dir fafb_v783` checks the directory.
   `visual_neuron_types`, `column_assignment`, `connectivity_tags`,
   `processed_labels`.
 
+### Caches beside the graph
+
+Three derived files can sit in `.connectomekg/` next to `graph.sqlite`. All
+are gitignored and safe to delete; each is rebuilt on demand or by its own
+command.
+
+| file | written by | what it saves |
+|---|---|---|
+| `neuropil_meshes.npz` | `connkg meshes` | the 78 v783 neuropil surfaces, about 1 MB |
+| `skeletons.parquet` | `connkg skeletons --data-dir fafb_v783` | every neuron's simplified skeleton, about 3.5 GB against the download's 31 GB; the same pass back-fills somas into the graph |
+| `synapse_graph.npz` | automatically, by the first `connkg path` or `connkg cone` | the neuron-level synapse matrix, 14 MB; an 8-second load of 3.7 M edges becomes under one |
+
+`connkg skeletons` is a ~25-minute maintainer pass over the 31 GB download --
+give the command, do not run it. `--step` (default 4) trades detail for size,
+and `--no-somas` writes the cache without touching the graph.
+
 ## Building
 
 ```bash
@@ -174,11 +190,15 @@ poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --wipe
 
 `connkg quilt SPEC [SPEC...]` and `connkg viz3d SPEC [SPEC...]` need the
 `viz3d` extra (`pip install "connectome-kg[viz3d]"`) and draw two things at
-once: every neuron's marked point as a dim whole-brain context cloud, plus
-the given spec(s)' circuit at full brightness, drawn from **real traced
-skeletons** read from `fafb_v783/sk_lod1_783_healed/<root_id>.swc`. Without
-`--data-dir` (default `fafb_v783`) or a missing skeleton file, a neuron falls
-back to a larger sphere at its marked point instead of a traced shape.
+once: every neuron as a dim whole-brain cloud, plus the given spec(s)'
+circuit at full brightness, drawn from **real traced skeletons**. Skeletons
+come from `.connectomekg/skeletons.parquet` (written by `connkg skeletons`)
+first, and from `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever the
+cache does not hold. With neither -- no cache, and no `--data-dir` (default
+`fafb_v783`) or a missing file -- a neuron falls back to a larger sphere at
+its marked point instead of a traced shape. The cloud's dots are somas where
+`connkg skeletons` has back-filled them and marked points otherwise; the
+scene title says which (`somas=N` against `context=N`).
 
 - **Do not start a real quilt render, cast, or the viewer yourself.** These
   are the maintainer's to run and watch, like a real build. Give the command;
@@ -188,7 +208,9 @@ back to a larger sphere at its marked point instead of a traced shape.
   expecting the cap to be raised.
 - `--skeleton-step` (default 4, capped at `MAX_SKELETON_STEP` = 50)
   simplifies a skeleton's point count for rendering; step 1 draws every
-  traced point.
+  traced point. A skeleton from the cache is already simplified at the
+  cache's own stride, so the requested stride is divided by it rather than
+  applied again, and a request below it draws the cache as it stands.
 - Output lands under `renders/` (`stills/` for a `--preview` PNG, `quilts/`
   for the quilt itself), none of it committed.
 - `--view flow` draws neuropil flow instead of a circuit: neuropils as spheres
@@ -259,8 +281,10 @@ Do not claim or try these; they are planned, not built:
 - activity simulation
 - neuropil meshes for any dataset but FAFB v783 (`connkg meshes` fetches
   v783's 78 surfaces; the 3-D views draw them once cached)
-- soma positions in the graph itself: neuron `x`/`y`/`z` metadata is a marked
-  point, not necessarily the soma. `connkg quilt`/`viz3d` read each neuron's
-  real soma from its skeleton file when one exists (falling back to the
-  skeleton's root point otherwise); nothing has back-filled the soma into the
-  graph's own `x`/`y`/`z` metadata
+- somas for a graph that has not had `connkg skeletons` run over it. That
+  command back-fills `soma_x`/`soma_y`/`soma_z`/`has_soma` into every neuron
+  node from the skeleton download; until it has run, a neuron's `x`/`y`/`z`
+  is FlyWire's marked point, not the cell body. Note the back-fill adds the
+  soma alongside `x`/`y`/`z` rather than overwriting them.
+- somas in the flow view's neuropil centroids, which are still weighted over
+  marked points even after the back-fill

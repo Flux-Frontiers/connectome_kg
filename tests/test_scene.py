@@ -66,16 +66,17 @@ def test_context_points_every_coordinate_neuron_appears_once(kg):
         "SELECT COUNT(*) FROM nodes WHERE kind='neuron' "
         "AND json_extract(metadata,'$.x') IS NOT NULL"
     ).fetchone()[0]
-    ids, points, colors = scene.context_points(kg.store)
+    ids, points, colors, n_somas = scene.context_points(kg.store)
     assert len(ids) == len(set(ids)) == n_expected
+    assert n_somas == 0
     assert points.shape == (n_expected, 3)
     assert len(colors) == n_expected
 
 
 def test_context_points_colors_are_valid_hex(kg):
-    _, _, colors = scene.context_points(kg.store, color_by="super_class")
+    _, _, colors, _ = scene.context_points(kg.store, color_by="super_class")
     assert all(_HEX.match(c) for c in colors)
-    _, _, colors = scene.context_points(kg.store, color_by="sign")
+    _, _, colors, _ = scene.context_points(kg.store, color_by="sign")
     assert all(_HEX.match(c) for c in colors)
 
 
@@ -403,7 +404,7 @@ def test_add_floor_adds_a_floor_below_the_scene_with_shadows(kg):
 
 
 def test_flow_view_thins_the_context_cloud_to_one_neutral_grey(kg):
-    ids, points, colors = scene.context_points(kg.store)
+    ids, points, colors, _ = scene.context_points(kg.store)
     f_ids, f_points, f_colors, f_radius = scene._context_for_view("flow", ids, points, colors)
     assert f_ids == ids[:: scene._FLOW_CONTEXT_STRIDE]
     assert len(f_points) == len(f_ids) == len(f_colors)

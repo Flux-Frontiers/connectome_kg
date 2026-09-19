@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A skeleton cache and a soma for every neuron.** `connkg skeletons
+  --data-dir fafb_v783` reads the 31 GB SWC download once (about 25 minutes
+  on FAFB v783) and writes two things. `.connectomekg/skeletons.parquet`
+  holds every neuron's skeleton simplified at `--step` (4 by default, the
+  circuit view's own default), about 3.5 GB, and the circuit view now reads
+  it in place of the download: 104 LC4 neurons render in 0.8 s rather than
+  1.7 s, with the same geometry, and no download needed at all. Each neuron
+  node also gains `soma_x`, `soma_y`, `soma_z` and `has_soma`, so the graph
+  answers for the cell body rather than only for FlyWire's marked point;
+  `--no-somas` writes the cache without touching the graph. The new
+  `connectomekg.skeleton_cache` holds both halves.
+- **A synapse-graph cache.** `connkg path` and `connkg cone` write the loaded
+  neuron-level matrix to `.connectomekg/synapse_graph.npz` (14 MB on v783)
+  and reuse it, turning an 8-second load of 3.7 M edges into under one:
+  `connkg path --from LPLC2 --to DNp01` goes from 8.8 s to 1.8 s. The cache
+  is keyed on the edge table's shape, the graph file and `min_syn`, so an
+  edited or rebuilt graph is not answered from a stale one. Like the mesh and
+  skeleton caches it is derived data, gitignored, and safe to delete.
+- **Neuroglancer links.** `connkg link SPEC [SPEC...]` prints a URL that opens
+  the specs' neurons as FlyWire meshes in the public Neuroglancer, with no
+  login, each spec in its own Okabe-Ito colour inside a translucent brain
+  outline. The same link comes from the MCP tool `neuroglancer_link` and from
+  `ConnectomeKG.neuroglancer_link()`. The URL is the only thing on stdout,
+  so `connkg link LC4 | pbcopy` works. A link selects root ids on the public
+  flat v783 segmentation (`gs://flywire_v141_m783`); datasets without a
+  public segmentation get an error that says so. Each spec shows up to
+  `--limit` neurons (default 200, at most 500) and reports its full count.
 - **Neuropil meshes in the 3-D views.** `connkg meshes` fetches the 78 FAFB
   v783 neuropil surfaces from FlyWire's public bucket (no sign-in, about
   1 MB, 11 seconds) into `.connectomekg/neuropil_meshes.npz` beside the
@@ -25,13 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The context cloud draws somas where the graph has them.** Each dot sits
+  at the neuron's `soma_x`/`soma_y`/`soma_z` once `connkg skeletons` has
+  back-filled one, and at its marked point otherwise, so a graph without the
+  back-fill draws exactly the cloud it always did. The scene title says which
+  (`somas=N` against `context=N`), and `build_brain_scene` reports it as
+  `SceneInfo.n_context_somas`. `connectomekg.scene.context_points` returns
+  that count as a fourth value, which is a breaking change to that function.
 - **Drawing the neuropil surfaces turns the context cloud off**, since the
   surfaces show the brain's outline more plainly than 139,255 dots; `--cloud`
   (or `cloud=True`) draws both. A graph with no mesh cache is unaffected, so
   this changes nothing until `connkg meshes` has run.
-
-### Changed
-
 - **The documented FAFB v783 build now includes the vector index.** The
   README and `docs/DOWNLOAD.md` drop `--no-index` from the reference build,
   so a new install has `connkg query` and the `query_connectome` and
@@ -44,9 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   earlier build in place, since that index was not rebuilt and may not match
   the new graph. The warning is recorded in the build report.
 
-### Added
-
-- **Neuroglancer links.** `connkg link SPEC [SPEC...]` prints a URL that opens
+ `connkg link SPEC [SPEC...]` prints a URL that opens
   the specs' neurons as FlyWire meshes in the public Neuroglancer, with no
   login, each spec in its own Okabe-Ito colour inside a translucent brain
   outline. The same link comes from the MCP tool `neuroglancer_link` and from
