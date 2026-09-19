@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-09-18T18:08:35.861964+00:00",
+  "last_update": "2026-09-19T05:15:18.202819+00:00",
   "snapshots": [
     {
       "key": "2026-09-17T01:22:59.856225+00:00",
@@ -264,6 +264,77 @@
         "method_count": 0,
         "docstring_coverage": 0.0,
         "snapshot_count": 3,
+        "dataset_id": "fafb783",
+        "dataset_version": "783",
+        "n_neurons": 139255,
+        "n_pairs": 3732460,
+        "n_synapses": 50666648,
+        "coverage": {
+          "cell_type": 0.9933,
+          "sign": 0.8588,
+          "visual_family": 0.6825,
+          "column": 0.3269,
+          "ontology_term": 0.3393,
+          "length": 0.9999
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 0,
+          "edges": 0
+        }
+      }
+    },
+    {
+      "key": "0.3.2",
+      "branch": "main",
+      "timestamp": "2026-09-19T05:15:18.201805+00:00",
+      "version": "0.3.2",
+      "subject": "corpus:fafb783",
+      "tool": "connectome-kg",
+      "tool_version": "0.3.2",
+      "file": "0.3.2.json",
+      "metrics": {
+        "db_path": ".connectomekg/graph.sqlite",
+        "total_nodes": 157698,
+        "meaningful_nodes": 157698,
+        "total_edges": 5072285,
+        "node_counts": {
+          "cell_type": 8772,
+          "column": 1581,
+          "connectivity_tag": 4,
+          "dataset": 1,
+          "hemilineage": 214,
+          "label": 7306,
+          "nerve": 8,
+          "neuron": 139255,
+          "neuropil": 79,
+          "ontology_term": 235,
+          "taxon": 243
+        },
+        "edge_counts": {
+          "CONTAINS": 9727,
+          "INNERVATES": 40211,
+          "INSTANCE_OF": 138327,
+          "IN_COLUMN": 45528,
+          "IN_DATASET": 10976,
+          "IN_NEUROPIL": 421132,
+          "LABELED": 139436,
+          "MAPS_TO": 305,
+          "MEMBER_OF": 7540,
+          "MIRROR_OF": 4441,
+          "SYNAPSES_TO": 3732460,
+          "TAGGED": 5268,
+          "TYPE_SYNAPSES_TO": 507287,
+          "VIA_NERVE": 9647
+        },
+        "module_count": 0,
+        "class_count": 0,
+        "function_count": 0,
+        "method_count": 0,
+        "docstring_coverage": 0.0,
+        "snapshot_count": 4,
         "dataset_id": "fafb783",
         "dataset_version": "783",
         "n_neurons": 139255,

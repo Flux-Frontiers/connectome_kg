@@ -1,6 +1,6 @@
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
+[![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)](https://github.com/Flux-Frontiers/connectome_kg/releases)
 [![CI](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/connectome_kg/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22817369-blue.svg)](https://doi.org/10.5281/zenodo.22817369)
@@ -20,7 +20,7 @@ Everything runs on your laptop. A full v783 build without the vector index takes
 
 *Author: Eric G. Suchanek, PhD -- Flux-Frontiers, Liberty TWP, OH*
 
-> **Status: pre-alpha (0.3.1).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS) and the LIF what-if simulation. The KGRAG adapter is merged into kg-rag and ships in its next release.
+> **Status: pre-alpha (0.3.2).** The Codex reader, the synthetic fixture, the extractor, path and cone queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS) and the LIF what-if simulation. The KGRAG adapter ships in kg-rag 0.16.0: `pip install "kg-rag[connectome]"`.
 
 ---
 
@@ -260,7 +260,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 
 **APA**
 
-> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.3.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
+> Suchanek, E. G. (2026). *ConnectomeKG: Connectomes as Knowledge Graphs* (Version 0.3.2) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.22817369
 
 **BibTeX**
 
@@ -268,7 +268,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 @software{suchanek_connectome_kg,
   author    = {Suchanek, Eric G.},
   title     = {{ConnectomeKG}: Connectomes as Knowledge Graphs},
-  version   = {0.3.1},
+  version   = {0.3.2},
   year      = {2026},
   publisher = {Flux-Frontiers},
   doi       = {10.5281/zenodo.22817369},

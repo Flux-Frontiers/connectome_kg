@@ -46,7 +46,7 @@ packages = [{ include = "connectomekg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "connectome-kg"
-version = "0.3.1"
+version = "0.3.2"
 description = "Connectomes (FlyWire, hemibrain, MaleCNS) as KGModule knowledge graphs"
 readme = "README.md"
 license = "Elastic-2.0"
