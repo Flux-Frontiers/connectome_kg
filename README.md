@@ -153,6 +153,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
+| **Open neurons as FlyWire meshes in the browser, no login** | `connkg link SPEC [SPEC...]` (FAFB v783) |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |
 | **Open a circuit inside the whole brain in an interactive 3-D viewer** | `connkg viz3d SPEC [SPEC...]` (the `viz3d` extra) |
@@ -219,6 +220,7 @@ dataset is built. Serve two datasets as two entries. In a project's
 | `find_nodes`, `get_node`, `node_edges` | find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
 | `neurons_of`, `type_partners` | resolve a spec to neurons; a type's partner types by synapses |
 | `strongest_path`, `cone` | the strongest synaptic route; everything within N hops |
+| `neuroglancer_link` | a Neuroglancer URL showing up to seven specs as meshes, one colour each |
 | `query_connectome`, `pack_connectome` | semantic search (needs a build with the vector index) |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | saved metric snapshots |
 

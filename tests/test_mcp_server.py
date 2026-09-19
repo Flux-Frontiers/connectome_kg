@@ -19,6 +19,8 @@ from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import CallToolResult, TextContent
 
 from connectomekg import ConnectomeKG, mcp_server
+from connectomekg.readers.synthetic import synthetic_tables
+from connectomekg.schema import FAFB_783
 from connectomekg.snapshots import SnapshotManager
 
 pytestmark = pytest.mark.anyio
@@ -81,6 +83,7 @@ async def test_every_tool_is_registered(graph_root):
         "type_partners",
         "strongest_path",
         "cone",
+        "neuroglancer_link",
         "query_connectome",
         "pack_connectome",
         "analyze_connectome",
@@ -121,6 +124,24 @@ async def test_circuit_tools(graph_root):
         reach = await _call(s, "cone", spec="LC4", hops=1, limit=2)
         assert reach["0"]["count"] == 8 and len(reach["0"]["neurons"]) == 2
         assert reach["1"]["count"] >= 1
+
+
+async def test_neuroglancer_link_tool(graph_root, tmp_path):
+    async with _session(graph_root) as s:
+        assert "no public Neuroglancer source" in await _error(
+            s, "neuroglancer_link", specs=["LC4"]
+        )
+    fafb, tables = tmp_path / "fafb", synthetic_tables(400, seed=5)
+    tables.dataset = FAFB_783
+    with ConnectomeKG(fafb, tables=tables) as kg:
+        kg.build_graph(wipe=True)
+    async with _session(fafb) as s:
+        link = await _call(s, "neuroglancer_link", specs=["LC4", "DNp01"], limit=2)
+        assert link["url"].startswith("https://neuroglancer-demo.appspot.com/#!")
+        assert [(x["spec"], x["count"], x["shown"]) for x in link["specs"]][0] == ("LC4", 8, 2)
+        assert "limit must be between" in await _error(
+            s, "neuroglancer_link", specs=["LC4"], limit=0
+        )
 
 
 async def test_report_and_snapshot_tools(graph_root):
