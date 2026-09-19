@@ -68,11 +68,14 @@ dependencies = [
     # Upper-bounded: mcp 2.0 removed the bundled `mcp.server.fastmcp` module (it
     # became the standalone fastmcp package). mcp_server.py imports FastMCP from
     # mcp, so an unbounded floor would let a clean install break `connkg-mcp` at
-    # import time. Lift only alongside a port to fastmcp.
-    "mcp>=1.0.0,<2",
+    # import time. Lift only alongside a port to fastmcp. Floor 1.3.0: the first
+    # release whose FastMCP takes the lifespan= and instructions= mcp_server.py
+    # passes.
+    "mcp>=1.3.0,<2",
     # Floor is the release this prototype was written against.
     "kgmodule-utils>=0.22.0",
-    "numpy>=1.24.0",
+    # 1.26.0: the first numpy that installs on Python 3.12, the requires-python floor.
+    "numpy>=1.26.0",
     "pandas>=2.2.0",
     "pyarrow>=15.0.0",
     "scipy>=1.12.0",

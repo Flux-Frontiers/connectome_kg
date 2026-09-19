@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Raised the `mcp` floor from 1.0.0 to 1.3.0, the first release whose
+  `FastMCP` accepts the `lifespan=` and `instructions=` arguments
+  `connkg-mcp` passes. Earlier versions have no `mcp.server.fastmcp` at all.
+- Raised the `numpy` floor from 1.24.0 to 1.26.0, the first release that
+  installs on Python 3.12.
+- Relocked `pycode-kg` to 0.27.1 (maintainer `kg` group; floor unchanged).
+
 ## [0.3.1] - 2026-09-18
 
 ### Added
