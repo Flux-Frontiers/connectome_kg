@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Neuroglancer links.** `connkg link SPEC [SPEC...]` prints a URL that opens
+  the specs' neurons as FlyWire meshes in the public Neuroglancer, with no
+  login, each spec in its own Okabe-Ito colour inside a translucent brain
+  outline. The same link comes from the MCP tool `neuroglancer_link` and from
+  `ConnectomeKG.neuroglancer_link()`. The URL is the only thing on stdout,
+  so `connkg link LC4 | pbcopy` works. A link selects root ids on the public
+  flat v783 segmentation (`gs://flywire_v141_m783`); datasets without a
+  public segmentation get an error that says so. Each spec shows up to
+  `--limit` neurons (default 200, at most 500) and reports its full count.
+
 ## [0.3.2] - 2026-09-19
 
 ### Changed
