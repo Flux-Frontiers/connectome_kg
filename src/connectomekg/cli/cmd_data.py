@@ -117,16 +117,16 @@ def meshes(ctx: click.Context) -> None:
 def skeletons(ctx: click.Context, data_dir: str, step: int, jobs: int, no_somas: bool) -> None:
     """Cache simplified skeletons and back-fill somas, in one pass over the SWC download.
 
-    Reads every neuron's .swc file once -- 20 minutes on the 139,255 of FAFB
-    v783, or a few with -j -- and writes two things: the skeletons/ cache
-    beside the graph, which the 3-D circuit view then draws from instead of
-    the 31 GB download, and each neuron's real soma into its node metadata,
+    Reads every neuron's .swc file once and writes two things: the skeletons/
+    cache beside the graph, which the 3-D circuit view then draws from instead
+    of the 31 GB download, and each neuron's real soma into its node metadata,
     which turns the whole-brain cloud from marked points into somas. Run again
     to refresh.
 
-    Parsing SWC holds the GIL, so the default pegs one core. -j splits the
-    read across that many processes, each writing one shard of the cache;
-    your core count is the sensible ceiling.
+    Parsing SWC is pure Python and holds the GIL, so the default pegs one core
+    and leaves the rest idle: on the 139,255 neurons of FAFB v783 that is
+    19m 30s, against 2m 39s at -j 12 for an identical cache. Pass your core
+    count.
     """
     run = BuildRun(
         root=Path(ctx.obj["root"]),

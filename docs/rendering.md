@@ -224,7 +224,7 @@ You need the following:
   the README for `connkg build` and `--dataset`.
 - For the circuit view, skeletons -- from either source, the cache first:
     - **The skeleton cache**, `.connectomekg/skeletons/`, written once by
-      `connkg skeletons --data-dir fafb_v783`. It holds every neuron's
+      `connkg skeletons --data-dir fafb_v783 -j 12`. It holds every neuron's
       simplified skeleton in 2.5 GB, so a render needs neither the 31 GB nor
       an SWC parse. See [The skeleton cache](#the-skeleton-cache).
     - **The skeleton download** in `fafb_v783/sk_lod1_783_healed/`, one `.swc`
@@ -473,8 +473,11 @@ things in it are worth keeping and the rest is not, so `connkg skeletons`
 reads every file once and writes both:
 
 ```bash
-connkg --root . --dataset fafb783 skeletons --data-dir fafb_v783
+connkg --root . --dataset fafb783 skeletons --data-dir fafb_v783 -j 12
 ```
+
+`-j` is the number of worker processes and defaults to 1, which uses one core
+of however many the machine has. Pass your core count.
 
 - **`.connectomekg/skeletons/`**, every neuron's skeleton simplified at
   `--step` (4 by default, the circuit view's own default). 2.5 GB on FAFB
