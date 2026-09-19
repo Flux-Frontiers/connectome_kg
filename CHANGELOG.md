@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Neuropil meshes in the 3-D views.** `connkg meshes` fetches the 78 FAFB
+  v783 neuropil surfaces from FlyWire's public bucket (no sign-in, about
+  1 MB, 11 seconds) into `.connectomekg/neuropil_meshes.npz` beside the
+  graph. `connkg quilt`, `connkg viz3d` and its Cast button then draw them:
+  pale neutral shells in the circuit view, region-tinted in the flow view.
+  These are the volumes FlyWire assigned synapses to neuropils with, so they
+  enclose what the graph's `IN_NEUROPIL` edges count. The source numbers its
+  meshes without names; the new `connectomekg.neuropil_meshes` names them
+  with a table matched vertex for vertex against fafbseg's named copy (78 of
+  78). `UNASGD` has no mesh.
+- `--neuropils/--no-neuropils` and `--cloud/--no-cloud` on `connkg quilt` and
+  `connkg viz3d`, and matching `neuropils=` and `cloud=` arguments on
+  `build_brain_scene`.
+
+### Changed
+
+- **Drawing the neuropil surfaces turns the context cloud off**, since the
+  surfaces show the brain's outline more plainly than 139,255 dots; `--cloud`
+  (or `cloud=True`) draws both. A graph with no mesh cache is unaffected, so
+  this changes nothing until `connkg meshes` has run.
+
 ### Changed
 
 - **The documented FAFB v783 build now includes the vector index.** The

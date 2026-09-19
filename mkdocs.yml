@@ -62,4 +62,5 @@ nav:
       - Rendering in 3-D: rendering.md
   - API reference:
       - Scene composition: api/scene.md
+      - Neuropil meshes: api/neuropil_meshes.md
       - Skeletons: api/skeletons.md

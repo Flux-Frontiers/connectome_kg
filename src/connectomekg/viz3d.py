@@ -44,6 +44,9 @@ class BrainSceneWindow(QMainWindow):
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.
+    :param neuropils: Draw the neuropil surface meshes, when cached.
+    :param cloud: Draw the whole-brain context cloud; ``None`` draws it
+        only when no neuropil meshes are.
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
@@ -60,6 +63,8 @@ class BrainSceneWindow(QMainWindow):
         skeleton_step: int = 4,
         tubes: bool = False,
         top: int = 100,
+        neuropils: bool = True,
+        cloud: bool | None = None,
         floor: bool = False,
         elevation: float = 0.0,
         preset: str = DEFAULT_QUILT_PRESET,
@@ -73,6 +78,8 @@ class BrainSceneWindow(QMainWindow):
         self._skeleton_step = skeleton_step
         self._tubes = tubes
         self._top = top
+        self._neuropils = neuropils
+        self._cloud = cloud
         self._floor = floor
         self._preset = preset
 
@@ -89,6 +96,8 @@ class BrainSceneWindow(QMainWindow):
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            neuropils=neuropils,
+            cloud=cloud,
         )
         self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
 
@@ -110,7 +119,7 @@ class BrainSceneWindow(QMainWindow):
         kg, specs, view = self._kg, self._specs, self._view
         data_dir, color_by = self._data_dir, self._color_by
         skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
-        floor = self._floor
+        floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
 
         def build(plotter) -> None:
             render3d.build_brain_scene(
@@ -123,6 +132,8 @@ class BrainSceneWindow(QMainWindow):
                 skeleton_step=skeleton_step,
                 tubes=tubes,
                 top=top,
+                neuropils=neuropils,
+                cloud=cloud,
             )
             if floor:
                 render3d.add_floor(plotter)
@@ -143,6 +154,8 @@ def launch(
     skeleton_step: int = 4,
     tubes: bool = False,
     top: int = 100,
+    neuropils: bool = True,
+    cloud: bool | None = None,
     floor: bool = False,
     elevation: float = 0.0,
     preset: str = DEFAULT_QUILT_PRESET,
@@ -161,6 +174,9 @@ def launch(
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.
+    :param neuropils: Draw the neuropil surface meshes, when cached.
+    :param cloud: Draw the whole-brain context cloud; ``None`` draws it
+        only when no neuropil meshes are.
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
@@ -183,6 +199,8 @@ def launch(
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            neuropils=neuropils,
+            cloud=cloud,
             floor=floor,
             elevation=elevation,
             preset=preset,

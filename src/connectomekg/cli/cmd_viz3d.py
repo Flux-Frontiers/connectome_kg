@@ -158,6 +158,18 @@ floor_option = click.option(
     help="Stand the scene over a floor lit from above, with shadows. Tilts the "
     "camera down (see --elevation).",
 )
+neuropils_option = click.option(
+    "--neuropils/--no-neuropils",
+    default=True,
+    show_default=True,
+    help="Draw the neuropil surface meshes, when fetched with `connkg meshes`.",
+)
+cloud_option = click.option(
+    "--cloud/--no-cloud",
+    default=None,
+    help="Draw the whole-brain context cloud of marked points. Default: only "
+    "when the neuropil surfaces are not drawn.",
+)
 elevation_option = click.option(
     "--elevation",
     default=None,
@@ -175,6 +187,8 @@ elevation_option = click.option(
 @skeleton_step_option
 @tubes_option
 @top_option
+@neuropils_option
+@cloud_option
 @floor_option
 @elevation_option
 @preset_option
@@ -226,6 +240,8 @@ def quilt(
     skeleton_step: int,
     tubes: bool,
     top: int,
+    neuropils: bool,
+    cloud: bool | None,
     floor: bool,
     elevation: float | None,
     preset: str,
@@ -286,6 +302,8 @@ def quilt(
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            neuropils=neuropils,
+            cloud=cloud,
             progress=lambda m: click.echo(f"  {m}", err=True),
         )
 
@@ -345,6 +363,8 @@ def quilt(
 @skeleton_step_option
 @tubes_option
 @top_option
+@neuropils_option
+@cloud_option
 @floor_option
 @elevation_option
 @preset_option
@@ -360,6 +380,8 @@ def viz3d(
     skeleton_step: int,
     tubes: bool,
     top: int,
+    neuropils: bool,
+    cloud: bool | None,
     floor: bool,
     elevation: float | None,
     preset: str,
@@ -391,6 +413,8 @@ def viz3d(
             skeleton_step=skeleton_step,
             tubes=tubes,
             top=top,
+            neuropils=neuropils,
+            cloud=cloud,
             floor=floor,
             elevation=resolve_elevation(floor, elevation),
             preset=preset,
