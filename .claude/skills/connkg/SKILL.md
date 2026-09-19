@@ -90,8 +90,9 @@ kg.close()
 
 **Semantic search** (`connkg query`, `kg.query`, `kg.pack`) needs
 `connectomes/fafb783/.connectomekg/vectors.sqlite`, which exists only after a build without
-`--no-index`, with the `semantic` extra installed. The reference build uses
-`--no-index`, so check for the file first. Without it, search docstrings and
+`--no-index`, with the `semantic` extra installed. The reference build
+includes it, but a graph built with `--no-index` has none, so check for the
+file first. Without it, search docstrings and
 labels in SQL (`lower(docstring) LIKE '%giant fib%'` on `cell_type` and `label`
 nodes finds DNp01). Community labels are the only free text in the graph:
 a concept nobody wrote into a label, such as "looming" on FAFB, is found by
@@ -134,8 +135,12 @@ names; `connkg verify --data-dir fafb_v783` checks the directory.
 ## Building
 
 ```bash
-poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-index --wipe
+poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --wipe
 ```
+
+- The index step after the graph takes about 25 seconds on v783. `build`
+  refuses to start without the `semantic` extra unless given `--no-index`, and
+  `--no-index` warns when it leaves an older `vectors.sqlite` in place.
 
 - **Do not start a real FAFB build yourself.** It takes about 4 minutes and
   2.1 GB (keep 4 GB free for the write-ahead log). Give the maintainer the
