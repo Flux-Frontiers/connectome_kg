@@ -87,7 +87,7 @@ def test_build_leaves_no_partial_file(tmp_path, download):
     dest = tmp_path / "skeletons.parquet"
     sc.build_skeleton_cache(data_dir, [100], dest)
     assert dest.exists()
-    assert not dest.with_suffix(".part").exists()
+    assert not dest.with_name(dest.name + ".part").exists()
 
 
 def test_cached_soma_is_the_parsed_soma(tmp_path, download):
@@ -146,10 +146,18 @@ def test_cache_info_reads_the_stride_back(tmp_path, download):
 
 
 def test_cache_info_rejects_a_foreign_parquet(tmp_path):
-    other = tmp_path / "other.parquet"
-    pq.write_table(pa.table({"a": [1]}), other)
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    pq.write_table(pa.table({"a": [1]}), cache / "part-0000.parquet")
     with pytest.raises(ValueError, match="skeleton cache"):
-        sc.cache_info(other)
+        sc.cache_info(cache)
+
+
+def test_cache_info_rejects_a_directory_with_no_shards(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(ValueError, match="no .* shards here"):
+        sc.cache_info(empty)
 
 
 def test_build_rejects_a_step_below_one(tmp_path, download):
@@ -226,17 +234,88 @@ def test_an_interrupted_pass_leaves_no_partial_behind(tmp_path, download, monkey
     with pytest.raises(KeyboardInterrupt):
         sc.build_skeleton_cache(data_dir, [100, 200, 300], dest)
 
-    assert not dest.with_suffix(".part").exists()
+    assert not dest.with_name(dest.name + ".part").exists()
     assert not dest.exists()
 
 
-def test_a_cache_that_cannot_be_renamed_into_place_cleans_up(tmp_path, download):
+def test_a_cache_that_cannot_be_moved_into_place_cleans_up(tmp_path, download):
     data_dir, _ = download
-    dest = tmp_path / "c.parquet"
-    dest.mkdir()  # a directory where the file goes: the rename cannot succeed
-    (dest / "occupied").touch()
+    dest = tmp_path / "cache"
+    dest.write_text("a plain file where the cache directory goes")
 
     with pytest.raises(OSError):
         sc.build_skeleton_cache(data_dir, [100, 200], dest)
 
-    assert not dest.with_suffix(".part").exists()
+    assert not dest.with_name(dest.name + ".part").exists()
+    assert dest.read_text().startswith("a plain file")  # left as it was found
+
+
+@pytest.mark.parametrize("jobs", [2, 3, 8])
+def test_parallel_matches_serial_exactly(tmp_path, download, jobs):
+    """The whole point: more workers must not change a single coordinate."""
+    data_dir, written = download
+    ids = list(written)
+    serial, serial_somas = sc.build_skeleton_cache(data_dir, ids, tmp_path / "one", jobs=1)
+    parallel, parallel_somas = sc.build_skeleton_cache(
+        data_dir, ids, tmp_path / f"many{jobs}", jobs=jobs
+    )
+
+    for field in ("n_cached", "n_missing", "n_unreadable", "n_soma", "n_points", "step"):
+        assert getattr(serial, field) == getattr(parallel, field), field
+    assert serial_somas.keys() == parallel_somas.keys()
+    for root_id, (point, is_soma) in serial_somas.items():
+        np.testing.assert_array_equal(point, parallel_somas[root_id][0])
+        assert is_soma == parallel_somas[root_id][1]
+
+    a, _ = sc.load_cached_skeletons(tmp_path / "one", ids)
+    b, _ = sc.load_cached_skeletons(tmp_path / f"many{jobs}", ids)
+    assert a.keys() == b.keys()
+    for root_id, skeleton in a.items():
+        np.testing.assert_array_equal(skeleton.points, b[root_id].points)
+        np.testing.assert_array_equal(skeleton.parent, b[root_id].parent)
+        np.testing.assert_array_equal(skeleton.labels, b[root_id].labels)
+
+
+def test_shards_hold_disjoint_root_id_ranges(tmp_path, download):
+    """Contiguous ranges are what lets a filtered read skip whole shards."""
+    data_dir, written = download
+    dest = tmp_path / "cache"
+    report, _ = sc.build_skeleton_cache(data_dir, list(written), dest, jobs=3)
+    shards = sorted(dest.glob("*.parquet"))
+    assert len(shards) == report.n_shards == 3
+
+    spans = []
+    for shard in shards:
+        ids = pq.read_table(shard, columns=["root_id"]).column("root_id").to_pylist()
+        assert ids == sorted(ids)
+        spans.append((min(ids), max(ids)))
+    spans.sort()
+    for (_, hi), (lo, _) in zip(spans, spans[1:], strict=False):  # pairwise
+        assert hi < lo, f"shards overlap: {spans}"
+
+
+def test_more_jobs_than_neurons_is_reduced_not_an_error(tmp_path, download):
+    data_dir, written = download
+    dest = tmp_path / "cache"
+    report, _ = sc.build_skeleton_cache(data_dir, list(written), dest, jobs=50)
+    assert report.n_shards == len(written)  # one neuron each, no empty shards
+    assert report.n_cached == len(written)
+
+
+def test_build_rejects_a_job_count_below_one(tmp_path, download):
+    data_dir, _ = download
+    with pytest.raises(ValueError, match="jobs must be at least 1"):
+        sc.build_skeleton_cache(data_dir, [100], tmp_path / "cache", jobs=0)
+
+
+def test_one_job_starts_no_pool(tmp_path, download, monkeypatch):
+    """The single-job path must stay free of multiprocessing entirely."""
+    data_dir, written = download
+
+    def explode(*args, **kwargs):
+        raise AssertionError("jobs=1 must not start a Pool")
+
+    monkeypatch.setattr(sc.multiprocessing, "Pool", explode)
+    report, _ = sc.build_skeleton_cache(data_dir, list(written), tmp_path / "cache", jobs=1)
+    assert report.n_cached == len(written)
+    assert report.n_shards == 1

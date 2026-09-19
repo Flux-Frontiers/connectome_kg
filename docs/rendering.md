@@ -223,10 +223,10 @@ You need the following:
 - A built graph in `connectomes/<dataset>/.connectomekg/graph.sqlite`. See
   the README for `connkg build` and `--dataset`.
 - For the circuit view, skeletons -- from either source, the cache first:
-    - **The skeleton cache**, `.connectomekg/skeletons.parquet`, written once
-      by `connkg skeletons --data-dir fafb_v783`. It holds every neuron's
-      simplified skeleton and is about 3.5 GB, so a render needs neither the
-      31 GB nor an SWC parse. See [The skeleton cache](#the-skeleton-cache).
+    - **The skeleton cache**, `.connectomekg/skeletons/`, written once by
+      `connkg skeletons --data-dir fafb_v783`. It holds every neuron's
+      simplified skeleton in 2.5 GB, so a render needs neither the 31 GB nor
+      an SWC parse. See [The skeleton cache](#the-skeleton-cache).
     - **The skeleton download** in `fafb_v783/sk_lod1_783_healed/`, one `.swc`
       file per neuron, about 31 GB. Any neuron the cache does not hold is read
       from here when `--data-dir` is given.
@@ -332,7 +332,7 @@ NumPy and SQL only. The tests exercise them without the `viz3d` extra.
 |---|---|---|
 | neuron positions | `soma_x`, `soma_y`, `soma_z` in each neuron node's metadata where `connkg skeletons` back-filled one, else `x`, `y`, `z`, the Codex marked point, in nm | world frame, context cloud, flow centroids |
 | super class and sign | neuron node metadata | context cloud colour |
-| skeletons | `.connectomekg/skeletons.parquet` (written by `connkg skeletons`), then `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever it does not hold | circuit |
+| skeletons | `.connectomekg/skeletons/` (written by `connkg skeletons`), then `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever it does not hold | circuit |
 | per-neuron neuropil synapse counts | `IN_NEUROPIL` edge evidence, `{"pre": n, "post": m}` | flow |
 | neuropil synapse totals | neuropil node metadata, `n_synapses` | flow sphere size |
 | neuropil surfaces | `.connectomekg/neuropil_meshes.npz`, written by `connkg meshes` | both |
@@ -476,18 +476,34 @@ reads every file once and writes both:
 connkg --root . --dataset fafb783 skeletons --data-dir fafb_v783
 ```
 
-- **`.connectomekg/skeletons.parquet`**, every neuron's skeleton simplified at
-  `--step` (4 by default, the circuit view's own default). About 3.5 GB on
-  FAFB v783, and the circuit view reads it in place of the download.
+- **`.connectomekg/skeletons/`**, every neuron's skeleton simplified at
+  `--step` (4 by default, the circuit view's own default). 2.5 GB on FAFB
+  v783, written as one `part-NNNN.parquet` shard per worker and read back as
+  one table. The circuit view reads it in place of the download.
 - **A soma in every neuron node**, as `soma_x`, `soma_y`, `soma_z` and
   `has_soma`. The context cloud draws somas from then on, and so does any
   query over the graph. This half writes to `graph.sqlite`; `--no-somas`
   leaves the graph untouched.
 
-The pass takes about 25 minutes on a laptop and is a one-time maintainer job:
-nothing else in the module needs the download afterwards. Run it again to
-refresh either product, or after a rebuild. A larger `--step` trades detail
-for size, roughly 2.2 GB at `--step 8`.
+Parsing SWC is pure Python and holds the GIL, so the pass pegs one core and
+leaves the rest idle. `-j` splits it across processes, each reading a
+contiguous range of root ids into its own shard. Measured on FAFB v783,
+139,255 neurons and 31 GB, on an 18-core laptop (6 performance, 12
+efficiency):
+
+| workers | wall time | skeletons/s |
+|---:|---:|---:|
+| 1 | 19m 30s | 119 |
+| 12 | 2m 39s | 881 |
+
+7.4x, and the two caches are identical -- same 212,351,918 points, same
+134,675 somas, and the same SHA-256 over a sampled 199 neurons' coordinates,
+parents and labels. Shards hold disjoint root-id ranges, so a filtered read
+still skips the ones that cannot match.
+
+It is a one-time maintainer job either way: nothing else in the module needs
+the download afterwards. Run it again to refresh either product, or after a
+rebuild. A larger `--step` trades detail for size.
 
 Every pass writes `reports/skeletons_<timestamp>.md`, the same per-run
 provenance record `connkg build` writes: versions and git commit, options,
@@ -504,7 +520,11 @@ took them from in the first place. What it does carry round-trips exactly:
 a cached skeleton drawn whole is the same geometry as the downloaded one drawn
 at the cache's stride, to float32 (under 0.03 nm, against a 4 nm imaging
 voxel). Every measurement above is FAFB v783: 104 LC4 neurons render from the
-cache in 0.8 s against 1.7 s from the download, with the same 379,096 points.
+cache in 1.0 s against 1.7 s from the download, with the same 379,096 points.
+Sharding costs nothing to read -- 252 ms to pull those 104 skeletons out of
+twelve shards, against 265 ms out of one file of the same size -- because
+their disjoint root-id ranges let Parquet skip whole shards, and what is left
+is read in parallel.
 
 Both caches beside the graph -- this one and `neuropil_meshes.npz` -- are
 derived data, gitignored, and safe to delete. So is `synapse_graph.npz`, which
@@ -548,8 +568,9 @@ output counts both:
 - **Missing skeletons:** a neuron with no SWC file is drawn as a larger
   sphere at its marked point (`fallback:<type>`). The larger size marks it
   as a stand-in, not a measured soma.
-- **Soma fallbacks:** in about 6% of skeletons, no row is labelled soma, so
-  the soma sphere sits at the skeleton's root point instead.
+- **Soma fallbacks:** in 3.3% of FAFB v783 skeletons (4,580 of 139,255) no
+  row is labelled soma, so the soma sphere sits at the skeleton's root point
+  instead.
 
 ## The flow view
 
