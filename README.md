@@ -85,11 +85,11 @@ The Codex portal needs a Google sign-in and lists display labels instead of file
 ```bash
 connkg files                                   # portal label -> file name
 connkg verify --data-dir /path/to/fafb_v783    # check the download
-connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783 --no-index
+connkg --root . --dataset fafb783 build --data-dir /path/to/fafb_v783
 connkg --root . analyze
 ```
 
-Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint.
+Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 seconds, 7.2 GB peak memory, and 2.3 GB of SQLite for 157,698 nodes and 5,072,285 edges. Keep about 4 GB free; the write-ahead log and the database both exist during the final checkpoint. The vector index for `connkg query` adds 25 seconds (16,861 vectors, 29 MB; Apple M5 Max, September 2026); `--no-index` skips it.
 
 ---
 

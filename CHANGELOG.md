@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The documented FAFB v783 build now includes the vector index.** The
+  README and `docs/DOWNLOAD.md` drop `--no-index` from the reference build,
+  so a new install has `connkg query` and the `query_connectome` and
+  `pack_connectome` MCP tools. Measured on v783: 16,861 vectors in 25
+  seconds and 29 MB (Apple M5 Max), not the "few minutes" the docs said.
+- `connkg build` without `--no-index` checks for the `semantic` extra before
+  it starts and stops with a usage error naming the missing modules, instead
+  of failing at the index step after the graph write.
+- `connkg build --no-index` warns when it leaves a vector index from an
+  earlier build in place, since that index was not rebuilt and may not match
+  the new graph. The warning is recorded in the build report.
+
 ### Added
 
 - **Neuroglancer links.** `connkg link SPEC [SPEC...]` prints a URL that opens

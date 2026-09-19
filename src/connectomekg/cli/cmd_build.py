@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,17 @@ from connectomekg.cli.options import open_kg, source_options
 from connectomekg.report import BuildRun, write_build_report
 from connectomekg.schema import DatasetInfo
 
+#: Modules the vector index imports, all from the ``semantic`` extra.
+_SEMANTIC_MODULES = ("sentence_transformers", "sqlite_vec")
+
+
+def missing_semantic() -> list[str]:
+    """Modules of the ``semantic`` extra that are not installed.
+
+    :return: Their import names; empty when the index can be built.
+    """
+    return [m for m in _SEMANTIC_MODULES if find_spec(m) is None]
+
 
 @cli.command("build")
 @source_options
@@ -20,11 +32,17 @@ from connectomekg.schema import DatasetInfo
 @click.option("--no-index", is_flag=True, help="Skip the vector index.")
 @click.pass_context
 def build(ctx: click.Context, wipe: bool, no_index: bool, **source: Any) -> None:
-    """Extract into SQLite (and the vector index).
+    """Extract into SQLite, then embed the vector index (skip it with --no-index).
 
     Every run, successful or not, writes a provenance report to
     <root>/reports/build_<timestamp>.md.
     """
+    # Checked up front: the index is built last, after minutes of graph work.
+    if not no_index and (missing := missing_semantic()):
+        raise click.UsageError(
+            f"the vector index needs the semantic extra (missing {', '.join(missing)}); "
+            "pip install 'connectome-kg[semantic]', or pass --no-index"
+        )
     run = BuildRun(Path(ctx.obj["root"]), {**source, "wipe": wipe, "no_index": no_index})
 
     def progress(message: str) -> None:
@@ -46,6 +64,12 @@ def build(ctx: click.Context, wipe: bool, no_index: bool, **source: Any) -> None
         ) as kg:
             db_path = kg.db_path
             stats = kg.build_graph(wipe=wipe) if no_index else kg.build(wipe=wipe)
+            if no_index and kg.vectors_path.exists():
+                progress(
+                    f"warning: kept the vector index from an earlier build at "
+                    f"{kg.vectors_path}; it was not rebuilt and may not match this "
+                    "graph. Build without --no-index to refresh it, or delete it."
+                )
             dataset = kg.tables().dataset
     except Exception as exc:
         error = exc
