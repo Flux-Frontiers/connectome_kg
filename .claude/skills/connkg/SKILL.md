@@ -173,11 +173,20 @@ poetry run connkg --root . --dataset fafb783 build --data-dir fafb_v783 --wipe
 
 ## Provenance
 
-- **Build reports.** Every build, including a failed one, writes
-  `reports/build_<UTC timestamp>.md`: versions and git commit, options, each
-  input's SHA-256 against the manifest, time per stage, counts, database size,
-  peak resident memory. Reports are gitignored; `git add -f` one worth keeping.
-  Read the newest report before guessing why a build was slow or wrong.
+- **Run reports.** Every `connkg build` and every `connkg skeletons`,
+  including a failed one, writes a Markdown record into `reports/`:
+  `build_<UTC timestamp>.md` and `skeletons_<UTC timestamp>.md`. Both carry
+  versions and git commit, options, host, timings and peak resident memory; a
+  build adds each input's SHA-256 against the manifest and the counts written,
+  and a skeletons pass adds what it read (file count and total size -- the
+  download has no recorded checksums) and what it wrote, including how many
+  neuron nodes gained a soma. Reports are gitignored; `git add -f` one worth
+  keeping. Read the newest before guessing why a pass was slow or wrong.
+- **A skeletons pass changes what a snapshot measures.** The soma back-fill
+  writes into an already-built `graph.sqlite`, so a snapshot taken before it
+  describes a graph without `soma_*` keys. Its report is the only record of
+  which download those somas came from, and at which step. Re-snapshot after
+  the pass.
 - **Snapshots** follow the fleet contract. `connkg snapshot save [OPTIONS]
   VERSION` keys on VERSION, or on a UTC timestamp when omitted, and never on
   the git tree hash, which is recorded only as provenance. The subject is

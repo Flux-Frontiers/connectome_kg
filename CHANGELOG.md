@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers for the cell body rather than only for FlyWire's marked point;
   `--no-somas` writes the cache without touching the graph. The new
   `connectomekg.skeleton_cache` holds both halves.
+- **A run report for `connkg skeletons`**, in `reports/skeletons_<timestamp>.md`,
+  the same per-run provenance record `connkg build` has written all along:
+  versions and git commit, options, host, the download read (file count and
+  total size; it has no recorded checksums to verify against), the cache
+  written, how many neuron nodes gained a soma, timings and peak memory. A
+  failed or interrupted pass writes one too, marked FAILED. The pass earns one
+  for a reason a build does not: it writes somas into an already-built
+  `graph.sqlite`, so the report is the only record of which download they came
+  from and at which step, and a snapshot taken before it no longer describes
+  the graph.
 - **A synapse-graph cache.** `connkg path` and `connkg cone` write the loaded
   neuron-level matrix to `.connectomekg/synapse_graph.npz` (14 MB on v783)
   and reuse it, turning an 8-second load of 3.7 M edges into under one:
@@ -52,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **An interrupted `connkg skeletons` pass removes its own partial cache.** It
+  writes to `skeletons.part` and renames at the end; a Ctrl-C part way through
+  a 25-minute read used to strand hundreds of megabytes there, and a failure
+  renaming it into place did too. Both now clean up, and `*.part` under
+  `.connectomekg/` is gitignored for the case a process is killed outright.
 - **The context cloud draws somas where the graph has them.** Each dot sits
   at the neuron's `soma_x`/`soma_y`/`soma_z` once `connkg skeletons` has
   back-filled one, and at its marked point otherwise, so a graph without the

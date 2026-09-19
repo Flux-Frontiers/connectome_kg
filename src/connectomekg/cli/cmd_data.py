@@ -14,8 +14,10 @@ from connectomekg.datasets import DATASETS_DIR, graph_path, scan_datasets
 from connectomekg.manifest import STATIC_ARCHIVES, portal_guide, verify_dir
 from connectomekg.neuropil_meshes import fetch_neuropil_meshes, neuropil_mesh_path
 from connectomekg.readers.synthetic import synthetic_tables, write_codex_dir
+from connectomekg.report import BuildRun, write_skeletons_report
 from connectomekg.skeleton_cache import (
     DEFAULT_CACHE_STEP,
+    CacheReport,
     build_skeleton_cache,
     skeleton_cache_path,
     write_somas,
@@ -113,27 +115,59 @@ def skeletons(ctx: click.Context, data_dir: str, step: int, no_somas: bool) -> N
     and each neuron's real soma into its node metadata, which turns the
     whole-brain cloud from marked points into somas. Run again to refresh.
     """
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
-        root_ids = [
-            int(r[0])
-            for r in kg.store.con.execute(
-                "SELECT json_extract(metadata,'$.root_id') FROM nodes WHERE kind = 'neuron' "
-                "AND json_extract(metadata,'$.root_id') IS NOT NULL"
+    run = BuildRun(
+        root=Path(ctx.obj["root"]),
+        options={
+            "command": "skeletons",
+            "dataset": ctx.obj["dataset"] or "(resolved)",
+            "data_dir": str(Path(data_dir).resolve()),
+            "step": step,
+            "no_somas": no_somas,
+        },
+    )
+    cache: CacheReport | None = None
+    cache_path: Path | None = None
+    db_path: Path | None = None
+    n_written: int | None = None
+    error: BaseException | None = None
+    try:
+        with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
+            db_path = kg.db_path
+            cache_path = skeleton_cache_path(kg.db_path)
+            root_ids = [
+                int(r[0])
+                for r in kg.store.con.execute(
+                    "SELECT json_extract(metadata,'$.root_id') FROM nodes WHERE kind = 'neuron' "
+                    "AND json_extract(metadata,'$.root_id') IS NOT NULL"
+                )
+            ]
+            click.echo(f"reading {len(root_ids)} skeletons from {data_dir}", err=True)
+            cache, somas = build_skeleton_cache(
+                data_dir,
+                root_ids,
+                cache_path,
+                step=step,
+                progress=lambda m: click.echo(m, err=True),
             )
-        ]
-        click.echo(f"reading {len(root_ids)} skeletons from {data_dir}", err=True)
-        report, somas = build_skeleton_cache(
-            data_dir,
-            root_ids,
-            skeleton_cache_path(kg.db_path),
-            step=step,
-            progress=lambda m: click.echo(m, err=True),
+            click.echo(str(cache))
+            if no_somas:
+                click.echo("graph left unchanged (--no-somas)")
+            else:
+                n_written = write_somas(kg.store, somas)
+                click.echo(f"back-filled somas into {n_written} neuron nodes")
+    except BaseException as exc:  # noqa: BLE001 - recorded, then re-raised
+        error = exc
+        raise
+    finally:
+        written = write_skeletons_report(
+            run,
+            cache=cache,
+            cache_path=cache_path,
+            db_path=db_path,
+            n_somas_written=n_written,
+            error=error,
         )
-        click.echo(str(report))
-        if no_somas:
-            click.echo("graph left unchanged (--no-somas)")
-        else:
-            click.echo(f"back-filled somas into {write_somas(kg.store, somas)} neuron nodes")
+        click.echo(f"report: {written}", err=True)
 
 
 @cli.command("datasets")

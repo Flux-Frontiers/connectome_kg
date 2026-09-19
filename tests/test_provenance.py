@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 
+import numpy as np
 import pytest
 from click.testing import CliRunner
 
 from connectomekg.cli import cli
 from connectomekg.readers.synthetic import write_codex_dir
+from connectomekg.skeletons import Skeleton, skeleton_path, write_swc
 
 
 def _run(*args: str, ok: bool = True):
@@ -122,3 +125,97 @@ def test_snapshot_keys_on_version_or_timestamp_never_the_tree_hash(tables, tmp_p
         json.loads(_run("--root", root, "snapshot", "show", entry["key"]).output)["subject"]
         == "repo:connectome-kg"
     )
+
+
+@pytest.fixture(scope="module")
+def download(tmp_path_factory, built):
+    """A skeleton directory for the built graph: three quarters of its neurons."""
+    db = built / "connectomes" / "synthetic" / ".connectomekg" / "graph.sqlite"
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        ids = [
+            int(r[0])
+            for r in con.execute(
+                "SELECT json_extract(metadata,'$.root_id') FROM nodes WHERE kind='neuron' "
+                "ORDER BY id"
+            )
+        ]
+    finally:
+        con.close()
+    data = tmp_path_factory.mktemp("swc")
+    (data / "sk_lod1_783_healed").mkdir()
+    for k, root_id in enumerate(ids[: len(ids) * 3 // 4]):
+        n = 12
+        points = np.stack([np.arange(n, dtype=float), np.zeros(n), np.zeros(n)], axis=1)
+        labels = np.zeros(n, dtype=np.int64)
+        if k % 5:  # every fifth skeleton has no soma row, so fallbacks are counted
+            labels[0] = 1
+        parent = np.array([-1] + list(range(n - 1)), dtype=np.int64)
+        write_swc(
+            Skeleton(root_id, points, np.full(n, 5.0), labels, parent),
+            skeleton_path(data, root_id),
+        )
+    return data, len(ids)
+
+
+def test_skeletons_writes_a_provenance_report(built, download):
+    data, n_neurons = download
+    n_cached = n_neurons * 3 // 4
+    _run("--root", str(built), "--dataset", "synthetic", "skeletons", "--data-dir", str(data))
+
+    (report,) = (built / "reports").glob("skeletons_*.md")
+    text = report.read_text()
+    assert "**Status:** SUCCESS" in text
+    assert "**Peak memory:**" in text and "**kgmodule-utils:**" in text
+    assert "| command | `skeletons` |" in text and "| step | `4` |" in text
+    assert f"{n_cached:,} `.swc` files" in text
+    assert f"| neurons cached | {n_cached:,} |" in text
+    assert f"| no skeleton file | {n_neurons - n_cached:,} |" in text
+    # The soma back-fill is the half a build report cannot describe.
+    assert f"{n_cached:,} neuron nodes gained" in text
+    assert "Snapshots taken before this pass" in text
+
+
+def test_skeletons_report_records_a_graph_it_left_alone(built, download):
+    data, _ = download
+    for stale in (built / "reports").glob("skeletons_*.md"):
+        stale.unlink()
+    _run(
+        "--root", str(built), "--dataset", "synthetic",
+        "skeletons", "--data-dir", str(data), "--no-somas",
+    )  # fmt: skip
+
+    (report,) = (built / "reports").glob("skeletons_*.md")
+    text = report.read_text()
+    assert "| no_somas | `True` |" in text
+    assert "was not modified (--no-somas)." in text
+    assert "neuron nodes gained" not in text
+
+
+def test_a_failed_skeletons_pass_still_leaves_a_report(tmp_path, tables, download):
+    data, _ = download
+    codex = write_codex_dir(tables, tmp_path / "codex")
+    _run(
+        "--root", str(tmp_path), "--dataset", "synthetic",
+        "build", "--data-dir", str(codex), "--no-index", "--wipe",
+    )  # fmt: skip
+    # A directory where the cache file goes: the pass reads every skeleton,
+    # then fails renaming its partial into place.
+    store = tmp_path / "connectomes" / "synthetic" / ".connectomekg"
+    (store / "skeletons.parquet").mkdir()
+    (store / "skeletons.parquet" / "occupied").touch()
+
+    res = _run(
+        "--root", str(tmp_path), "--dataset", "synthetic",
+        "skeletons", "--data-dir", str(data), ok=False,
+    )  # fmt: skip
+
+    assert res.exit_code != 0
+    (report,) = (tmp_path / "reports").glob("skeletons_*.md")
+    text = report.read_text()
+    assert "**Status:** FAILED" in text
+    assert "Nothing was written." in text
+    # The graph is reported untouched, because the somas are written last.
+    assert "neuron nodes gained" not in text
+    # And the partial is cleaned up rather than left as hundreds of megabytes.
+    assert not (store / "skeletons.part").exists()

@@ -1,19 +1,31 @@
-"""Build reports: one Markdown record per ``connkg build`` run.
+"""Run reports: one Markdown record per long pass that writes something.
 
-Each run writes ``<root>/reports/build_<UTC timestamp>.md``, following the
-per-run ingest reports gutenberg_kg writes. The report is provenance, not a
-log: what ran (package versions, git commit, options), on what (each input
-file with its SHA-256 and whether it matches the manifest), where (host,
-platform, Python), and what came out (counts, database size, time per stage,
-peak memory). A failed build still gets one, marked FAILED.
+Two commands write one, each into ``<root>/reports/``, following the per-run
+ingest reports gutenberg_kg writes:
+
+* ``connkg build`` -- ``build_<UTC timestamp>.md``, via :func:`write_build_report`.
+* ``connkg skeletons`` -- ``skeletons_<UTC timestamp>.md``, via
+  :func:`write_skeletons_report`.
+
+A report is provenance, not a log: what ran (package versions, git commit,
+options), on what (the inputs, with digests where there is a manifest to
+check them against), where (host, platform, Python), and what came out
+(counts, sizes, timings, peak memory). A pass that fails still gets one,
+marked FAILED.
+
+``connkg skeletons`` earns one for a reason ``connkg build`` does not: it
+writes somas into an *already built* ``graph.sqlite``, so the graph a snapshot
+measures afterwards is not the one the build report describes. Its report is
+the only record of which download those somas came from, and at which step.
 
 Reports are not tracked by default; keep a run worth keeping with
-``git add -f reports/build_<timestamp>.md``.
+``git add -f reports/<name>.md``.
 """
 
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import platform
 import resource
 import socket
@@ -30,6 +42,8 @@ from kg_utils.specs import BuildStats
 from connectomekg.manifest import FAFB_783_FILES, sha256_of
 from connectomekg.readers.codex import find_connections_file
 from connectomekg.schema import DatasetInfo
+from connectomekg.skeleton_cache import CacheReport
+from connectomekg.skeletons import SKELETON_SUBDIR
 
 
 @dataclass
@@ -166,6 +180,126 @@ def write_build_report(
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def write_skeletons_report(
+    run: BuildRun,
+    *,
+    cache: CacheReport | None,
+    cache_path: Path | None,
+    db_path: Path | None,
+    n_somas_written: int | None,
+    error: BaseException | None = None,
+) -> Path:
+    """Write the report for a finished or failed ``connkg skeletons`` pass.
+
+    :param run: The run's context; its ``options`` are recorded verbatim.
+    :param cache: What the pass read and wrote, or ``None`` if it failed first.
+    :param cache_path: The Parquet cache written, if it got that far.
+    :param db_path: The graph the somas went into, if known.
+    :param n_somas_written: Neuron nodes back-filled, or ``None`` when the
+        graph was left alone (``--no-somas``, or a failure before that point).
+    :param error: The exception that ended the pass, if any.
+    :return: Path of the report written.
+    """
+    elapsed = run.elapsed
+    peak = peak_rss_bytes()
+    reports = run.root / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    path = reports / f"skeletons_{run.started.strftime('%Y-%m-%d_%H%M%S')}.md"
+
+    status = "SUCCESS" if error is None else f"FAILED: {type(error).__name__}: {error}"
+    lines = [
+        "# ConnectomeKG Skeleton Cache Report",
+        "",
+        f"**Date:** {run.started.strftime('%Y-%m-%d %H:%M:%S')} UTC  ",
+        f"**Elapsed:** {_duration(elapsed)}  ",
+        f"**Peak memory:** {_bytes(peak)} resident  ",
+        f"**Status:** {status}  ",
+        f"**Host:** {socket.gethostname()} / {platform.system()} {platform.release()}"
+        f" / {platform.machine()}  ",
+        f"**Python:** {sys.version.split()[0]}  ",
+        f"**connectome-kg:** {_version('connectome-kg')}{_git_suffix()}  ",
+        f"**kgmodule-utils:** {_version('kgmodule-utils')}",
+        "",
+        "## Options",
+        "",
+        "| option | value |",
+        "|---|---|",
+    ]
+    lines += [f"| {k} | `{v}` |" for k, v in run.options.items()]
+
+    lines += ["", "## Input", ""]
+    data_dir = run.options.get("data_dir")
+    lines += _skeleton_input_rows(Path(data_dir)) if data_dir else ["No skeleton directory given."]
+
+    lines += ["", "## Output", ""]
+    if cache is None:
+        lines.append("Nothing was written.")
+    else:
+        rate = cache.n_cached / elapsed if elapsed > 0 else 0.0
+        lines += [
+            f"Cache `{cache_path}`"
+            + (f", {_bytes(cache.bytes_written)}" if cache.bytes_written else "")
+            + f", simplified at step {cache.step}.",
+            "",
+            "| measure | count |",
+            "|---|---:|",
+            f"| neurons cached | {cache.n_cached:,} |",
+            f"| points kept | {cache.n_points:,} |",
+            f"| with a real soma (SWC label 1) | {cache.n_soma:,} |",
+            f"| fell back to a root point | {cache.n_cached - cache.n_soma:,} |",
+            f"| no skeleton file | {cache.n_missing:,} |",
+            f"| unreadable skeleton file | {cache.n_unreadable:,} |",
+            "",
+            f"{rate:.0f} skeletons per second.",
+        ]
+
+    lines += ["", "## Graph", ""]
+    if n_somas_written is None:
+        lines.append(
+            f"Graph `{db_path}` was not modified"
+            + (" (--no-somas)." if run.options.get("no_somas") else ".")
+        )
+    else:
+        lines += [
+            f"Graph `{db_path}`"
+            + (f", {_bytes(db_path.stat().st_size)}" if db_path and db_path.exists() else "")
+            + ".",
+            "",
+            f"{n_somas_written:,} neuron nodes gained `soma_x`, `soma_y`, `soma_z` and "
+            "`has_soma`, written alongside the marked point in `x`/`y`/`z` rather than "
+            "over it.",
+            "",
+            "Snapshots taken before this pass measured a graph without those keys.",
+        ]
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _skeleton_input_rows(data_dir: Path) -> list[str]:
+    """Describe the SWC download read, without a manifest to check it against.
+
+    The skeleton download has no recorded digests -- ``FAFB_783_FILES`` covers
+    the CSV tables only -- and hashing 31 GB would cost more than the pass
+    itself. The file count and total size are what can honestly be recorded.
+    """
+    directory = data_dir / SKELETON_SUBDIR
+    if not directory.is_dir():
+        return [f"No skeleton directory at `{directory.resolve()}`."]
+    n = total = 0
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            if entry.is_file() and entry.name.endswith(".swc"):
+                n += 1
+                total += entry.stat().st_size
+    return [
+        f"Skeleton directory `{directory.resolve()}`.",
+        "",
+        f"{n:,} `.swc` files, {_bytes(total)} total. No digests: the download has no "
+        "recorded checksums, and hashing it would cost more than reading it.",
+    ]
 
 
 def _input_rows(data_dir: Path, connections_file: str | None) -> list[str]:

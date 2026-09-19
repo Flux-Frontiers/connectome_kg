@@ -64,6 +64,9 @@ renders/*
 **/.connectomekg/*.npz
 # simplified skeleton cache (connkg skeletons) -- derived from FlyWire data
 **/.connectomekg/*.parquet
+# the partial a cache is written to before it is renamed into place; an
+# interrupted run removes its own, but a killed process cannot
+**/.connectomekg/*.part
 
 # Agent scratch dirs (Claude Code / Codex)
 .agents/

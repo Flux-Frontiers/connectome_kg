@@ -18,8 +18,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import numpy as np
+
+#: Subdirectory of the Codex download holding one ``.swc`` file per neuron.
+SKELETON_SUBDIR: Final = "sk_lod1_783_healed"
 
 #: SWC label values used structurally, beyond a plain undefined (0) point.
 _LABEL_SOMA = 1
@@ -290,7 +294,7 @@ def skeleton_path(data_dir: str | Path, root_id: int) -> Path:
     :param root_id: Neuron root id.
     :return: ``<data_dir>/sk_lod1_783_healed/<root_id>.swc``.
     """
-    return Path(data_dir) / "sk_lod1_783_healed" / f"{int(root_id)}.swc"
+    return Path(data_dir) / SKELETON_SUBDIR / f"{int(root_id)}.swc"
 
 
 def load_skeletons(
@@ -315,6 +319,7 @@ def load_skeletons(
 
 
 __all__ = [
+    "SKELETON_SUBDIR",
     "Skeleton",
     "load_skeletons",
     "read_swc",

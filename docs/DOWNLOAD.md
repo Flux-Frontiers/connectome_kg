@@ -191,10 +191,13 @@ used on the dataset node.
 
    Every build writes `reports/build_<timestamp>.md`: versions and git commit,
    the options, each input file's SHA-256 against the manifest, time per
-   extraction stage, the counts written, and peak resident memory. The reports
-   are gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
+   extraction stage, the counts written, and peak resident memory. `connkg
+   skeletons` writes `reports/skeletons_<timestamp>.md` the same way. Both are
+   gitignored; `git add -f` the ones worth keeping. `connkg snapshot save`
    records the built graph's metrics in
-   `connectomes/fafb783/.connectomekg/snapshots/`, which is tracked.
+   `connectomes/fafb783/.connectomekg/snapshots/`, which is tracked -- take a
+   snapshot after a skeletons pass as well as after a build, since the soma
+   back-fill changes the graph the snapshot measures.
 
 ## If Codex offers something other than what you expected
 

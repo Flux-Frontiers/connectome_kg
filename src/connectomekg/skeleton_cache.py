@@ -30,6 +30,7 @@ read a cached skeleton exactly as they read a parsed one.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -107,11 +108,19 @@ class CacheReport:
     bytes_written: int
 
     def __str__(self) -> str:
-        mb = self.bytes_written / 1e6
-        size = f"{mb / 1000:.2f} GB" if mb >= 1000 else f"{mb:.0f} MB"
+        n = float(self.bytes_written)
+        for unit in ("B", "KB", "MB", "GB"):
+            if n < 1000 or unit == "GB":
+                size = f"{int(n)} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+                break
+            n /= 1000
+        points = (
+            f"{self.n_points / 1e6:.1f} M points"
+            if self.n_points >= 1e6
+            else f"{self.n_points:,} points"
+        )
         lines = [
-            f"cached {self.n_cached} skeletons at step {self.step}: "
-            f"{self.n_points / 1e6:.1f} M points, {size}",
+            f"cached {self.n_cached} skeletons at step {self.step}: {points}, {size}",
             f"somas: {self.n_soma} real, {self.n_cached - self.n_soma} fell back to a root point",
         ]
         if self.n_missing:
@@ -210,8 +219,12 @@ def build_skeleton_cache(
     somas: dict[int, tuple[np.ndarray, bool]] = {}
     n_cached = n_missing = n_unreadable = n_soma = n_points = 0
     batch: list[dict] = []
+    finished = False
     # Written to a partial file and renamed, so an interrupted pass leaves no
-    # half-built cache where the renderer would find one.
+    # half-built cache where the renderer would find one. The partial is
+    # removed on the way out of a pass that does not finish -- a 25-minute
+    # read of 31 GB is one a maintainer will interrupt sooner or later, and
+    # it has hundreds of megabytes on disk by then.
     partial = dest.with_suffix(".part")
     writer = pq.ParquetWriter(
         partial,
@@ -264,9 +277,20 @@ def build_skeleton_cache(
                 "connectomekg.n_neurons": str(n_cached),
             }
         )
-    finally:
+        # Closed and renamed inside the try, so a failure at either step is a
+        # failure of the pass and cleans up after itself like any other.
         writer.close()
-    partial.replace(dest)
+        partial.replace(dest)
+        finished = True
+    finally:
+        # Not `except Exception`: Ctrl-C is the likeliest way a 25-minute read
+        # ends early, and it must not leave hundreds of megabytes behind
+        # either. Closing twice is a no-op, but a close that raises here would
+        # mask whatever ended the pass.
+        if not finished:
+            with contextlib.suppress(Exception):
+                writer.close()
+            partial.unlink(missing_ok=True)
 
     return (
         CacheReport(

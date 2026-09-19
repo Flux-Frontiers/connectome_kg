@@ -207,3 +207,36 @@ def test_write_somas_adds_keys_without_disturbing_the_rest(kg):
         (node_id,),
     )
     kg.store.con.commit()
+
+
+def test_an_interrupted_pass_leaves_no_partial_behind(tmp_path, download, monkeypatch):
+    """A killed 25-minute read must not strand hundreds of megabytes on disk."""
+    data_dir, _ = download
+    dest = tmp_path / "c.parquet"
+    calls = {"n": 0}
+    real = sk.read_swc
+
+    def fail_on_the_second(path):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise KeyboardInterrupt("maintainer pressed Ctrl-C")
+        return real(path)
+
+    monkeypatch.setattr(sc, "read_swc", fail_on_the_second)
+    with pytest.raises(KeyboardInterrupt):
+        sc.build_skeleton_cache(data_dir, [100, 200, 300], dest)
+
+    assert not dest.with_suffix(".part").exists()
+    assert not dest.exists()
+
+
+def test_a_cache_that_cannot_be_renamed_into_place_cleans_up(tmp_path, download):
+    data_dir, _ = download
+    dest = tmp_path / "c.parquet"
+    dest.mkdir()  # a directory where the file goes: the rename cannot succeed
+    (dest / "occupied").touch()
+
+    with pytest.raises(OSError):
+        sc.build_skeleton_cache(data_dir, [100, 200], dest)
+
+    assert not dest.with_suffix(".part").exists()

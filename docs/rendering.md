@@ -489,6 +489,14 @@ nothing else in the module needs the download afterwards. Run it again to
 refresh either product, or after a rebuild. A larger `--step` trades detail
 for size, roughly 2.2 GB at `--step 8`.
 
+Every pass writes `reports/skeletons_<timestamp>.md`, the same per-run
+provenance record `connkg build` writes: versions and git commit, options,
+host, what was read, what was written, timings and peak memory. A failed or
+interrupted pass writes one too, marked FAILED, and removes its own partial
+cache. Because the soma back-fill changes an already-built graph, take a fresh
+`connkg snapshot save` afterwards -- one taken before the pass measures a
+graph with no `soma_*` keys in it.
+
 What the cache holds is not the whole skeleton. It carries no radii, which the
 renderer does not use, and its only SWC label is the soma's -- branch points
 and tips are recomputed from the parent links, which is where the renderer
