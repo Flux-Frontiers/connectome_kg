@@ -1,4 +1,4 @@
-"""``connkg fixture``, ``files``, ``verify``, ``meshes`` and ``datasets`` -- getting, checking and listing releases."""
+"""``connkg fixture``, ``files``, ``verify``, ``meshes``, ``skeletons`` and ``datasets`` -- getting, checking and listing releases."""
 
 from __future__ import annotations
 
@@ -14,6 +14,13 @@ from connectomekg.datasets import DATASETS_DIR, graph_path, scan_datasets
 from connectomekg.manifest import STATIC_ARCHIVES, portal_guide, verify_dir
 from connectomekg.neuropil_meshes import fetch_neuropil_meshes, neuropil_mesh_path
 from connectomekg.readers.synthetic import synthetic_tables, write_codex_dir
+from connectomekg.skeleton_cache import (
+    DEFAULT_CACHE_STEP,
+    build_skeleton_cache,
+    skeleton_cache_path,
+    write_somas,
+)
+from connectomekg.validation import MAX_SKELETON_STEP
 
 
 @cli.command("fixture")
@@ -79,6 +86,54 @@ def meshes(ctx: click.Context) -> None:
             progress=lambda m: click.echo(m, err=True),
         )
     click.echo(f"wrote {path}")
+
+
+@cli.command("skeletons")
+@click.option(
+    "--data-dir",
+    required=True,
+    type=click.Path(file_okay=False, exists=True),
+    help="Root of the skeleton download, e.g. fafb_v783.",
+)
+@click.option(
+    "--step",
+    default=DEFAULT_CACHE_STEP,
+    show_default=True,
+    type=click.IntRange(1, MAX_SKELETON_STEP),
+    help="Keep every Nth skeleton point; the circuit view's own default.",
+)
+@click.option("--no-somas", is_flag=True, help="Write the cache without touching the graph.")
+@click.pass_context
+def skeletons(ctx: click.Context, data_dir: str, step: int, no_somas: bool) -> None:
+    """Cache simplified skeletons and back-fill somas, in one pass over the SWC download.
+
+    Reads every neuron's .swc file once -- about 25 minutes on the 139,255 of
+    FAFB v783 -- and writes two things: skeletons.parquet beside the graph,
+    which the 3-D circuit view then draws from instead of the 31 GB download,
+    and each neuron's real soma into its node metadata, which turns the
+    whole-brain cloud from marked points into somas. Run again to refresh.
+    """
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
+        root_ids = [
+            int(r[0])
+            for r in kg.store.con.execute(
+                "SELECT json_extract(metadata,'$.root_id') FROM nodes WHERE kind = 'neuron' "
+                "AND json_extract(metadata,'$.root_id') IS NOT NULL"
+            )
+        ]
+        click.echo(f"reading {len(root_ids)} skeletons from {data_dir}", err=True)
+        report, somas = build_skeleton_cache(
+            data_dir,
+            root_ids,
+            skeleton_cache_path(kg.db_path),
+            step=step,
+            progress=lambda m: click.echo(m, err=True),
+        )
+        click.echo(str(report))
+        if no_somas:
+            click.echo("graph left unchanged (--no-somas)")
+        else:
+            click.echo(f"back-filled somas into {write_somas(kg.store, somas)} neuron nodes")
 
 
 @cli.command("datasets")

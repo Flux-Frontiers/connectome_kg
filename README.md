@@ -159,6 +159,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Open a circuit inside the whole brain in an interactive 3-D viewer** | `connkg viz3d SPEC [SPEC...]` (the `viz3d` extra) |
 | **Draw the signal flow between neuropils in 3-D, for the whole brain or one population** | `connkg quilt --view flow [SPEC...]`, `connkg viz3d --view flow [SPEC...]` (the `viz3d` extra) |
 | **Draw the brain's 78 neuropil surfaces in the 3-D views** | `connkg meshes` once, then any `quilt` or `viz3d` (FAFB v783) |
+| **Cache simplified skeletons and give every neuron a soma** | `connkg skeletons --data-dir fafb_v783` once; the circuit view then renders without the 31 GB download, and the whole-brain cloud shows cell bodies |
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |

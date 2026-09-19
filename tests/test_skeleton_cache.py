@@ -1,0 +1,209 @@
+"""Tests for connectomekg.skeleton_cache -- the Parquet cache and the soma back-fill.
+
+Every test writes real SWC files and reads them back through the same entry
+point ``connkg skeletons`` uses, so a cached skeleton is checked against the
+parsed one it came from rather than against an assumption about the format.
+"""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+from connectomekg import skeleton_cache as sc
+from connectomekg import skeletons as sk
+
+
+def _branching_skeleton(root_id: int, n_trunk: int = 40) -> sk.Skeleton:
+    """A soma-rooted trunk of ``n_trunk`` points that forks into two equal branches."""
+    n = n_trunk * 2 + 1
+    points = np.zeros((n, 3))
+    labels = np.zeros(n, dtype=np.int64)
+    parent = np.full(n, -1, dtype=np.int64)
+    labels[0] = 1  # soma
+    for i in range(1, n_trunk + 1):
+        points[i] = (float(i), 0.0, 0.0)
+        parent[i] = i - 1
+    fork = n_trunk
+    for k in range(n_trunk):
+        a, b = fork + 1 + k, fork + 1 + n_trunk // 2 + k
+        if b >= n:
+            break
+        points[a] = (float(fork + k), float(k + 1), 0.0)
+        parent[a] = fork if k == 0 else a - 1
+    labels[n - 1] = 6  # an end point
+    return sk.Skeleton(
+        root_id=root_id,
+        points=points,
+        radius=np.full(n, 10.0),
+        labels=labels,
+        parent=parent,
+    )
+
+
+@pytest.fixture
+def download(tmp_path):
+    """A ``data_dir``-shaped directory holding three skeletons, one without a soma."""
+    directory = tmp_path / "fafb_v783" / "sk_lod1_783_healed"
+    directory.mkdir(parents=True)
+    written = {}
+    for root_id in (100, 200, 300):
+        skeleton = _branching_skeleton(root_id)
+        if root_id == 300:
+            skeleton = sk.Skeleton(
+                root_id=root_id,
+                points=skeleton.points,
+                radius=skeleton.radius,
+                labels=np.zeros_like(skeleton.labels),
+                parent=skeleton.parent,
+            )
+        sk.write_swc(skeleton, sk.skeleton_path(tmp_path / "fafb_v783", root_id))
+        written[root_id] = skeleton
+    return tmp_path / "fafb_v783", written
+
+
+def test_build_reports_what_it_read(tmp_path, download):
+    data_dir, _ = download
+    report, somas = sc.build_skeleton_cache(
+        data_dir, [100, 200, 300, 999], tmp_path / "skeletons.parquet", step=4
+    )
+    assert report.n_cached == 3
+    assert report.n_missing == 1  # 999 has no file
+    assert report.n_unreadable == 0
+    assert report.n_soma == 2  # 300 has no Label 1 row
+    assert report.step == 4
+    assert report.bytes_written > 0
+    assert set(somas) == {100, 200, 300}
+    assert somas[300][1] is False
+    assert "3 skeletons at step 4" in str(report)
+
+
+def test_build_leaves_no_partial_file(tmp_path, download):
+    data_dir, _ = download
+    dest = tmp_path / "skeletons.parquet"
+    sc.build_skeleton_cache(data_dir, [100], dest)
+    assert dest.exists()
+    assert not dest.with_suffix(".part").exists()
+
+
+def test_cached_soma_is_the_parsed_soma(tmp_path, download):
+    data_dir, written = download
+    _, somas = sc.build_skeleton_cache(data_dir, list(written), tmp_path / "c.parquet", step=4)
+    for root_id, skeleton in written.items():
+        expected, is_soma = sk.soma(skeleton)
+        np.testing.assert_allclose(somas[root_id][0], expected, rtol=1e-6)
+        assert somas[root_id][1] == is_soma
+
+
+def test_round_trip_matches_simplifying_the_parsed_skeleton(tmp_path, download):
+    data_dir, written = download
+    dest = tmp_path / "c.parquet"
+    sc.build_skeleton_cache(data_dir, list(written), dest, step=4)
+    loaded, missing = sc.load_cached_skeletons(dest, [100, 200, 300])
+    assert missing == []
+    for root_id, cached in loaded.items():
+        # A cached skeleton drawn whole is the parsed one drawn at the cache's
+        # stride: same segment count, same endpoints, to float32.
+        expected = sk.segments(written[root_id], step=4)
+        actual = sk.segments(cached, step=1)
+        assert actual.shape == expected.shape
+        np.testing.assert_allclose(np.sort(actual, axis=0), np.sort(expected, axis=0), rtol=1e-5)
+
+
+def test_round_trip_keeps_the_soma_readable(tmp_path, download):
+    data_dir, written = download
+    dest = tmp_path / "c.parquet"
+    sc.build_skeleton_cache(data_dir, list(written), dest, step=4)
+    loaded, _ = sc.load_cached_skeletons(dest, [100, 300])
+    point, is_soma = sk.soma(loaded[100])
+    np.testing.assert_allclose(point, sk.soma(written[100])[0], rtol=1e-6)
+    assert is_soma is True
+    assert sk.soma(loaded[300])[1] is False
+
+
+def test_load_reports_root_ids_the_cache_does_not_hold(tmp_path, download):
+    data_dir, _ = download
+    dest = tmp_path / "c.parquet"
+    sc.build_skeleton_cache(data_dir, [100], dest)
+    loaded, missing = sc.load_cached_skeletons(dest, [100, 777])
+    assert set(loaded) == {100}
+    assert missing == [777]
+
+
+def test_load_of_nothing_reads_nothing(tmp_path):
+    assert sc.load_cached_skeletons(tmp_path / "absent.parquet", []) == ({}, [])
+
+
+def test_cache_info_reads_the_stride_back(tmp_path, download):
+    data_dir, _ = download
+    dest = tmp_path / "c.parquet"
+    sc.build_skeleton_cache(data_dir, [100, 200], dest, step=6)
+    assert sc.cache_info(dest) == (6, 2)
+
+
+def test_cache_info_rejects_a_foreign_parquet(tmp_path):
+    other = tmp_path / "other.parquet"
+    pq.write_table(pa.table({"a": [1]}), other)
+    with pytest.raises(ValueError, match="skeleton cache"):
+        sc.cache_info(other)
+
+
+def test_build_rejects_a_step_below_one(tmp_path, download):
+    data_dir, _ = download
+    with pytest.raises(ValueError, match="at least 1"):
+        sc.build_skeleton_cache(data_dir, [100], tmp_path / "c.parquet", step=0)
+
+
+@pytest.mark.parametrize(
+    ("requested", "cache_step", "expected"),
+    [(4, 4, 1), (1, 4, 1), (2, 4, 1), (8, 4, 2), (50, 4, 12), (4, 1, 4)],
+)
+def test_effective_step_divides_rather_than_compounds(requested, cache_step, expected):
+    assert sc.effective_step(requested, cache_step) == expected
+
+
+def test_skeleton_cache_path_sits_beside_the_graph(tmp_path):
+    db = tmp_path / ".connectomekg" / "graph.sqlite"
+    assert sc.skeleton_cache_path(db) == tmp_path / ".connectomekg" / sc.SKELETON_CACHE
+
+
+def _meta(kg, node_id):
+    row = kg.store.con.execute("SELECT metadata FROM nodes WHERE id = ?", (node_id,)).fetchone()
+    return json.loads(row[0])
+
+
+def test_write_somas_adds_keys_without_disturbing_the_rest(kg):
+    row = kg.store.con.execute(
+        "SELECT id, json_extract(metadata,'$.root_id') FROM nodes WHERE kind='neuron' LIMIT 1"
+    ).fetchone()
+    node_id, root_id = row[0], int(row[1])
+    before = _meta(kg, node_id)
+
+    n = sc.write_somas(
+        kg.store, {root_id: (np.asarray([1.0, 2.0, 3.0]), True), -1: (np.zeros(3), True)}
+    )
+
+    assert n == 1  # the unknown root id is skipped, not an error
+    after = _meta(kg, node_id)
+    assert (after["soma_x"], after["soma_y"], after["soma_z"]) == (1.0, 2.0, 3.0)
+    assert after["has_soma"] is True
+    assert after["x"] == before["x"] and after["cell_type"] == before["cell_type"]
+
+    # Running again overwrites the four keys rather than accumulating.
+    sc.write_somas(kg.store, {root_id: (np.asarray([9.0, 9.0, 9.0]), False)})
+    again = _meta(kg, node_id)
+    assert again["soma_x"] == 9.0
+    assert again["has_soma"] is False
+    assert len(again) == len(after)
+
+    # Leave the session graph as the other tests expect to find it.
+    kg.store.con.execute(
+        "UPDATE nodes SET metadata = json_remove(metadata, '$.soma_x', '$.soma_y', "
+        "'$.soma_z', '$.has_soma') WHERE id = ?",
+        (node_id,),
+    )
+    kg.store.con.commit()

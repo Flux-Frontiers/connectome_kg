@@ -44,6 +44,12 @@ from kg_utils.viz3d import seed_from_key
 from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
 from connectomekg.neuropil_meshes import Mesh, load_neuropil_meshes, neuropil_mesh_path
 from connectomekg.neuropils import neuropil_region
+from connectomekg.skeleton_cache import (
+    cache_info,
+    effective_step,
+    load_cached_skeletons,
+    skeleton_cache_path,
+)
 from connectomekg.skeletons import Skeleton, load_skeletons, segments, soma
 from connectomekg.validation import (
     MAX_FLOW_PAIRS,
@@ -230,21 +236,32 @@ def world_frame(store: GraphStore) -> WorldFrame:
 
 def context_points(
     store: GraphStore, *, color_by: str = "super_class"
-) -> tuple[list[str], np.ndarray, list[str]]:
-    """Every neuron's marked point, for the whole-brain context cloud (view A).
+) -> tuple[list[str], np.ndarray, list[str], int]:
+    """Every neuron's soma, or its marked point, for the whole-brain context cloud (view A).
+
+    A neuron carries FlyWire's marked point as ``x``/``y``/``z`` always, and
+    its real soma as ``soma_x``/``soma_y``/``soma_z`` once ``connkg skeletons``
+    has back-filled one (:func:`connectomekg.skeleton_cache.write_somas`). The
+    soma wins where there is one, so a graph with the back-fill draws a soma
+    cloud and one without still draws the marked-point cloud it always did.
 
     :param store: The graph store.
     :param color_by: ``"super_class"`` or ``"sign"``.
-    :return: ``(neuron_ids, points_nm, colors)`` -- ``points_nm`` is
+    :return: ``(neuron_ids, points_nm, colors, n_somas)`` -- ``points_nm`` is
         ``(n, 3)``, ``colors`` is one ``#RRGGBB`` string per neuron, same
-        order as ``neuron_ids``. Neurons with no coordinates are omitted.
+        order as ``neuron_ids``, and ``n_somas`` counts how many of those
+        points are a real soma rather than a marked point. Neurons with no
+        coordinates at all are omitted.
     :raises ValueError: If ``color_by`` is not one of the two choices.
     """
     color_by = require_choice("color_by", color_by, ("super_class", "sign"))
     rows = store.con.execute(
-        f"SELECT id, json_extract(metadata,'$.x'), json_extract(metadata,'$.y'), "
-        f"json_extract(metadata,'$.z'), json_extract(metadata,'$.super_class'), "
-        f"json_extract(metadata,'$.sign') FROM nodes WHERE {_SQL_NEURON_XYZ}"
+        f"SELECT id, "
+        f"COALESCE(json_extract(metadata,'$.soma_x'), json_extract(metadata,'$.x')), "
+        f"COALESCE(json_extract(metadata,'$.soma_y'), json_extract(metadata,'$.y')), "
+        f"COALESCE(json_extract(metadata,'$.soma_z'), json_extract(metadata,'$.z')), "
+        f"json_extract(metadata,'$.super_class'), json_extract(metadata,'$.sign'), "
+        f"json_extract(metadata,'$.has_soma') FROM nodes WHERE {_SQL_NEURON_XYZ}"
     ).fetchall()
     ids = [r[0] for r in rows]
     points = (
@@ -256,7 +273,7 @@ def context_points(
         colors = [SUPER_CLASS_COLOR.get(r[4] or "", UNKNOWN_COLOR) for r in rows]
     else:
         colors = [SIGN_COLOR.get(int(r[5]) if r[5] is not None else 0, SIGN_COLOR[0]) for r in rows]
-    return ids, points, colors
+    return ids, points, colors, sum(1 for r in rows if r[6])
 
 
 def circuit_neurons(kg: ConnectomeKG, specs: Sequence[str]) -> list[str]:
@@ -431,6 +448,9 @@ class SceneInfo:
     :param n_flow_pairs: Flow arcs drawn (view C).
     :param n_flow_total: Directed neuropil pairs with nonzero flow (view C).
     :param n_neuropil_meshes: Neuropil surface meshes drawn; 0 when none are cached.
+    :param n_context_somas: Context-cloud neurons drawn at a real soma rather
+        than at FlyWire's marked point; 0 until ``connkg skeletons`` has
+        back-filled somas.
     """
 
     title: str
@@ -444,6 +464,7 @@ class SceneInfo:
     n_flow_pairs: int = 0
     n_flow_total: int = 0
     n_neuropil_meshes: int = 0
+    n_context_somas: int = 0
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -775,13 +796,16 @@ def build_brain_scene(
             _say("no neuropil meshes cached; `connkg meshes` fetches them")
 
     n_context = 0
+    n_context_somas = 0
     if cloud is None:
         # The surfaces show the brain's outline more plainly than 139,255
         # dots, so the cloud stays for a scene that has no meshes drawn.
         cloud = n_meshes == 0
     if cloud:
         _say("context point cloud")
-        ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
+        ctx_ids, ctx_points_nm, ctx_colors, n_context_somas = context_points(
+            kg.store, color_by=color_by
+        )
         ctx_ids, ctx_points_nm, ctx_colors, radius = _context_for_view(
             view, ctx_ids, ctx_points_nm, ctx_colors
         )
@@ -826,6 +850,7 @@ def build_brain_scene(
             n_flow_pairs=n_pairs,
             n_flow_total=n_total,
             n_neuropil_meshes=n_meshes,
+            n_context_somas=n_context_somas,
         )
 
     circuit_ids = circuit_neurons(kg, specs) if specs else []
@@ -847,9 +872,20 @@ def build_brain_scene(
 
     skeletons_by_root: dict[int, Skeleton] = {}
     missing_skeletons: list[int] = list(root_ids)
-    if data_dir is not None and root_ids:
-        _say(f"loading {len(root_ids)} skeletons from {data_dir}")
-        skeletons_by_root, missing_skeletons = load_skeletons(data_dir, root_ids)
+    cached_roots: set[int] = set()
+    cache_path = skeleton_cache_path(kg.db_path)
+    if root_ids and cache_path.exists():
+        _say(f"loading {len(root_ids)} skeletons from {cache_path.name}")
+        skeletons_by_root, missing_skeletons = load_cached_skeletons(cache_path, root_ids)
+        cached_roots = set(skeletons_by_root)
+    if data_dir is not None and missing_skeletons:
+        _say(f"loading {len(missing_skeletons)} skeletons from {data_dir}")
+        from_swc, missing_skeletons = load_skeletons(data_dir, missing_skeletons)
+        skeletons_by_root.update(from_swc)
+    # A cached skeleton is already simplified, so it is drawn with the stride
+    # divided down rather than applied a second time; see
+    # connectomekg.skeleton_cache.effective_step.
+    cached_step = effective_step(skeleton_step, cache_info(cache_path)[0]) if cached_roots else 1
 
     n_skeletons = 0
     soma_fallbacks = 0
@@ -865,7 +901,8 @@ def build_brain_scene(
             skeleton = skeletons_by_root.get(int(root_id)) if root_id is not None else None
             if skeleton is not None:
                 n_skeletons += 1
-                segs_nm = segments(skeleton, step=skeleton_step)
+                step = cached_step if skeleton.root_id in cached_roots else skeleton_step
+                segs_nm = segments(skeleton, step=step)
                 if segs_nm.size:
                     segment_batches.append(frame.to_world(segs_nm.reshape(-1, 3)).reshape(-1, 2, 3))
                 soma_nm, is_soma = soma(skeleton)
@@ -901,7 +938,8 @@ def build_brain_scene(
             world_points.append(arr)
 
     points = np.concatenate(world_points, axis=0) if world_points else np.zeros((1, 3))
-    title = f"{dataset_name} | context={n_context} circuit={n_circuit} skeletons={n_skeletons}"
+    cloud_kind = "somas" if n_context_somas else "context"
+    title = f"{dataset_name} | {cloud_kind}={n_context} circuit={n_circuit} skeletons={n_skeletons}"
     _say("scene composed")
     return SceneInfo(
         title=title,
@@ -912,6 +950,7 @@ def build_brain_scene(
         missing_skeletons=sorted(set(missing_skeletons)),
         soma_fallbacks=soma_fallbacks,
         n_neuropil_meshes=n_meshes,
+        n_context_somas=n_context_somas,
     )
 
 

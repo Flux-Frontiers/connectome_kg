@@ -196,9 +196,9 @@ class ConnectomeKG(KGModule):
     # --------------------------------------------------------- navigation
     @property
     def graph(self) -> SynapseGraph:
-        """Neuron-level synapse graph of the built store (lazy)."""
+        """Neuron-level synapse graph of the built store (lazy, cached on disk)."""
         if self._graph is None:
-            self._graph = SynapseGraph.from_store(self.store)
+            self._graph = SynapseGraph.from_store(self.store, cache_for=self.db_path)
         return self._graph
 
     def neurons_of(self, spec: str) -> list[str]:
