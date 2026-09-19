@@ -219,3 +219,29 @@ def test_a_failed_skeletons_pass_still_leaves_a_report(tmp_path, tables, downloa
     # And the partial is cleaned up rather than left as hundreds of megabytes.
     assert not (store / "skeletons.part").exists()
     assert (store / "skeletons").read_text() == "in the way"
+
+
+def test_soma_coverage_is_zero_until_a_skeletons_pass_raises_it(built, download):
+    """The release record must be able to tell a soma graph from a marked-point one."""
+    root = str(built)
+    data, n_neurons = download
+    n_cached = n_neurons * 3 // 4
+
+    _run("--root", root, "--dataset", "synthetic", "snapshot", "save", "before", "--force")
+    before = json.loads(_run("--root", root, "--dataset", "synthetic", "snapshot", "show",
+                             "before").output)  # fmt: skip
+    # The graph under test may already carry somas from an earlier test, so
+    # assert the metric exists rather than its value here.
+    assert "soma" in before["metrics"]["coverage"]
+
+    _run("--root", root, "--dataset", "synthetic", "skeletons", "--data-dir", str(data))
+    _run("--root", root, "--dataset", "synthetic", "snapshot", "save", "after", "--force")
+    after = json.loads(_run("--root", root, "--dataset", "synthetic", "snapshot", "show",
+                            "after").output)  # fmt: skip
+
+    # Only the neurons with a real Label 1 row count, not every cached one.
+    assert 0 < after["metrics"]["coverage"]["soma"] <= n_cached / n_neurons
+    # The back-fill adds metadata, never a node or an edge -- which is exactly
+    # why this metric had to exist for the snapshot to see the change at all.
+    assert after["metrics"]["total_nodes"] == before["metrics"]["total_nodes"]
+    assert after["metrics"]["total_edges"] == before["metrics"]["total_edges"]

@@ -39,6 +39,13 @@ _COVERAGE = {
     "column": "json_extract(metadata,'$.column') != ''",
     "ontology_term": "json_array_length(metadata,'$.fbbt') > 0",
     "length": "json_extract(metadata,'$.length_nm') IS NOT NULL",
+    # Written by `connkg skeletons`, not by the build, so this one is 0 on a
+    # freshly built graph and rises once the skeleton download has been read.
+    # Without it a snapshot cannot tell a graph that knows where its cell
+    # bodies are from one that only has FlyWire's marked points: the back-fill
+    # adds metadata, never a node or an edge, so every other metric here is
+    # identical either way.
+    "soma": "json_extract(metadata,'$.has_soma') = 1",
 }
 
 
