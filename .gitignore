@@ -60,6 +60,8 @@ renders/*
 **/.connectomekg/*.sqlite-wal
 **/.connectomekg/*.db
 **/.connectomekg/models
+# neuropil mesh cache (connkg meshes) -- derived from FlyWire data
+**/.connectomekg/*.npz
 
 # Agent scratch dirs (Claude Code / Codex)
 .agents/

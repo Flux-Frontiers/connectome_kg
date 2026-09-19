@@ -256,8 +256,9 @@ Do not claim or try these; they are planned, not built:
 
 - KGRAG registration or federated queries across KGs
 - other datasets (hemibrain, MANC, BANC) or a neuPrint reader
-- activity simulation, and neuropil meshes (no mesh source in the download;
-  a neuropil is visible only as the density of the 3-D context cloud)
+- activity simulation
+- neuropil meshes for any dataset but FAFB v783 (`connkg meshes` fetches
+  v783's 78 surfaces; the 3-D views draw them once cached)
 - soma positions in the graph itself: neuron `x`/`y`/`z` metadata is a marked
   point, not necessarily the soma. `connkg quilt`/`viz3d` read each neuron's
   real soma from its skeleton file when one exists (falling back to the

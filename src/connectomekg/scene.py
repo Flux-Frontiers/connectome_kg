@@ -3,7 +3,9 @@
 Builds the real-geometry 3-D views of a connectome: view A, every neuron's
 marked point as a dim context cloud, and view B, the skeletons of a query's
 neurons drawn at full brightness inside it, and view C, neuropils linked by
-the signal flow their neurons carry between them. Unlike the fleet's other viz3d
+the signal flow their neurons carry between them. Both views can also draw
+the neuropil surface meshes ``connkg meshes`` caches
+(:mod:`connectomekg.neuropil_meshes`). Unlike the fleet's other viz3d
 consumers (``gutenberg_kg``, ``pycode_kg``, ``genealogy_kg``), this graph
 already has space -- every neuron carries real ``x``/``y``/``z`` coordinates
 and the download holds a traced skeleton for most of them -- so there is no
@@ -40,6 +42,7 @@ from kg_utils.store import GraphStore
 from kg_utils.viz3d import seed_from_key
 
 from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
+from connectomekg.neuropil_meshes import Mesh, load_neuropil_meshes, neuropil_mesh_path
 from connectomekg.neuropils import neuropil_region
 from connectomekg.skeletons import Skeleton, load_skeletons, segments, soma
 from connectomekg.validation import (
@@ -112,6 +115,13 @@ _FLOW_ARC_POINTS: Final = 17
 #: and region colours must stay recognisable, so these surfaces are lit more
 #: evenly than the default.
 _FLOW_AMBIENT: Final = 0.45
+#: Neuropil surface meshes. The circuit view draws them as pale neutral
+#: shells so the circuit's own colours stay the only colour in the scene; the
+#: flow view tints each by its brain region, the colour its sphere already
+#: carries. Faint in both, so what sits inside shows through.
+_NEUROPIL_SHELL_COLOR: Final = "#C8CCD2"
+_NEUROPIL_SHELL_OPACITY: Final = 0.10
+_NEUROPIL_TINT_OPACITY: Final = 0.15
 
 #: Floor and shadow rig for :func:`add_floor`, world units. The floor sits a
 #: little below the subject and is far larger than any frame, so it fills the
@@ -420,6 +430,7 @@ class SceneInfo:
     :param view: The view composed, one of :data:`VIEWS`.
     :param n_flow_pairs: Flow arcs drawn (view C).
     :param n_flow_total: Directed neuropil pairs with nonzero flow (view C).
+    :param n_neuropil_meshes: Neuropil surface meshes drawn; 0 when none are cached.
     """
 
     title: str
@@ -432,6 +443,7 @@ class SceneInfo:
     view: str = "circuit"
     n_flow_pairs: int = 0
     n_flow_total: int = 0
+    n_neuropil_meshes: int = 0
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -487,6 +499,35 @@ def _context_for_view(
         [_FLOW_CONTEXT_COLOR] * len(ids),
         _FLOW_CONTEXT_RADIUS,
     )
+
+
+def _draw_neuropil_meshes(
+    plotter: pv.Plotter, meshes: dict[str, Mesh], frame: WorldFrame, view: str
+) -> None:
+    """Draw neuropil surfaces: neutral shells (circuit view) or region-tinted (flow view).
+
+    One actor per colour, ``neuropils`` in the circuit view and
+    ``neuropils:<region colour>`` in the flow view, so the brain costs a
+    handful of draw calls rather than one per neuropil.
+    """
+    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
+
+    by_color: dict[str, list[pv.PolyData]] = defaultdict(list)
+    for name, (vertices, faces) in meshes.items():
+        cells = np.hstack([np.full((len(faces), 1), 3), faces]).astype(np.int64).ravel()
+        mesh = pv.PolyData(frame.to_world(vertices.astype(np.float64)), cells)
+        color = region_color(name) if view == "flow" else _NEUROPIL_SHELL_COLOR
+        by_color[color].append(mesh)
+    opacity = _NEUROPIL_TINT_OPACITY if view == "flow" else _NEUROPIL_SHELL_OPACITY
+    for color, parts in by_color.items():
+        plotter.add_mesh(
+            parts[0] if len(parts) == 1 else pv.merge(parts),
+            color=color,
+            opacity=opacity,
+            name="neuropils" if view != "flow" else f"neuropils:{color}",
+        )
+    # Translucent surfaces composite in the right order only with depth peeling.
+    plotter.enable_depth_peeling()  # ty: ignore[missing-argument]
 
 
 def _draw_flow(
@@ -670,6 +711,8 @@ def build_brain_scene(
     skeleton_step: int = 4,
     tubes: bool = False,
     top: int = 100,
+    neuropils: bool = True,
+    cloud: bool | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> SceneInfo:
     """Compose the whole-brain context cloud plus a circuit or neuropil flow into *plotter*.
@@ -691,6 +734,11 @@ def build_brain_scene(
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first, bounded to
         ``[1, MAX_FLOW_PAIRS]``.
+    :param neuropils: Draw the neuropil surface meshes when the dataset has
+        them cached (``connkg meshes``); without the cache the scene is drawn
+        without them and *progress* says how to fetch them.
+    :param cloud: Draw the whole-brain context cloud of marked points;
+        ``None`` (the default) draws it only when no neuropil meshes are.
     :param progress: Called with a short message at each stage; ``None`` (the
         default) keeps the build silent. The same
         ``Callable[[str], None]`` contract as ``ConnectomeExtractor``'s, so
@@ -714,25 +762,45 @@ def build_brain_scene(
     frame = world_frame(kg.store)
     world_points: list[np.ndarray] = []
 
-    _say("context point cloud")
-    ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
-    ctx_ids, ctx_points_nm, ctx_colors, radius = _context_for_view(
-        view, ctx_ids, ctx_points_nm, ctx_colors
-    )
-    n_context = len(ctx_ids)
-    if n_context:
-        ctx_world = frame.to_world(ctx_points_nm)
-        cloud = pv.PolyData(ctx_world)
-        rgb = np.asarray([_hex_to_rgb(c) for c in ctx_colors], dtype=np.float64)
-        rgb = rgb + (np.asarray(_hex_to_rgb(BACKGROUND), dtype=np.float64) - rgb) * _CONTEXT_MUTE
-        cloud.point_data["rgb"] = np.clip(rgb, 0, 255).astype(np.uint8)
-        glyphs = cloud.glyph(
-            geom=pv.Sphere(radius=radius, theta_resolution=6, phi_resolution=4),
-            orient=False,
-            scale=False,
+    n_meshes = 0
+    if neuropils:
+        mesh_path = neuropil_mesh_path(kg.db_path)
+        if mesh_path.exists():
+            meshes = load_neuropil_meshes(mesh_path)
+            _say(f"{len(meshes)} neuropil meshes")
+            _draw_neuropil_meshes(plotter, meshes, frame, view)
+            world_points.extend(frame.to_world(v.astype(np.float64)) for v, _ in meshes.values())
+            n_meshes = len(meshes)
+        else:
+            _say("no neuropil meshes cached; `connkg meshes` fetches them")
+
+    n_context = 0
+    if cloud is None:
+        # The surfaces show the brain's outline more plainly than 139,255
+        # dots, so the cloud stays for a scene that has no meshes drawn.
+        cloud = n_meshes == 0
+    if cloud:
+        _say("context point cloud")
+        ctx_ids, ctx_points_nm, ctx_colors = context_points(kg.store, color_by=color_by)
+        ctx_ids, ctx_points_nm, ctx_colors, radius = _context_for_view(
+            view, ctx_ids, ctx_points_nm, ctx_colors
         )
-        plotter.add_mesh(glyphs, scalars="rgb", rgb=True, name="context")
-        world_points.append(ctx_world)
+        n_context = len(ctx_ids)
+        if n_context:
+            ctx_world = frame.to_world(ctx_points_nm)
+            cloud_mesh = pv.PolyData(ctx_world)
+            rgb = np.asarray([_hex_to_rgb(c) for c in ctx_colors], dtype=np.float64)
+            rgb = (
+                rgb + (np.asarray(_hex_to_rgb(BACKGROUND), dtype=np.float64) - rgb) * _CONTEXT_MUTE
+            )
+            cloud_mesh.point_data["rgb"] = np.clip(rgb, 0, 255).astype(np.uint8)
+            glyphs = cloud_mesh.glyph(
+                geom=pv.Sphere(radius=radius, theta_resolution=6, phi_resolution=4),
+                orient=False,
+                scale=False,
+            )
+            plotter.add_mesh(glyphs, scalars="rgb", rgb=True, name="context")
+            world_points.append(ctx_world)
 
     ds_row = kg.store.con.execute("SELECT name FROM nodes WHERE kind='dataset'").fetchone()
     dataset_name = ds_row[0] if ds_row else "connectome"
@@ -757,6 +825,7 @@ def build_brain_scene(
             view=view,
             n_flow_pairs=n_pairs,
             n_flow_total=n_total,
+            n_neuropil_meshes=n_meshes,
         )
 
     circuit_ids = circuit_neurons(kg, specs) if specs else []
@@ -842,6 +911,7 @@ def build_brain_scene(
         n_skeletons=n_skeletons,
         missing_skeletons=sorted(set(missing_skeletons)),
         soma_fallbacks=soma_fallbacks,
+        n_neuropil_meshes=n_meshes,
     )
 
 

@@ -12,8 +12,9 @@ Two views are available:
 - **Flow** (`--view flow`) draws neuropils as spheres, linked by tubes
   weighted by how much signal the brain's neurons carry between them.
 
-Both views draw the whole brain as a context cloud behind the subject, and
-both render either as a Looking Glass quilt or in an interactive viewer.
+Both views draw the whole brain as a context cloud behind the subject, and,
+once fetched with `connkg meshes`, the brain's neuropils as faint surfaces.
+Both render either as a Looking Glass quilt or in an interactive viewer.
 
 ![The two DNp01 descending neurons inside the whole-brain context cloud](images/circuit_dnp01.png)
 
@@ -224,6 +225,11 @@ You need the following:
   `fafb_v783/sk_lod1_783_healed/`, which holds one `.swc` file per neuron
   (about 31 GB). Without it, each circuit neuron is drawn as a sphere at its
   marked point. The flow view does not read skeletons.
+- For the neuropil surfaces, the mesh cache. Fetch it once with
+  `connkg meshes`, which downloads the 78 FAFB v783 neuropil meshes from
+  FlyWire's public bucket (no sign-in, about 1 MB) into
+  `connectomes/<dataset>/.connectomekg/neuropil_meshes.npz`. Without it,
+  both views are drawn without surfaces. See [Neuropil meshes](#neuropil-meshes).
 
 ## Render a view
 
@@ -277,6 +283,8 @@ Quilts are never committed.
 | `--skeleton-step` | circuit | `4` | keep every Nth skeleton point, 1 to 50 |
 | `--tubes` | circuit | off | draw skeletons as tubes instead of lines |
 | `--top` | flow | `100` | strongest neuropil pairs drawn, 1 to 500 |
+| `--neuropils` / `--no-neuropils` | both | on | draw the neuropil surfaces, when `connkg meshes` has fetched them |
+| `--cloud` / `--no-cloud` | both | on, unless the surfaces are drawn | draw the context cloud |
 | `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
 | `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
@@ -297,12 +305,14 @@ plotter, the viewer passes its Qt widget, and **Cast to Looking Glass**
 rebuilds the scene in a fresh off-screen plotter. All three therefore draw
 the same thing.
 
-The function works in four steps:
+The function works in five steps:
 
 1. Set the background to a muted grey (`scene.BACKGROUND`, `#5A5D62`).
 2. Compute the world frame from the neuron positions.
-3. Draw the context cloud.
-4. Draw the circuit or the flow.
+3. Draw the neuropil meshes, when cached and `neuropils=True`.
+4. Draw the context cloud, unless meshes were drawn (`cloud=None`, the
+   default) or `cloud=False`.
+5. Draw the circuit or the flow.
 
 The module is split so most of it runs without PyVista. `world_frame`,
 `context_points`, `circuit_neurons`, `neuropil_flow` and `flow_arc` are
@@ -317,6 +327,7 @@ NumPy and SQL only. The tests exercise them without the `viz3d` extra.
 | skeletons | `fafb_v783/sk_lod1_783_healed/<root_id>.swc` | circuit |
 | per-neuron neuropil synapse counts | `IN_NEUROPIL` edge evidence, `{"pre": n, "post": m}` | flow |
 | neuropil synapse totals | neuropil node metadata, `n_synapses` | flow sphere size |
+| neuropil surfaces | `.connectomekg/neuropil_meshes.npz`, written by `connkg meshes` | both |
 
 ## World coordinates
 
@@ -394,6 +405,51 @@ colour.
 A marked point is not a cell body. It can be tens of microns from the
 soma. The cloud shows where neurons are, not where their
 cell bodies are.
+
+## Neuropil meshes
+
+The neuropil meshes are the surfaces of the volumes FlyWire used to assign
+each v783 synapse to a neuropil: the JFRC2 template neuropils (Ito et al.
+2014) mapped into FlyWire space. So a mesh encloses the synapses that the
+graph's `IN_NEUROPIL` edges count for that neuropil. FlyWire publishes them
+as Neuroglancer precomputed meshes at
+`gs://flywire_neuropil_meshes/neuropils/neuropil_mesh_v141_v6`. That source
+numbers the meshes 0 to 77 and does not name them.
+
+`connectomekg.neuropil_meshes.FAFB_783_MESH_NAMES` names them. It was built
+by matching every v6 mesh, vertex set for vertex set, against the named copy
+fafbseg packages from the same source: all 78 match exactly, to 78 distinct
+names. The one v783 neuropil without a mesh is `UNASGD`, the synapses no
+volume claimed. fafbseg's `volume_name_dict.json` looks like the answer but
+is not: it numbers the synapse-assignment volume, and matches none of these
+meshes.
+
+The views draw the meshes like this:
+
+- **Circuit view:** pale neutral shells, `#C8CCD2` at 10% opacity, so the
+  circuit's cell-type colours stay the only colour in the scene.
+- **Flow view:** each surface tinted with its brain region's colour at 15%
+  opacity, the colour its sphere already carries, so the spheres and tubes
+  read as sitting inside their neuropils.
+
+Meshes of one colour are merged into one actor (`neuropils` in the circuit
+view, `neuropils:<colour>` in the flow view), so the 78 surfaces cost a
+handful of draw calls. Depth peeling is on so translucent surfaces composite
+in the right order. On FAFB v783 a 48-view quilt of LPLC2 and DNp01 with
+meshes renders in about 5 seconds.
+
+The surfaces are the one translucent layer in the scene. Everything else is
+opaque, because alpha blending can ghost between views in a light-field
+render. The shells render correctly in every quilt tile, but have not been
+judged on a Looking Glass display yet. If they ghost, `--no-neuropils` turns
+them off.
+
+With the meshes drawn, the context cloud is redundant: the surfaces show the
+brain's outline more plainly than 139,255 dots. So drawing the surfaces turns
+the cloud off, leaving the subject inside the anatomy. Pass `--cloud` for
+both at once, which is worth it when the dots' own colouring is the point
+(`--color-by sign`, say). Without a mesh cache, nothing changes: the cloud
+draws as it always did.
 
 ## The circuit view
 
@@ -616,9 +672,9 @@ the CLI and the Python API:
 
 ## Known limits
 
-- **No neuropil geometry.** Regions show only as the density of the context
-  cloud and as flow centroids. Drawing neuropil surfaces needs a mesh source
-  that the Codex download does not include.
+- **Neuropil surfaces are FAFB v783 only.** `connkg meshes` knows one mesh
+  source. Another dataset renders without surfaces until its source is added
+  to `connectomekg.neuropil_meshes`.
 - **Marked points are not somas.** The cloud and the flow centroids use
   marked points. Only the circuit view reads real somas, from skeletons.
 - **Large circuits are refused, not sampled.** Narrow a SPEC that resolves
