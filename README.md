@@ -10,6 +10,18 @@
 
 **ConnectomeKG turns an electron-microscopy connectome into a queryable knowledge graph: every neuron a node, every edge a counted synapse, with the cell types, neuropils and community labels layered on top.**
 
+<!-- An absolute raw URL, not a repo-relative path: PyPI re-hosts this README
+     and repo-relative images do not resolve there. Pinned to main rather than
+     to a tag on purpose. A tag-pinned hero has to be bumped every release and
+     fails silently when it is not, serving the previous release's image at
+     200 OK; and this one could not be pinned to v0.4.0 in any case, because
+     the tag was cut before the image existed. -->
+![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/anatomy_lplc2_dnp01.png)
+
+*The escape circuit in its anatomy. Pink is LPLC2, the looming detectors whose dendrites fill the lobula of each optic lobe; blue is DNp01, the giant fibre, which collects from them in the central brain and sends the two axons leaving the bottom of the frame down to the nerve cord. Behind them the brain's 78 neuropil surfaces, and one dot for each of the 139,255 neurons placed at its cell body. One command draws it, over the same spec grammar the path and cone queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
+
+*Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same licence, not under the software's Elastic License 2.0.*
+
 The first corpus is the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460 connected neuron pairs. ConnectomeKG reads the Codex export, normalises it into dataset-neutral tables, and writes a typed graph to SQLite. Neurons are instances of cell types, cell types sit under a super class and class taxonomy and belong to hemilineages, and both neurons and types connect to the neuropils they innervate. Each synapse edge carries its count and a transmitter sign. A vector index over the small human vocabulary (cell type names, neuropils, labels, taxa) lets a query like *"sugar sensing gustatory neurons"* find the right place to start.
 
 From there you can ask wiring questions directly: the strongest signed path from a sensory neuron to a motor neuron, the downstream cone of a visual projection type, the hub neurons and strongest type-to-type connections. Because it is a `KGModule` built on [kgmodule-utils](https://github.com/Flux-Frontiers/KG_utils), the same graph also federates with the rest of the KGRAG fleet.

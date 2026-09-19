@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/scripts/render_images.py` runs again.** It opened `ConnectomeKG(".")`,
+  which has looked for `./.connectomekg/graph.sqlite` since 0.3.0 moved each
+  dataset into `connectomes/<dataset>/`, so it failed on its first line and
+  nothing had regenerated the documentation images since 2026-09-17. They
+  therefore still showed the whole-brain cloud of marked points with no
+  neuropil surfaces, two days after 0.4.0 added both.
+
+### Added
+
+- **A hero render, `docs/images/anatomy_lplc2_dnp01.png`**, on the README and
+  the documentation site: the escape circuit, LPLC2 to DNp01, drawn inside the
+  brain's neuropil surfaces with one dot per neuron at its cell body. The four
+  existing images were regenerated and now show the surfaces and the somas too.
+
+
 ## [0.4.0] - 2026-09-19
 
 ### Added

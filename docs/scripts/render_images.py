@@ -24,6 +24,7 @@ from PIL import Image
 from quiltwright import QUILT_PRESETS, render_quilt
 
 from connectomekg import ConnectomeKG
+from connectomekg.datasets import dataset_dir
 from connectomekg.scene import (
     FLOOR_ELEVATION,
     add_floor,
@@ -37,8 +38,28 @@ OUT = Path("docs/images")
 SPEC = QUILT_PRESETS["16-landscape"].still(height=900)  # 1600 x 900
 FOV = 14.0
 
+#: The dataset these images are rendered from.
+DATASET = "fafb783"
+
 #: (file stem, build_brain_scene options, floor, label neuropils)
+#:
+#: Since 0.4.0 every one of these draws the neuropil surfaces where the mesh
+#: cache exists, and the whole-brain cloud sits on real somas rather than
+#: marked points where `connkg skeletons` has back-filled them. Drawing the
+#: surfaces turns the cloud off by default, so an entry that wants both says
+#: so with `cloud=True`.
 IMAGES = [
+    (
+        "anatomy_lplc2_dnp01",
+        {
+            "specs": ["LPLC2", "DNp01"],
+            "data_dir": "fafb_v783",
+            "tubes": True,
+            "cloud": True,
+        },
+        False,
+        False,
+    ),
     ("circuit_dnp01", {"specs": ["DNp01"], "data_dir": "fafb_v783"}, False, False),
     ("flow_all", {"view": "flow", "top": 100}, False, True),
     ("flow_lc4", {"view": "flow", "specs": ["LC4"]}, False, True),
@@ -77,7 +98,9 @@ def label_active_neuropils(plotter: pv.Plotter, kg: ConnectomeKG, options: dict)
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    kg = ConnectomeKG(".")
+    # Each dataset owns its own store since 0.3.0; ConnectomeKG(".") looked
+    # for ./.connectomekg/graph.sqlite and found nothing.
+    kg = ConnectomeKG(dataset_dir(".", DATASET))
     try:
         for stem, options, floor, labels in IMAGES:
             plotter = pv.Plotter(off_screen=True)
