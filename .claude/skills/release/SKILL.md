@@ -27,16 +27,27 @@ release record does not depend on which graph happened to be built last.
 
 ```bash
 poetry install --only-root
-connkg --root . --dataset fafb783 build --data-dir fafb_v783 --no-index --wipe
+connkg --root . --dataset fafb783 stats          # assert the real graph, see below
 connkg --root . --dataset fafb783 snapshot save <version> --subject corpus:fafb783 --force
 ls connectomes/fafb783/.connectomekg/snapshots/<version>.json
 ```
 
 - **The graph must be the real FAFB v783 build.** A synthetic fixture graph in
   `connectomes/fafb783/` would be recorded as the release. Always pass
-  `--dataset fafb783` so another built dataset can never be picked up. The build takes about 4
-  minutes; the maintainer runs it and watches it rather than an agent running
-  it in the background.
+  `--dataset fafb783` so another built dataset can never be picked up.
+- **Verify the graph; do not rebuild it by reflex.** `connkg stats` must report
+  139,255 neurons and 3,732,460 synaptic pairs. That is the check the old
+  `build --wipe` in this step was standing in for, and it costs a second
+  rather than four minutes. Rebuild only when the graph is absent, wrong, or
+  the release actually changed the extractor.
+- **A rebuild wipes the somas.** `connkg skeletons` writes `soma_*` into an
+  already-built graph, so `build --wipe` silently drops them and the release
+  would record `coverage.soma` at 0 for a version that shipped them. If a
+  rebuild is genuinely needed, re-run `connkg skeletons --data-dir fafb_v783
+  -j <cores>` (2m 39s) *before* the snapshot, not after.
+- **Check `coverage.soma` in the saved snapshot.** It is the one metric a
+  metadata back-fill moves; every other number is identical with or without
+  it. On v783 it should read about 0.967.
 - **Reinstall before snapshotting.** `version` and `tool_version` come from the
   installed distribution, not `pyproject.toml`, so a snapshot taken straight
   after the bump records the previous version inside a file keyed to the new

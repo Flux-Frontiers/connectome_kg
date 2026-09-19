@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parents and labels, and a bit-identical soma back-fill across all 139,255
   neuron nodes. Shards hold disjoint root-id ranges, so a filtered read still
   skips the ones that cannot match, and `-j 1` starts no pool at all.
+- **`coverage.soma` in the graph snapshot.** The soma back-fill writes
+  metadata and never a node or an edge, so every metric a snapshot recorded
+  was identical with or without it -- a 0.4 snapshot would have been
+  indistinguishable from 0.3.2 on the one thing 0.4 adds. The new metric reads
+  0.967 on FAFB v783 (134,675 of 139,255) and 0 on a graph that has not had
+  `connkg skeletons` run over it.
 - **A run report for `connkg skeletons`**, in `reports/skeletons_<timestamp>.md`,
   the same per-run provenance record `connkg build` has written all along:
   versions and git commit, options, host, the download read (file count and
