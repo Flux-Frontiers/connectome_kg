@@ -18,15 +18,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PDFs and the text derived from them are not, since the publishers' files are
   theirs to distribute.
 
-  Two measured details. The extraction undoes the hard wrapping of a
-  two-column PDF, without which chunk boundaries fall mid-clause. And it cuts
-  the reference lists, which are **176,000 of 335,000 characters** -- more
-  than half the corpus -- and which retrieve: before cutting them, a query for
-  looming visual projection neurons returned a bibliography entry rather than
-  any prose.
+  Eight papers, about a million characters: the two FlyWire papers, Eckstein
+  on neurotransmitter classification, Matsliah on the optic lobe, Namiki on
+  descending neurons, Morimoto on looming, Scheffer on hemibrain and Shiu on
+  the brain model.
 
-  What it answers is how the dataset was made. It does **not** answer circuit
-  questions: `DNp01`, `LC4` and `LPLC2` appear zero times in either paper.
+  The extraction undoes the hard wrapping of a two-column PDF, without which
+  chunk boundaries fall mid-clause, and cuts the reference lists, which are
+  a third to a half of each paper and which retrieve -- before cutting them a
+  query for looming visual projection neurons returned a bibliography entry
+  rather than any prose. Journals differ enough that this is three rules:
+  Nature prints no "References" heading in its extracted text, so its first
+  numbered citation is the anchor; eLife and Cell print one, in their own
+  case; and a heading only counts when citations crowd in behind it, since
+  "References" occurs in prose too. Cell prints 90,000 characters of methods
+  *after* its references, so the list is cut as a span rather than a tail.
+  eLife's per-figure DOIs are stripped as well -- one paper carried 105 of
+  them inline.
+
+  Asked what the giant fibre does in the escape response, the corpus returns a
+  passage naming DNp01, the looming stimulus and the fast mode of takeoff: the
+  same DNp01 the graph holds as a node, which is what this was for. With only
+  the first two papers that query returned nothing useful, since `DNp01`,
+  `LC4` and `LPLC2` appeared zero times in either.
 
 ### Fixed
 
