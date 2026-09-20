@@ -15,9 +15,13 @@
      to a tag on purpose -- a tag-pinned hero has to be bumped every release
      and fails silently when it is not, serving the previous release's image
      at 200 OK. -->
-![Signal flow across the FAFB v783 brain, over a floor](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
+![The FlyWire FAFB v783 fly brain seen from the front and slightly above, standing on a floor with its shadow below. Coloured spheres mark the 79 neuropils, linked by curved tubes showing where signal flows between them, inside a haze of grey dots, one for each of the 139,255 neurons' cell bodies.](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
 
-*Signal flow across the whole brain: the strongest 100 of 5,786 directed neuropil pairs, each neuropil a sphere at the synapse-weighted centroid of its neurons and tinted by brain region, inside the outline of all 139,255 cell bodies. Flow from A to B is carried by neurons, not counted from synapses: each neuron's output synapses in B, apportioned by the share of its input that lies in A.*
+**The whole fly brain, and where its signal goes.** Each sphere is one of the 79 neuropils, placed at the synapse-weighted centre of its neurons and coloured by brain region -- orange for the optic lobes down each side, yellow for the superior neuropils and lateral horn across the top, green for the antennal lobe and the neuropils around the oesophagus below, blue and light blue for the inferior, ventromedial and ventrolateral neuropils between them. A sphere's width grows with the cube root of its synapse count, so one twice as wide holds about eight times as many.
+
+The tubes are the strongest 100 of 5,786 directed neuropil pairs. Thickness grows with the square root of the flow, and each tube bows to the right of its direction of travel, so a tube bulging toward you runs left to right. Flow is carried by neurons rather than counted from synapses: each neuron's output synapses in B, apportioned by the share of its input lying in A, summed over every neuron.
+
+Behind them, one grey dot per neuron at its cell body -- all 139,255 of them, which is what gives the brain its outline. The floor and shadow carry no data; they are there for depth. One command draws it: `connkg quilt --view flow --floor --cloud --still`.
 
 *Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same licence, not under the software's Elastic License 2.0.*
 

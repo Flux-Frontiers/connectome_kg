@@ -11,9 +11,13 @@ taxonomy, hemilineages and community labels sit on top. The first corpus is
 the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460
 connected neuron pairs.
 
-![Signal flow across the FAFB v783 brain, over a floor](images/flow_all_floor.png)
+![The FlyWire FAFB v783 fly brain seen from the front and slightly above, standing on a floor with its shadow below. Coloured spheres mark the 79 neuropils, linked by curved tubes showing where signal flows between them, inside a haze of grey dots, one for each of the 139,255 neurons' cell bodies.](images/flow_all_floor.png)
 
-*Signal flow across the whole brain: the strongest 100 of 5,786 directed neuropil pairs, each neuropil a sphere at the synapse-weighted centroid of its neurons and tinted by brain region, inside the outline of all 139,255 cell bodies. Flow from A to B is carried by neurons, not counted from synapses: each neuron's output synapses in B, apportioned by the share of its input that lies in A.*
+**The whole fly brain, and where its signal goes.** Each sphere is one of the 79 neuropils, placed at the synapse-weighted centre of its neurons and coloured by brain region -- orange for the optic lobes down each side, yellow for the superior neuropils and lateral horn across the top, green for the antennal lobe and the neuropils around the oesophagus below, blue and light blue for the inferior, ventromedial and ventrolateral neuropils between them. A sphere's width grows with the cube root of its synapse count, so one twice as wide holds about eight times as many.
+
+The tubes are the strongest 100 of 5,786 directed neuropil pairs. Thickness grows with the square root of the flow, and each tube bows to the right of its direction of travel, so a tube bulging toward you runs left to right. Flow is carried by neurons rather than counted from synapses: each neuron's output synapses in B, apportioned by the share of its input lying in A, summed over every neuron.
+
+Behind them, one grey dot per neuron at its cell body -- all 139,255 of them, which is what gives the brain its outline. The floor and shadow carry no data; they are there for depth. One command draws it: `connkg quilt --view flow --floor --cloud --still`. Every mark is keyed in [Reading the images](rendering.md#flow-view).
 
 ![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](images/anatomy_lplc2_dnp01.png)
 
