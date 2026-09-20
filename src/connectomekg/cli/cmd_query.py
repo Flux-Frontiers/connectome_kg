@@ -83,6 +83,49 @@ def cone(
                 click.echo(f"  {q}")
 
 
+@cli.command("influence")
+@source_options
+@click.option("--from", "source_spec", required=True, help="Source spec.")
+@click.option("--to", "target_spec", default=None, help="Target spec; omit to rank cell types.")
+@click.option("--hops", default=3, show_default=True, type=click.IntRange(1, MAX_HOP))
+@click.option(
+    "--unsigned",
+    is_flag=True,
+    help="Treat every synapse as excitatory instead of applying transmitter signs.",
+)
+@click.option(
+    "--limit",
+    default=20,
+    show_default=True,
+    type=click.IntRange(1, MAX_LIMIT),
+    help="Cell types listed per hop.",
+)
+@click.pass_context
+def influence(
+    ctx: click.Context,
+    source_spec: str,
+    target_spec: str | None,
+    hops: int,
+    unsigned: bool,
+    limit: int,
+    **source: Any,
+) -> None:
+    """Effective connectivity: how much one population drives another, hop by hop.
+
+    A value is the share of the receiving neuron's input synapses the source
+    drives, averaged over the receiving neurons, so 0.15 reads as "the average
+    target gets 15% of its input from the source". Signed by default, so a
+    negative value is net inhibition and two routes of opposite sign cancel --
+    which is what this answers that counting paths does not.
+
+    Unlike `connkg path`, which finds one strongest route, this sums every
+    route of the given length at once.
+    """
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+        result = kg.influence(source_spec, target_spec, hops=hops, signed=not unsigned, limit=limit)
+        click.echo(str(result))
+
+
 @cli.command("link")
 @source_options
 @click.argument("specs", nargs=-1, required=True)

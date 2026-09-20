@@ -204,6 +204,50 @@ def type_partners(cell_type: str, direction: str = "down", limit: int = 20) -> s
 
 
 @mcp.tool()
+def influence(
+    source: str, target: str = "", hops: int = 3, signed: bool = True, limit: int = 20
+) -> str:
+    """Effective connectivity: how much one population drives another, hop by hop.
+
+    A value is the share of the receiving neuron's input synapses that the
+    source drives, averaged over the receiving neurons, so 0.15 means the
+    average target gets 15% of its input from the source. Signed, a negative
+    value is net inhibition, and two routes of opposite sign cancel.
+
+    Unlike ``strongest_path``, which returns one best route, this sums every
+    route of the given length at once. Use it to ask "does A drive B, and net
+    of what sign" rather than "how does A reach B".
+
+    :param source: Spec for the driving population.
+    :param target: Spec for the receiving population; empty ranks cell types
+        instead of measuring one population.
+    :param hops: Hops to propagate, 1-5.
+    :param signed: Apply transmitter signs; False treats every synapse as
+        excitatory, which matches the raw input share at hop 1.
+    :param limit: Cell types listed per hop, 1-500.
+    :return: JSON with per-hop values onto the target and the strongest cell
+        types at each hop.
+    """
+    result = _get_kg().influence(source, target or None, hops=hops, signed=signed, limit=limit)
+    return _json(
+        {
+            "source": result.source,
+            "target": result.target,
+            "signed": result.signed,
+            "n_sources": result.n_sources,
+            "n_targets": result.n_targets,
+            "units": "share of the receiving neuron's input synapses, averaged over them",
+            "onto": [round(v, 6) for v in result.onto],
+            "onto_total": round(sum(result.onto), 6) if result.onto else None,
+            "ranked": [
+                [{"cell_type": n, "influence": round(v, 6)} for n, v in hop]
+                for hop in result.ranked
+            ],
+        }
+    )
+
+
+@mcp.tool()
 def strongest_path(source: str, target: str) -> str:
     """Strongest synaptic path between two specs.
 
