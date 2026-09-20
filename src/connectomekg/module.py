@@ -104,7 +104,7 @@ class ConnectomeKG(KGModule):
         return "connectome"
 
     def tables(self) -> ConnectomeTables:
-        """Load (once) the normalised tables for the configured source."""
+        """Load (once) the normalized tables for the configured source."""
         if self._tables is None:
             if self.source == "synthetic":
                 self._tables = synthetic_tables(self.n_neurons, self.seed)
@@ -341,7 +341,7 @@ class ConnectomeKG(KGModule):
         return self.graph.cone(seeds, hops=hops, min_syn=min_syn, direction=direction)
 
     def neuroglancer_link(self, specs: list[str], *, limit: int = 200) -> dict[str, Any]:
-        """A Neuroglancer URL showing each spec's neurons as meshes, one colour per spec.
+        """A Neuroglancer URL showing each spec's neurons as meshes, one color per spec.
 
         :param specs: One to seven specs (see :meth:`neurons_of`).
         :param limit: Neurons shown per spec, 1-500; ``count`` is always the full total.
@@ -513,7 +513,10 @@ class ConnectomeKG(KGModule):
         ds = con.execute("SELECT name, metadata FROM nodes WHERE kind='dataset'").fetchone()
         meta = json.loads(ds[1]) if ds and ds[1] else {}
         out = [f"# ConnectomeKG analysis: {ds[0] if ds else 'unknown dataset'}", ""]
-        out.append(f"Licence: {meta.get('licence', '?')}. {meta.get('citation', '')}")
+        # "licence" is what graphs built before 0.5.1 wrote. Reading both keeps
+        # an existing build reporting its license without a 4-minute rebuild.
+        license_name = meta.get("license") or meta.get("licence") or "?"
+        out.append(f"License: {license_name}. {meta.get('citation', '')}")
         out.append("")
         out.append("## Counts")
         out.append("")
@@ -575,7 +578,7 @@ class ConnectomeKG(KGModule):
         signed = con.execute(
             "SELECT COUNT(*) FROM nodes WHERE kind='neuron' AND json_extract(metadata,'$.sign') != 0"
         ).fetchone()[0]
-        labelled = con.execute(
+        labeled = con.execute(
             "SELECT COUNT(DISTINCT src) FROM edges WHERE rel='LABELED'"
         ).fetchone()[0]
         out.append("## Coverage")
@@ -586,7 +589,7 @@ class ConnectomeKG(KGModule):
                 f"- neurons with a resolved sign: {signed} of {n_neu} ({signed / n_neu:.1%})"
             )
             out.append(
-                f"- neurons with a community label: {labelled} of {n_neu} ({labelled / n_neu:.1%})"
+                f"- neurons with a community label: {labeled} of {n_neu} ({labeled / n_neu:.1%})"
             )
             layers = (
                 ("a visual family", "json_extract(metadata,'$.visual_family') != ''"),

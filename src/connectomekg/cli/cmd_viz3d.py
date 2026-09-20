@@ -129,8 +129,8 @@ color_by_option = click.option(
     type=click.Choice(["super_class", "sign"]),
     default="super_class",
     show_default=True,
-    help="Colour the context cloud by super class or transmitter sign (circuit view; "
-    "the flow view's cloud is neutral grey).",
+    help="Color the context cloud by super class or transmitter sign (circuit view; "
+    "the flow view's cloud is neutral gray).",
 )
 skeleton_step_option = click.option(
     "--skeleton-step",
@@ -219,12 +219,12 @@ def render_answer(
     """Draw an answer -- a path's hops, a cone's shells -- as one still.
 
     The query layer has already decided what belongs together and in what
-    colour; this only draws it. Tubes rather than lines, because a line has no
+    color; this only draws it. Tubes rather than lines, because a line has no
     surface to shade and reads flat, and a floor, because an answer suspended
     in nothing has no depth cue at all.
 
     :param kg: An open ``ConnectomeKG``.
-    :param groups: What to draw, in order, each carrying its own colour.
+    :param groups: What to draw, in order, each carrying its own color.
     :param stem: Output file stem, before the still's own suffix.
     :param data_dir: Skeleton download root, for neurons the cache lacks.
     :param labels: ``(neuron node id, text)`` drawn at that neuron's geometry.
@@ -275,7 +275,7 @@ def _label_neurons(plotter: pv.Plotter, info: SceneInfo, labels: Sequence[tuple[
     """Put each label on its neuron's own geometry, skipping any not drawn.
 
     The label goes at a point the neuron actually occupies rather than at a
-    computed centre, so it never floats over a neighbour's arbour.
+    computed center, so it never floats over a neighbour's arbour.
     """
     if not labels:
         return
@@ -343,7 +343,7 @@ def _label_neurons(plotter: pv.Plotter, info: SceneInfo, labels: Sequence[tuple[
 @click.option(
     "--still",
     is_flag=True,
-    help="Render one flat centre view at the preset's aspect (3840x2160 for "
+    help="Render one flat center view at the preset's aspect (3840x2160 for "
     "16-landscape) instead of a quilt.",
 )
 @click.option(
@@ -382,7 +382,7 @@ def quilt(
     (see ``ConnectomeKG.neurons_of``). With ``--view circuit`` their union is
     the circuit drawn at full brightness, capped at ``MAX_SCENE_NEURONS``
     neurons. With ``--view flow`` SPECs are optional and restrict the flow to
-    their neurons. ``--still`` renders the same camera's centre view as one
+    their neurons. ``--still`` renders the same camera's center view as one
     flat image.
     """
     require_specs_for_view(view, specs)
@@ -515,7 +515,7 @@ def viz3d(
 
     SPEC may also be an answer -- path:FROM>TO, cone:SPEC, cone:SPEC>HOPS
     downstream or cone:SPEC<HOPS upstream -- and the answer is drawn
-    hop-coloured, dark at the start and bright at the end. The toolbar's Show
+    hop-colored, dark at the start and bright at the end. The toolbar's Show
     box takes the same thing, so a question can be re-asked without
     restarting. The "Cast to Looking Glass" button sends the current view to
     Bridge.

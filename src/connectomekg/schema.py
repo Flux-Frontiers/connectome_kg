@@ -1,4 +1,4 @@
-"""Normalised in-memory tables every reader produces and the extractor consumes.
+"""Normalized in-memory tables every reader produces and the extractor consumes.
 
 Four tables, all pandas: neurons, connections, labels, and a dataset record.
 Readers translate a release's files into this shape; nothing downstream knows
@@ -61,7 +61,7 @@ _FBBT = re.compile(r"\bfbbt_(\d{8})\b", re.IGNORECASE)
 
 
 def fbbt_ids(texts: tuple[str, ...] | list[str]) -> tuple[str, ...]:
-    """Fly Anatomy Ontology ids mentioned in some label texts, normalised.
+    """Fly Anatomy Ontology ids mentioned in some label texts, normalized.
 
     Codex spells the prefix both ``FBbt_`` and ``Fbbt_``; the ontology's own
     form is ``FBbt_``, so every match is rewritten to it.
@@ -80,7 +80,7 @@ class DatasetInfo:
     :param name: Human name of the release.
     :param version: Release version string.
     :param organism: Organism and sex.
-    :param licence: SPDX-style licence name.
+    :param license: SPDX-style license name.
     :param url: Where the release lives.
     :param citation: The paper(s) to cite.
     """
@@ -89,7 +89,7 @@ class DatasetInfo:
     name: str
     version: str
     organism: str
-    licence: str
+    license: str
     url: str
     citation: str
 
@@ -99,7 +99,7 @@ FAFB_783 = DatasetInfo(
     name="FlyWire FAFB",
     version="783",
     organism="Drosophila melanogaster, adult female, whole brain",
-    licence="CC-BY-NC-SA-4.0",
+    license="CC-BY-NC-SA-4.0",
     url="https://codex.flywire.ai",
     citation=(
         "Dorkenwald et al. 2024 Nature 634:124 (doi:10.1038/s41586-024-07558-y); "
@@ -111,7 +111,7 @@ FAFB_783 = DatasetInfo(
 
 @dataclass
 class ConnectomeTables:
-    """The normalised tables for one connectome.
+    """The normalized tables for one connectome.
 
     :param dataset: Provenance record.
     :param neurons: One row per neuron, columns :data:`NEURON_COLUMNS`. Optional

@@ -4,6 +4,24 @@ The build reads the Codex export files. They are free for non-commercial use
 under CC BY-NC-SA 4.0 and Codex requires a **Google** sign-in to fetch them,
 so this is a manual step. Under 100 MB for the files the build reads.
 
+## Skipping the download
+
+Nothing here is needed to try the tool. `connkg fixture` writes a synthetic
+connectome in the same Codex format, with feeding, escape and grooming
+circuits planted in it, and the build reads that exactly as it reads the real
+release:
+
+```bash
+connkg fixture --out /tmp/fake --n 2000
+connkg --root /tmp/kg --dataset synthetic build --source synthetic --n 2000
+```
+
+The synthetic graph answers the same commands with the same grammar. Its cell
+type names are its own, though -- `GRN_sugar` and `MN9` exist there and not in
+v783 -- so an example written against one does not run against the other.
+
+For real anatomy, carry on.
+
 ## The portal lists labels, not file names
 
 This is the thing that trips everyone. The download page shows friendly labels;
@@ -213,10 +231,10 @@ the same v783 release that need no sign-in (a Zenodo record accompanies the
 annotation paper, and `flyconnectome/flywire_annotations` on GitHub carries the
 annotation tables). Any of them work as long as the directory ends up with a
 neurons table, a classification table and a connections table whose columns the
-reader recognises. Run `connkg verify --data-dir <dir> --no-checksums`
+reader recognizes. Run `connkg verify --data-dir <dir> --no-checksums`
 to see what it detects before building.
 
-## Licence reminder
+## License reminder
 
 The built index over FlyWire data is a derived work under CC BY-NC-SA 4.0.
 Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository

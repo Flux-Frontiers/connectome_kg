@@ -11,7 +11,7 @@ already has space -- every neuron carries real ``x``/``y``/``z`` coordinates
 and the download holds a traced skeleton for most of them -- so there is no
 tree to grow here, no ``kg_utils.viz3d.organic`` call anywhere in this file.
 What is reused from that engine is just the camera rule (``frame_tree``, in
-``cli/cmd_viz3d.py``) and ``seed_from_key`` for a stable per-type colour.
+``cli/cmd_viz3d.py``) and ``seed_from_key`` for a stable per-type color.
 
 Split the way ``pycode_kg.scene3d`` and ``genealogy_kg.scene`` split their own
 layout from composition, so most of this is testable without PyVista:
@@ -22,7 +22,7 @@ layout from composition, so most of this is testable without PyVista:
 * :func:`build_brain_scene` composes those into a caller-supplied
   ``pv.Plotter``. This half needs the ``viz3d`` extra.
 
-Colours come from :mod:`connectomekg.colors`, never from :mod:`connectomekg.viz`
+Colors come from :mod:`connectomekg.colors`, never from :mod:`connectomekg.viz`
 -- ``viz.py`` imports ``plotly`` at module scope, and this module must stay
 importable with only the ``viz3d`` extra installed, no ``viz``. The same
 reason ``genealogy_kg`` keeps its palette in ``theme.py`` rather than
@@ -83,18 +83,18 @@ _SQL_NEURON_XYZ = (
 #: The context cloud is one low-poly sphere glyph per neuron, sized in world
 #: units rather than screen pixels: a pixel-sized point vanishes on a HiDPI
 #: display and in a quilt tile, while a world-sized glyph scales with the view.
-#: Its colours are blended part of the way toward the background, which keeps
+#: Its colors are blended part of the way toward the background, which keeps
 #: their hue but mutes them, so the subject drawn at full saturation stands
-#: out even where it shares a hue with the cloud around it. Toward the grey
-#: background, not toward white: lightened colours turn pastel, which
-#: colour-blind readers cannot tell apart. Opaque, since alpha ghosts in
+#: out even where it shares a hue with the cloud around it. Toward the gray
+#: background, not toward white: lightened colors turn pastel, which
+#: color-blind readers cannot tell apart. Opaque, since alpha ghosts in
 #: light-field renders.
 _CONTEXT_RADIUS: Final = 0.005
 _CONTEXT_MUTE: Final = 0.45
 #: Darkening for idle neuropil spheres in the flow view.
 _CONTEXT_DIM: Final = 0.85
-#: Scene background: a muted mid grey. On PyVista's default white the dimmed
-#: context cloud all but disappears; on this grey it reads as the brain's
+#: Scene background: a muted mid gray. On PyVista's default white the dimmed
+#: context cloud all but disappears; on this gray it reads as the brain's
 #: outline without competing with the subject.
 BACKGROUND: Final = "#5A5D62"
 #: The floor, a step darker than the background so the horizon and the lit
@@ -104,8 +104,8 @@ FLOOR_COLOR: Final = "#44474B"
 #: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
 _FLOW_CONTEXT_RADIUS: Final = 0.014
-#: The flow view draws its context cloud in one neutral grey, so that colour
-#: in that view means only a neuropil's brain region: super-class colours on
+#: The flow view draws its context cloud in one neutral gray, so that color
+#: in that view means only a neuropil's brain region: super-class colors on
 #: the dots would reuse the same hues for something else.
 _FLOW_CONTEXT_COLOR: Final = "#8A8F96"
 #: Sphere radii, world units. A fallback sphere (no skeleton) is drawn larger
@@ -123,13 +123,13 @@ _FLOW_MIN_RADIUS: Final = 0.004
 _FLOW_BOW: Final = 0.15
 _FLOW_ARC_POINTS: Final = 17
 #: Ambient share of the lighting on neuropil spheres and flow tubes. Shading
-#: darkens a colour toward its neighbours (a shaded yellow reads as orange),
-#: and region colours must stay recognisable, so these surfaces are lit more
+#: darkens a color toward its neighbours (a shaded yellow reads as orange),
+#: and region colors must stay recognizable, so these surfaces are lit more
 #: evenly than the default.
 _FLOW_AMBIENT: Final = 0.45
 #: Neuropil surface meshes. The circuit view draws them as pale neutral
-#: shells so the circuit's own colours stay the only colour in the scene; the
-#: flow view tints each by its brain region, the colour its sphere already
+#: shells so the circuit's own colors stay the only color in the scene; the
+#: flow view tints each by its brain region, the color its sphere already
 #: carries. Faint in both, so what sits inside shows through.
 _NEUROPIL_SHELL_COLOR: Final = "#C8CCD2"
 _NEUROPIL_SHELL_OPACITY: Final = 0.10
@@ -183,9 +183,9 @@ _SHADOW_MAP_RESOLUTION: Final = 8192
 #: The views :func:`build_brain_scene` composes.
 VIEWS: Final = ("circuit", "flow")
 
-#: Qualitative palette a cell type's colour is deterministically drawn from,
-#: via :func:`type_color`: the seven saturated Okabe-Ito colours other than
-#: black, which stay distinguishable under the common forms of colour
+#: Qualitative palette a cell type's color is deterministically drawn from,
+#: via :func:`type_color`: the seven saturated Okabe-Ito colors other than
+#: black, which stay distinguishable under the common forms of color
 #: blindness. A circuit rarely draws more than a few cell types at once.
 _TYPE_PALETTE: Final[tuple[str, ...]] = (
     "#E69F00",
@@ -199,24 +199,24 @@ _TYPE_PALETTE: Final[tuple[str, ...]] = (
 
 
 def region_color(neuropil: str) -> str:
-    """The colour for a neuropil: its brain region's colour.
+    """The color for a neuropil: its brain region's color.
 
     :param neuropil: FlyWire abbreviation, with or without side suffix.
-    :return: A ``#RRGGBB`` colour from :data:`connectomekg.colors.REGION_COLOR`,
-        or the unknown grey for a neuropil with no region.
+    :return: A ``#RRGGBB`` color from :data:`connectomekg.colors.REGION_COLOR`,
+        or the unknown gray for a neuropil with no region.
     """
     return REGION_COLOR.get(neuropil_region(neuropil) or "", UNKNOWN_COLOR)
 
 
 def type_color(name: str) -> str:
-    """A deterministic colour for a cell type name.
+    """A deterministic color for a cell type name.
 
     Indexes a fixed qualitative palette via ``seed_from_key``, so the same
-    type name always draws the same colour -- across renders, sessions and a
+    type name always draws the same color -- across renders, sessions and a
     printed figure.
 
     :param name: Cell type name, e.g. ``"LC4"``.
-    :return: A ``#RRGGBB`` colour.
+    :return: A ``#RRGGBB`` color.
     """
     return _TYPE_PALETTE[seed_from_key(name) % len(_TYPE_PALETTE)]
 
@@ -252,10 +252,10 @@ class WorldFrame:
 
 
 def world_frame(store: GraphStore) -> WorldFrame:
-    """The scene's :class:`WorldFrame`, centred on the median neuron position.
+    """The scene's :class:`WorldFrame`, centered on the median neuron position.
 
     :param store: The graph store.
-    :return: A frame centred on the median of every neuron's marked point
+    :return: A frame centered on the median of every neuron's marked point
         (skipping neurons with no coordinates), at :data:`NM_PER_WORLD_UNIT`.
     :raises ValueError: If no neuron in the store has coordinates.
     """
@@ -491,9 +491,9 @@ def flow_arc(
 
 @dataclass(frozen=True)
 class NeuronGroup:
-    """Neurons drawn together in one colour, under one label.
+    """Neurons drawn together in one color, under one label.
 
-    The circuit view otherwise groups by cell type and colours by name, which
+    The circuit view otherwise groups by cell type and colors by name, which
     is right when the question is "show me LC4" and wrong when it is "show me
     the answer": a path's hops are an order, and the neurons in one hop rarely
     share a type. A group lets the caller say what belongs together.
@@ -584,12 +584,12 @@ def _segments_to_polydata(segs: np.ndarray) -> pv.PolyData:
 def _context_for_view(
     view: str, ids: list[str], points_nm: np.ndarray, colors: list[str]
 ) -> tuple[list[str], np.ndarray, list[str], float]:
-    """The context cloud a view draws: which neurons, their colours, glyph radius.
+    """The context cloud a view draws: which neurons, their colors, glyph radius.
 
-    The circuit view draws every neuron in its super-class or sign colour.
+    The circuit view draws every neuron in its super-class or sign color.
     The flow view thins the cloud to every :data:`_FLOW_CONTEXT_STRIDE`-th
-    neuron, draws larger glyphs, and colours every glyph neutral grey so that
-    colour in that view means only a neuropil's region.
+    neuron, draws larger glyphs, and colors every glyph neutral gray so that
+    color in that view means only a neuropil's region.
 
     :return: ``(ids, points_nm, colors, radius)``.
     """
@@ -609,8 +609,8 @@ def _draw_neuropil_meshes(
 ) -> None:
     """Draw neuropil surfaces: neutral shells (circuit view) or region-tinted (flow view).
 
-    One actor per colour, ``neuropils`` in the circuit view and
-    ``neuropils:<region colour>`` in the flow view, so the brain costs a
+    One actor per color, ``neuropils`` in the circuit view and
+    ``neuropils:<region color>`` in the flow view, so the brain costs a
     handful of draw calls rather than one per neuropil.
     """
     import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
@@ -645,7 +645,7 @@ def _draw_flow(
     """Draw neuropil spheres and the *top* flow arcs (view C) into *plotter*.
 
     One sphere actor per neuropil (``neuropil:<name>``) and one tube actor per
-    source neuropil (``flow:<name>``), coloured by the neuropil's brain region
+    source neuropil (``flow:<name>``), colored by the neuropil's brain region
     (:func:`region_color`).
 
     :return: ``(arcs drawn, directed pairs with nonzero flow)``.
@@ -780,7 +780,7 @@ def add_studio_lighting(plotter: pv.Plotter) -> None:
 def add_floor(plotter: pv.Plotter) -> None:
     """Put a shadow-receiving floor under the composed scene, lit from above.
 
-    Adds a floor plane (actor ``floor``) in the background grey just below
+    Adds a floor plane (actor ``floor``) in the background gray just below
     ``plotter.bounds``, replaces the lights with a shadow-casting key
     spotlight above the scene plus a weak headlight, and enables shadow
     mapping. The floor is only visible from a camera that looks down on it,
@@ -802,7 +802,7 @@ def add_floor(plotter: pv.Plotter) -> None:
         i_resolution=1,
         j_resolution=1,
     )
-    # Darker than the background, not equal to it: a floor the same colour as
+    # Darker than the background, not equal to it: a floor the same color as
     # the void behind it shows no horizon and no lit pool, so the shadow has
     # nothing to be a shadow *on*.
     # Culled from behind, so orbiting under the scene does not put an opaque
@@ -871,8 +871,8 @@ def build_brain_scene(
     :param data_dir: Skeleton download root (``fafb_v783``); without it every
         circuit neuron falls back to a marked-point sphere. Unused by the
         flow view.
-    :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
-        The flow view ignores it and draws the cloud in neutral grey.
+    :param color_by: Context cloud coloring, ``"super_class"`` or ``"sign"``.
+        The flow view ignores it and draws the cloud in neutral gray.
     :param skeleton_step: Skeleton simplification stride; ``None`` chooses one
         by neuron count via :func:`auto_skeleton_step`. Bounded to
         ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.

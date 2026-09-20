@@ -153,9 +153,9 @@ def soma(skeleton: Skeleton) -> tuple[np.ndarray, bool]:
     :raises ValueError: If the skeleton has neither a ``Label 1`` row nor a
         root (``Parent == -1``) row.
     """
-    labelled = np.nonzero(skeleton.labels == _LABEL_SOMA)[0]
-    if labelled.size:
-        return skeleton.points[labelled[0]], True
+    labeled = np.nonzero(skeleton.labels == _LABEL_SOMA)[0]
+    if labeled.size:
+        return skeleton.points[labeled[0]], True
     roots = np.nonzero(skeleton.parent == -1)[0]
     if roots.size == 0:
         raise ValueError("skeleton has no soma row and no root point")

@@ -32,7 +32,7 @@ Eight, about a million characters of body text.
 | Schlegel, P. et al. (2024). *Whole-brain annotation and multi-connectome cell typing of Drosophila.* Nature 634, 139-152. | [10.1038/s41586-024-07686-5](https://doi.org/10.1038/s41586-024-07686-5) | the annotations: cell types, classes, hemilineages |
 | Eckstein, N. et al. (2024). *Neurotransmitter classification from electron microscopy images at synaptic sites.* Cell 187, 2574-2594.e23. | [10.1016/j.cell.2024.03.016](https://doi.org/10.1016/j.cell.2024.03.016) | `nt_type`, `nt_score`, and every `sign` on every edge |
 | Matsliah, A. et al. (2024). *Neuronal parts list and wiring diagram for a visual system.* Nature. | [10.1038/s41586-024-07981-1](https://doi.org/10.1038/s41586-024-07981-1) | the optic lobe: LC4, LPLC2, the visual families and columns |
-| Namiki, S. et al. (2018). *The functional organization of descending sensory-motor pathways in Drosophila.* eLife 7, e34272. | [10.7554/eLife.34272](https://doi.org/10.7554/eLife.34272) | the DNp nomenclature, DNp01 included, and what the giant fibre does |
+| Namiki, S. et al. (2018). *The functional organization of descending sensory-motor pathways in Drosophila.* eLife 7, e34272. | [10.7554/eLife.34272](https://doi.org/10.7554/eLife.34272) | the DNp nomenclature, DNp01 included, and what the giant fiber does |
 | Morimoto, M. M. et al. (2020). *Spatial readout of visual looming in the central brain of Drosophila.* eLife 9, e57685. | [10.7554/eLife.57685](https://doi.org/10.7554/eLife.57685) | what the looming detectors compute |
 | Scheffer, L. K. et al. (2020). *A connectome and analysis of the adult Drosophila central brain.* eLife 9, e57443. | [10.7554/eLife.57443](https://doi.org/10.7554/eLife.57443) | hemibrain, the connectome the cell types are matched against |
 | Shiu, P. K. et al. (2024). *A Drosophila computational brain model reveals sensorimotor processing.* Nature. | [10.1038/s41586-024-07763-9](https://doi.org/10.1038/s41586-024-07763-9) | the leaky-integrate-and-fire contract, if a simulation is ever built |
@@ -74,7 +74,7 @@ single synapse may be wrong -- the caveat behind every `sign` the graph
 carries.
 
 **And, since the second batch of papers, it answers circuit questions.** Asked
-what the giant fibre does in the escape response it returns:
+what the giant fiber does in the escape response it returns:
 
 > Even the giant fibers (a.k.a. DNp01), whose activation drives a stereotyped
 > escape jump in response to looming stimuli, are necessary only for a

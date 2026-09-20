@@ -13,6 +13,6 @@ The data comes from FlyWire (https://flywire.ai):
 
 The data is licensed under CC BY-NC-SA 4.0
 (https://creativecommons.org/licenses/by-nc-sa/4.0/). These images are
-adaptations of it and are shared under the same licence: non-commercial use,
+adaptations of it and are shared under the same license: non-commercial use,
 with attribution, and adaptations under the same terms. The Elastic License
 2.0 in the repository's `LICENSE` covers the software, not these images.

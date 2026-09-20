@@ -81,7 +81,7 @@ class BrainSceneWindow(QMainWindow):
     :param view: ``"circuit"`` or ``"flow"``.
     :param data_dir: Skeleton download root, or ``None`` for marked-point
         fallback spheres on every circuit neuron.
-    :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
+    :param color_by: Context cloud coloring, ``"super_class"`` or ``"sign"``.
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.
@@ -91,7 +91,7 @@ class BrainSceneWindow(QMainWindow):
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
-    :param answer: A resolved path or cone to open on, drawn hop-coloured
+    :param answer: A resolved path or cone to open on, drawn hop-colored
         instead of by cell type.
     :param width: Window width in pixels; also the render window's width,
         which the camera framing divides by and so cannot be left at zero.
@@ -194,7 +194,7 @@ class BrainSceneWindow(QMainWindow):
 
         The fleet's other viewers (``gutenberg_kg``, ``pycode_kg``,
         ``Metabo_kg``) put their controls in a panel like this; only
-        ``genealogy_kg``, which this file was modelled on, has none. A
+        ``genealogy_kg``, which this file was modeled on, has none. A
         connectome scene has more to turn on and off than a family tree does,
         so it follows the majority.
 
@@ -281,7 +281,7 @@ class BrainSceneWindow(QMainWindow):
         """Draw a scene for *specs*, or for an answer, replacing whatever is there.
 
         :param specs: The specs to draw; empty draws the brain alone.
-        :param answer: A resolved path or cone, drawn hop-coloured instead of
+        :param answer: A resolved path or cone, drawn hop-colored instead of
             by cell type.
         :param keep_camera: Leave the camera where the viewer put it. A toggle
             changes what is drawn, not what is being looked at, so re-aiming
@@ -462,7 +462,7 @@ def launch(
     :param view: ``"circuit"`` or ``"flow"``.
     :param data_dir: Skeleton download root, or ``None`` for marked-point
         fallback spheres.
-    :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
+    :param color_by: Context cloud coloring, ``"super_class"`` or ``"sign"``.
     :param skeleton_step: Skeleton simplification stride.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first.

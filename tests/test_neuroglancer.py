@@ -35,7 +35,7 @@ def neurons_layer(state: dict) -> dict:
 
 @pytest.fixture(scope="module")
 def fafb_root(tmp_path_factory) -> Path:
-    """A ``--root`` holding a small synthetic graph labelled as FAFB v783.
+    """A ``--root`` holding a small synthetic graph labeled as FAFB v783.
 
     Fresh tables, not the session ``tables`` fixture, since this relabels them.
     """

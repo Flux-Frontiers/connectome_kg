@@ -35,7 +35,7 @@ SYNTHETIC = DatasetInfo(
     name="Synthetic connectome",
     version="1",
     organism="none (generated)",
-    licence="Elastic-2.0",
+    license="Elastic-2.0",
     url="connectomekg.readers.synthetic",
     citation="statistics from FlyWire FAFB v783, see FLY_CONNECTOME_MODEL_PLAN.md",
 )
@@ -153,7 +153,7 @@ PLANTS: tuple[tuple[str, str, int, str, str, str], ...] = (
     ("motor", "MN9", 2, "GNG", "ACH", "proboscis motor neuron MN9"),
     ("visual_projection", "LC4", 8, "LO", "ACH", "lobula columnar LC4, looming"),
     ("visual_projection", "LPLC2", 10, "LO", "ACH", "lobula plate lobula columnar LPLC2"),
-    ("descending", "DNp01", 2, "GNG", "ACH", "giant fibre descending neuron"),
+    ("descending", "DNp01", 2, "GNG", "ACH", "giant fiber descending neuron"),
     ("descending", "aDN1", 2, "GNG", "ACH", "antennal grooming descending neuron aDN1"),
 )
 

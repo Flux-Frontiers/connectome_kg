@@ -9,12 +9,12 @@ Two views of one cell type, as ``connkg viz`` draws them:
 
 The network renderer is ``kg_utils.viz.build_graph_html``, shared with every
 other KG module. What lives here is only what is about a connectome: super
-class colours, transmitter-sign colours and the fields worth hovering over.
+class colors, transmitter-sign colors and the fields worth hovering over.
 
-That renderer draws every edge at one width labelled with its relation name.
+That renderer draws every edge at one width labeled with its relation name.
 A connectome edge's meaning is its synapse count and sign, so each drawn edge
-is labelled with its count and transmitter ("5,543 ACH") and the theme's
-relation colours are built per render to colour those labels by sign. That is configuration of the shared
+is labeled with its count and transmitter ("5,543 ACH") and the theme's
+relation colors are built per render to color those labels by sign. That is configuration of the shared
 renderer, not a workaround inside it.
 
 Nothing here is imported at package import time: ``plotly`` and, through
@@ -77,7 +77,7 @@ def type_network_html(
 
     The picture holds the type, its ``limit`` strongest output types and its
     ``limit`` strongest input types. Edges between partners are drawn only when
-    they are at least as strong as the weakest edge to the centre, so the page
+    they are at least as strong as the weakest edge to the center, so the page
     shows the local circuit without becoming a hairball.
 
     :param kg: An open ConnectomeKG.
@@ -111,7 +111,7 @@ def type_network_html(
             continue
         # The transmitter is in the label so that a label always implies one
         # sign: two edges with equal counts but opposite signs must not share
-        # a colour entry.
+        # a color entry.
         nt = str(ev.get("nt_type") or "").upper()
         label = f"{syn:,} {nt or 'syn'}"
         relation_colors[label] = SIGN_COLOR[NT_SIGN.get(nt, 0)]

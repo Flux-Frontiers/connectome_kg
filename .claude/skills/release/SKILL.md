@@ -14,6 +14,39 @@ is different here.** The generic (`~/.claude/commands/release.md`) owns the
 steps that are the same fleet-wide, including the release snapshot (its Step
 5b). Where the two disagree, **this file wins**.
 
+## Step 4b -- Check the docs site covers what the release adds
+
+Do this before the version bump, because it usually means writing prose and
+that is not something to discover mid-release.
+
+0.5.0 was cut with `connkg influence`, `connkg specs` and the whole answer
+grammar (`path:`, `cone:`) documented in the README and nowhere on the site.
+Pages deployed green throughout: a command with no page is not a build error,
+and `mkdocs build --strict` only catches broken links between pages that
+exist. It was noticed after the tag had been pushed.
+
+`tests/test_docs_coverage.py` now fails when a `connkg` command's name appears
+nowhere under `docs/`, or when a page is missing from `mkdocs.yml`'s nav, so
+`pre-commit run --all-files` catches the blunt version. It cannot judge whether
+a page says anything *useful*, so ask directly:
+
+```bash
+git log --oneline <previous tag>..HEAD | rg "^[0-9a-f]+ feat"
+```
+
+For each `feat` in that list, name the page a reader would land on. If the
+answer is "the README", the site has a gap: add it to `docs/queries.md` for a
+query or CLI feature, `docs/rendering.md` for anything drawn, and list any new
+page in the nav.
+
+Pages redeploy on merge to `main` -- `docs.yml` fires on `docs/**`,
+`src/connectomekg/**` or `mkdocs.yml`. It also has `workflow_dispatch`, so a
+docs-only fix can be deployed without a release:
+
+```bash
+gh workflow run docs.yml --ref main
+```
+
 ## Step 5b -- Save a release snapshot
 
 Run the generic's Step 5b in its position: after the version bump, before the

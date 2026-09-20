@@ -24,7 +24,7 @@ __all__ = ["NEUROGLANCER_VIEWER", "SPEC_COLORS", "has_public_source", "neuroglan
 #: The public Neuroglancer build the flyconnectome links open in.
 NEUROGLANCER_VIEWER: Final = "https://neuroglancer-demo.appspot.com"
 
-#: Colour per spec, in the order given: Okabe-Ito without black, which
+#: Color per spec, in the order given: Okabe-Ito without black, which
 #: vanishes on Neuroglancer's black background.
 SPEC_COLORS: Final = (
     "#E69F00",
@@ -40,10 +40,10 @@ _FAFB_783: Final[dict[str, Any]] = {
     "segmentation": "precomputed://gs://flywire_v141_m783",
     "image": "precomputed://gs://flywire_em/aligned/v1",
     "brain": "precomputed://gs://flywire_neuropil_meshes/whole_neuropil/brain_mesh_v141.surf",
-    # Voxel size in nanometres, and the brain's centre in voxels: the mean
+    # Voxel size in nanometres, and the brain's center in voxels: the mean
     # marked point of all 139,255 v783 neurons.
     "voxel_nm": (4, 4, 40),
-    "centre": (130267, 64604, 4106),
+    "center": (130267, 64604, 4106),
 }
 
 #: Public sources per dataset id.
@@ -69,14 +69,14 @@ def _meshes_only(url: str) -> dict[str, Any]:
 
 
 def neuroglancer_url(dataset_id: str, groups: list[list[int]]) -> str:
-    """A Neuroglancer URL showing groups of neurons, one colour per group.
+    """A Neuroglancer URL showing groups of neurons, one color per group.
 
     :param dataset_id: Dataset id, e.g. ``"fafb783"``.
     :param groups: Root ids per group; group ``i`` is drawn in
-        ``SPEC_COLORS[i]``. A root id in two groups takes the later colour.
+        ``SPEC_COLORS[i]``. A root id in two groups takes the later color.
     :return: The URL.
     :raises ValueError: If the dataset has no public source, or there are more
-        groups than colours.
+        groups than colors.
     """
     src = _SOURCES.get(dataset_id)
     if src is None:
@@ -88,7 +88,7 @@ def neuroglancer_url(dataset_id: str, groups: list[list[int]]) -> str:
     x, y, z = (v * 1e-9 for v in src["voxel_nm"])
     state = {
         "dimensions": {"x": [x, "m"], "y": [y, "m"], "z": [z, "m"]},
-        "position": list(src["centre"]),
+        "position": list(src["center"]),
         "projectionScale": 1e5,
         "layers": [
             {"type": "image", "source": src["image"], "name": "em", "visible": False},

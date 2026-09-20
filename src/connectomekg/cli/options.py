@@ -138,7 +138,7 @@ def _dataset(dataset_id: str) -> DatasetInfo:
         name=dataset_id,
         version="",
         organism="",
-        licence="",
+        license="",
         url="",
         citation="",
     )
