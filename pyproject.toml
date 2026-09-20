@@ -108,7 +108,7 @@ viz3d = [
     "pyvistaqt>=0.11.0",
     # 0.14.1: frame_and_focus(spec=) frames at the display aspect render_quilt
     # captures views at, not whatever the window was sized to.
-    "quiltwright>=0.14.1",
+    "quiltwright>=0.15.0",
 ]
 
 [project.urls]
@@ -136,7 +136,7 @@ pre-commit = ">=4.5.1"
 pytest = ">=9.0.3"
 pytest-cov = ">=5.0.0"
 # Capped below 0.16 to match the rest of the fleet.
-ruff = ">=0.6,<0.16"
+ruff = ">=0.15,<0.16"
 ty = ">=0.0.44"
 
 # ---------------------------------------------------------------------------

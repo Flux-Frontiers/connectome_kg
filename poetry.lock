@@ -3979,15 +3979,15 @@ test = ["pytest (>=6,!=7.0.0,!=7.0.1)", "pytest-cov (>=3.0.0)", "pytest-qt"]
 
 [[package]]
 name = "quiltwright"
-version = "0.14.1"
+version = "0.15.0"
 description = "Holographic output for Looking Glass displays: off-axis multi-view quilts from PyVista, POV-Ray or Blender Cycles scenes"
 optional = true
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 markers = "extra == \"viz3d\""
 files = [
-    {file = "quiltwright-0.14.1-py3-none-any.whl", hash = "sha256:f8f0576ac7ee66298f1d3f1109c51d3b167cff7bc1bd599e6987daaa44d710ee"},
-    {file = "quiltwright-0.14.1.tar.gz", hash = "sha256:e53a633eb22e72aec2de7b866d8b97294755764398698f68fed928f6cb87be78"},
+    {file = "quiltwright-0.15.0-py3-none-any.whl", hash = "sha256:874012700434ac59f84ad34b34a9ffc168fc501e5e0f615a86634be845466acc"},
+    {file = "quiltwright-0.15.0.tar.gz", hash = "sha256:eabcfbeca5ce224c889017230f02df73f808531646edab744b93bedd218c6a6a"},
 ]
 
 [package.dependencies]
@@ -5246,4 +5246,4 @@ viz3d = ["kgmodule-utils", "pyvistaqt", "quiltwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "ff4627965ff7240bd6546ddf7d9da10968c2677ab95487e0d010a9f9ca6851d5"
+content-hash = "8b708848d87c08352fda57053307f5f4c2872d987fc97eaacb54ff3d8d5e124e"
