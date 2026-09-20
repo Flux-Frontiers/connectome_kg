@@ -7,6 +7,7 @@ from typing import Any
 
 import click
 
+from connectomekg.answers import answer_groups
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, usage_errors
 from connectomekg.validation import MAX_LIMIT
@@ -36,68 +37,24 @@ render_option = click.option(
 )
 
 
-def _draw_path(kg: Any, result: Any, src: str, dst: str, data_dir: str | None) -> None:
-    """Render a strongest path: one group per hop, dark to bright along it.
+def _draw(kg: Any, query: str, min_syn: int, data_dir: str | None) -> None:
+    """Render an answer query as a still, and say where it landed.
 
-    One neuron per hop, so each hop is its own group and the ramp reads as the
-    direction of travel. The label on a hop is the synapses entering it, which
-    is the number the text output puts on the same line.
+    :raises click.UsageError: If the answer will not fit in one scene, or the
+        viz3d extra is missing.
     """
     from connectomekg.cli.cmd_viz3d import render_answer  # noqa: PLC0415 - needs the extra
-    from connectomekg.colors import hop_color  # noqa: PLC0415
-    from connectomekg.scene import NeuronGroup  # noqa: PLC0415
 
-    n = len(result.hops)
-    groups, labels = [], []
-    for i, hop in enumerate(result.hops):
-        node = kg.store.node(hop.node_id) or {}
-        name = node.get("name") or hop.node_id
-        groups.append(NeuronGroup(f"hop {i} {name}", [hop.node_id], hop_color(i, n)))
-        labels.append(
-            (hop.node_id, f"{name}" if not hop.syn_count else f"{name}  {hop.syn_count} syn")
-        )
+    try:
+        answer = answer_groups(kg, query, min_syn=min_syn)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
     written = render_answer(
         kg,
-        groups,
-        stem=f"path_{src}_to_{dst}",
+        answer.groups,
+        stem=answer.stem,
         data_dir=data_dir,
-        labels=labels,
-        say=lambda m: click.echo(f"  {m}", err=True),
-    )
-    click.echo(f"Wrote {written}")
-
-
-def _draw_cone(
-    kg: Any, reached: dict[str, int], spec: str, direction: str, data_dir: str | None
-) -> None:
-    """Render a cone: one group per hop, dark at the seed and bright outward.
-
-    :raises click.UsageError: If the cone holds more neurons than one scene
-        may draw, with the count and the cap.
-    """
-    from connectomekg.cli.cmd_viz3d import render_answer  # noqa: PLC0415 - needs the extra
-    from connectomekg.colors import hop_color  # noqa: PLC0415
-    from connectomekg.scene import NeuronGroup  # noqa: PLC0415
-    from connectomekg.validation import MAX_SCENE_NEURONS  # noqa: PLC0415
-
-    if len(reached) > MAX_SCENE_NEURONS:
-        raise click.UsageError(
-            f"{len(reached)} neurons in this cone, over the cap of {MAX_SCENE_NEURONS} for "
-            "one scene; narrow it with fewer --hops or a higher --min-syn"
-        )
-    by_hop: dict[int, list[str]] = {}
-    for node_id, hop in reached.items():
-        by_hop.setdefault(hop, []).append(node_id)
-    n = len(by_hop)
-    groups = [
-        NeuronGroup(f"hop {hop}", sorted(by_hop[hop]), hop_color(i, n))
-        for i, hop in enumerate(sorted(by_hop))
-    ]
-    written = render_answer(
-        kg,
-        groups,
-        stem=f"cone_{spec}_{direction}",
-        data_dir=data_dir,
+        labels=answer.labels,
         say=lambda m: click.echo(f"  {m}", err=True),
     )
     click.echo(f"Wrote {written}")
@@ -133,7 +90,7 @@ def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) ->
             else:
                 click.echo(f"  {tag}")
         if render:
-            _draw_path(kg, res, src, dst, source.get("data_dir"))
+            _draw(kg, f"path:{src}>{dst}", source["min_syn"], source.get("data_dir"))
 
 
 @cli.command("cone")
@@ -177,7 +134,8 @@ def cone(
             for q in sorted(by_hop[h])[:limit]:
                 click.echo(f"  {q}")
         if render:
-            _draw_cone(kg, reached, spec, direction, source.get("data_dir"))
+            arrow = "<" if direction == "up" else ">"
+            _draw(kg, f"cone:{spec}{arrow}{hops}", source["min_syn"], source.get("data_dir"))
 
 
 @cli.command("influence")

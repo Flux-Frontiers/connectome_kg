@@ -509,9 +509,14 @@ def viz3d(
 
     Orbit/zoom/pan with the mouse. Point at a neuron and press P to identify
     it: the panel on the right names it, describes it, and lists its strongest
-    partner types each way. The toolbar's Show box takes the same specs this
-    command does, space-separated, and redraws without restarting. The "Cast
-    to Looking Glass" button sends the current view to Bridge.
+    partner types each way.
+
+    SPEC may also be an answer -- path:FROM>TO, cone:SPEC, cone:SPEC>HOPS
+    downstream or cone:SPEC<HOPS upstream -- and the answer is drawn
+    hop-coloured, dark at the start and bright at the end. The toolbar's Show
+    box takes the same thing, so a question can be re-asked without
+    restarting. The "Cast to Looking Glass" button sends the current view to
+    Bridge.
     """
     require_specs_for_view(view, specs)
     require_viz3d("pyvista", "pyvistaqt", "PyQt5", "quiltwright")

@@ -182,3 +182,64 @@ def test_clearing_the_box_draws_the_brain_alone(qapp, kg):
         assert window._specs == []
     finally:
         window.close()
+
+
+def test_the_show_box_takes_an_answer(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._filter_box.setText("path:GRN_sugar>MN9")
+        window._apply_filter()
+        assert "path GRN_sugar to MN9" in window.windowTitle()
+        # Hop-coloured, not type-coloured: the actors are named for the hops.
+        names = set(window.plotter.renderer.actors)
+        assert any("hop 0" in n for n in names) and any("hop 1" in n for n in names)
+        # And the answer is still pickable.
+        assert len(window._picks.neuron_ids) >= 2
+    finally:
+        window.close()
+
+
+def test_the_show_box_goes_back_to_plain_specs(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._filter_box.setText("path:GRN_sugar>MN9")
+        window._apply_filter()
+        assert window._answer is not None
+        window._filter_box.setText("MN9")
+        window._apply_filter()
+        assert window._answer is None, "a plain spec clears the answer"
+        assert "path" not in window.windowTitle()
+        assert set(window._picks.neuron_ids) == set(kg.neurons_of("MN9"))
+    finally:
+        window.close()
+
+
+def test_an_unreachable_answer_keeps_the_scene(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        before = list(window._picks.neuron_ids)
+        window._filter_box.setText("path:GRN_sugar>NoSuchType")
+        window._apply_filter()
+        assert window._picks.neuron_ids == before
+        assert "no path" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
+def test_the_window_can_open_on_an_answer(qapp, kg):
+    from connectomekg.answers import answer_groups  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    answer = answer_groups(kg, "cone:GRN_sugar>1")
+    window = BrainSceneWindow(kg, ["cone:GRN_sugar>1"], cloud=False, neuropils=False, answer=answer)
+    try:
+        assert "cone GRN_sugar down 1" in window.windowTitle()
+        assert len(window._picks.neuron_ids) == len(answer)
+    finally:
+        window.close()

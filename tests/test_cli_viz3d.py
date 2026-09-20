@@ -246,7 +246,9 @@ def test_cone_render_writes_a_still(kg, kg_root, tmp_path, monkeypatch):
 
 def test_cone_render_over_the_cap_is_a_usage_error(kg, kg_root, monkeypatch):
     pytest.importorskip("pyvista")
-    monkeypatch.setattr("connectomekg.validation.MAX_SCENE_NEURONS", 1)
+    # Patched where it is read: answers.py binds the cap at import, so
+    # patching validation's own attribute would not reach it.
+    monkeypatch.setattr("connectomekg.answers.MAX_SCENE_NEURONS", 1)
     result = CliRunner().invoke(
         cli, ["--root", str(kg_root), "cone", "GRN_sugar", "--hops", "1", "--render"]
     )
