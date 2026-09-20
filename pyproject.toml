@@ -206,5 +206,8 @@ include = ["src"]
 
 [tool.dockg]
 # fafb_v783/ and data/ hold connectome downloads, not documentation. site/ is
-# the gitignored mkdocs build: it would index every page twice.
-exclude = ["__pycache__", "dist", "src", "tests", "data", "fafb_v783", "site"]
+# the gitignored mkdocs build: it would index every page twice. papers/ is a
+# corpus of its own, built with `dockg build --repo papers` into
+# papers/.dockg/ -- indexing it here too would mix the source papers into the
+# repository's own documentation graph.
+exclude = ["__pycache__", "dist", "src", "tests", "data", "fafb_v783", "site", "papers"]

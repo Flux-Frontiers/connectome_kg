@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The source papers as a searchable corpus**, in `papers/`. The graph says
+  LC4 makes 1,401 synapses onto DNp01; it does not say how the synapses were
+  detected or what a neurotransmitter prediction is worth. DocKG indexes
+  Dorkenwald et al. 2024 and Schlegel et al. 2024 beside the connectome, so
+  the same session can ask the graph a wiring question and the papers a
+  provenance one. `papers/extract.py` and `papers/README.md` are tracked; the
+  PDFs and the text derived from them are not, since the publishers' files are
+  theirs to distribute.
+
+  Two measured details. The extraction undoes the hard wrapping of a
+  two-column PDF, without which chunk boundaries fall mid-clause. And it cuts
+  the reference lists, which are **176,000 of 335,000 characters** -- more
+  than half the corpus -- and which retrieve: before cutting them, a query for
+  looming visual projection neurons returned a bibliography entry rather than
+  any prose.
+
+  What it answers is how the dataset was made. It does **not** answer circuit
+  questions: `DNp01`, `LC4` and `LPLC2` appear zero times in either paper.
+
 ### Fixed
 
 - **A toggle in the 3-D viewer no longer throws away the rotation.** Every
