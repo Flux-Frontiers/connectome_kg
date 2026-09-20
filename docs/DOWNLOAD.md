@@ -4,6 +4,24 @@ The build reads the Codex export files. They are free for non-commercial use
 under CC BY-NC-SA 4.0 and Codex requires a **Google** sign-in to fetch them,
 so this is a manual step. Under 100 MB for the files the build reads.
 
+## Skipping the download
+
+Nothing here is needed to try the tool. `connkg fixture` writes a synthetic
+connectome in the same Codex format, with feeding, escape and grooming
+circuits planted in it, and the build reads that exactly as it reads the real
+release:
+
+```bash
+connkg fixture --out /tmp/fake --n 2000
+connkg --root /tmp/kg --dataset synthetic build --source synthetic --n 2000
+```
+
+The synthetic graph answers the same commands with the same grammar. Its cell
+type names are its own, though -- `GRN_sugar` and `MN9` exist there and not in
+v783 -- so an example written against one does not run against the other.
+
+For real anatomy, carry on.
+
 ## The portal lists labels, not file names
 
 This is the thing that trips everyone. The download page shows friendly labels;

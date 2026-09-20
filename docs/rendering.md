@@ -265,10 +265,9 @@ connkg --root . viz3d --view flow               # flow: whole brain
 connkg --root . viz3d --view flow LC4           # flow carried by LC4 only
 ```
 
-Drag to orbit, scroll to zoom, and shift-drag to pan. To send the current
-camera view to a Looking Glass display as a quilt, click **Cast to Looking
-Glass**. Looking Glass Bridge must be running; see
-[Set up Bridge and the display](https://flux-frontiers.github.io/quiltwright/lfd/#1-set-up-bridge-and-the-display).
+Drag to orbit, scroll to zoom, and shift-drag to pan. The viewer also picks
+neurons, re-resolves specs in place and toggles what is drawn -- see
+[Using the viewer](#using-the-viewer) below.
 
 To render a quilt without a window, run `connkg quilt`:
 
@@ -313,9 +312,83 @@ Quilts are never committed.
 | `--fov`, `--zoom` | quilt | `14.0`, `1.0` | per-view field of view in degrees, and camera dolly |
 | `--still` | quilt | off | render one flat center view instead of a quilt |
 | `--cast` | quilt | off | send the finished quilt to Looking Glass Bridge; not with `--still` |
+| `--width`, `--height` | viewer | `1400`, `900` | window size in pixels |
 
 The circuit view needs at least one SPEC. In the flow view, SPECs are
 optional.
+
+## Using the viewer
+
+`connkg viz3d` opens a window, and three things in it are worth knowing about.
+Everything here is per-session: the viewer never writes to the graph.
+
+### Point at a neuron and press P
+
+Hover the cursor over a drawn neuron and press **P**. The panel on the right
+names it, gives the description the graph already stores, and lists its
+strongest partner cell types in each direction.
+
+Picking is bound to a key rather than a left click because a left click is
+where VTK begins a rotation: picking there would re-answer the question on
+every orbit.
+
+A pick more than 25 microns from any drawn neuron is reported as a miss rather
+than as whichever neuron happened to be nearest, so pointing at empty space
+says so.
+
+!!! note "Why a click cannot answer this by itself"
+    A whole cell type is drawn as a single actor, so VTK can report which
+    *type* was hit but never which *neuron* -- and the neuron is the question.
+    `connectomekg.picking` carries identity beside the geometry instead: every
+    drawn point paired with the neuron that owns it, resolved by nearest-point
+    lookup. That costs about 12 MB for a 212-neuron scene and 4.4 microseconds
+    a pick, and it is indifferent to `--tubes`, to the simplification stride,
+    and to whether VTK propagates point data through its filters.
+
+### The Show box
+
+The toolbar's **Show** box takes the same specs the command does, plus the
+answer forms from [Asking the graph a question](queries.md#an-answer-names-a-query),
+and redraws in place. Typing
+
+```text
+path:LPLC2>DNp01
+```
+
+replaces the scene with that path, hop-colored. Exploring no longer means
+restarting, and **Cast to Looking Glass** follows what is currently shown
+rather than the specs the window opened with.
+
+A spec matching nothing, or one over the scene cap, is refused with the reason
+and the scene is left as it was -- including when only one spec of several is
+bad, since drawing the rest would look like a scene that contained them all.
+
+### The control panel
+
+| control | what it does |
+|---|---|
+| Whole-brain cloud | one dot per neuron at its cell body |
+| Neuropil surfaces | the 78 meshes `connkg meshes` fetches |
+| Floor and shadow | stands the scene on a lit floor |
+| Tubes | draws skeletons as tubes rather than lines |
+| Detail | skeleton stride, where **0** means choose it from the neuron count |
+| Minimum synapses | drops connections below the threshold |
+
+Minimum synapses is what makes a multi-hop cone usable interactively:
+`cone:LC4>2` is 19,866 neurons at the default and 104 at 200.
+
+Each toggle redraws rather than hiding an actor, because the overlays are
+*composed*: the cloud is one glyph per neuron and the surfaces are 78 merged
+meshes, so keeping both around to flip visibility costs more than rebuilding
+without them. A toggle keeps the camera where you put it -- it changes what is
+drawn, not what is being looked at -- while a new spec or answer re-frames,
+since the old camera may not contain it.
+
+### Casting to a Looking Glass
+
+Click **Cast to Looking Glass** to send the current camera view as a quilt.
+Looking Glass Bridge must be running; see
+[Set up Bridge and the display](https://flux-frontiers.github.io/quiltwright/lfd/#1-set-up-bridge-and-the-display).
 
 ## How a scene is built
 

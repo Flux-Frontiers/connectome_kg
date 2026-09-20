@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A documentation page for querying**, `docs/queries.md`: the SPEC grammar,
+  the answer forms, and `connkg path`, `cone`, `influence`, `query`, `link`,
+  `stats`, `analyze` and `datasets`. 0.5.0 shipped `influence`, `specs` and
+  the whole answer grammar documented in the README and nowhere on the site,
+  which was noticed only after the tag was pushed.
+- **A viewer section in `docs/rendering.md`**: picking with P, the Show box,
+  the control panel, and why a toggle keeps the camera while a new spec does
+  not.
+- **`tests/test_docs_coverage.py`**, so this cannot happen quietly again. It
+  fails when a `connkg` command's name appears nowhere under `docs/`, or when
+  a page is missing from `mkdocs.yml`'s nav. `mkdocs build --strict` could not
+  catch either: a command with no page is not a broken link. It caught
+  `connkg fixture`, which is now covered in `docs/DOWNLOAD.md` as the way to
+  skip the download entirely.
+
+### Changed
+
+- **American spellings throughout**: `color`, `license`, `gray`, `fiber`,
+  `center`, `labeled`. `Dataset.licence` is `Dataset.license` now, and the
+  extractor writes a `license` key into the dataset node's metadata; the
+  analysis reads either, so a graph built before this keeps reporting its
+  license rather than `?` until it is rebuilt. FlyWire's own label text is
+  left as it is -- the v783 community label reads `giant fiber/giant
+  fibre/GF/GFN` and carries both spellings itself.
+
 ## [0.5.0] - 2026-09-20
 
 ### Added

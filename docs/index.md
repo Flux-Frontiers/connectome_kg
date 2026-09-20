@@ -41,6 +41,7 @@ queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
 | page | covers |
 |---|---|
 | [Get the FAFB v783 data](DOWNLOAD.md) | The Codex files the build reads, and how to download and check them |
+| [Asking the graph a question](queries.md) | The SPEC grammar and the answer forms, then `connkg path`, `cone`, `influence`, `query` and `link` |
 | [Rendering the connectome in 3-D](rendering.md) | `connkg quilt` and `connkg viz3d`: the circuit and flow views, how each is drawn, and Looking Glass quilts through [quiltwright](https://flux-frontiers.github.io/quiltwright/) |
 | [Scene API](api/scene.md) | `build_brain_scene`, `neuropil_flow` and the rest of `connectomekg.scene` |
 | [Skeleton API](api/skeletons.md) | Reading, writing and simplifying SWC skeletons |
