@@ -16,10 +16,23 @@ Both views draw the whole brain as a context cloud behind the subject, and,
 once fetched with `connkg meshes`, the brain's neuropils as faint surfaces.
 Both render either as a Looking Glass quilt or in an interactive viewer.
 
-![The two DNp01 descending neurons inside the whole-brain context cloud](images/circuit_dnp01.png)
+![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](images/anatomy_lplc2_dnp01.png)
 
-*Circuit view: the two DNp01 giant fiber neurons, drawn from their traced
-skeletons, inside the FAFB v783 context cloud. See
+*The escape circuit in its anatomy. Pink is LPLC2, the looming detectors,
+whose dendrites fill the lobula of each optic lobe; blue is DNp01, the giant
+fibre, which collects from them in the central brain and sends the two axons
+leaving the bottom of the frame down to the nerve cord. Behind them the 78
+neuropil surfaces, and one dot for each of the 139,255 neurons, placed at its
+cell body. Both populations come from a spec the query layer understands:
+`connkg quilt LPLC2 DNp01 --tubes --cloud`. See
+[Reading the images](#reading-the-images).*
+
+![The two DNp01 descending neurons inside the brain's neuropil surfaces](images/circuit_dnp01.png)
+
+*Circuit view: the two DNp01 giant fibre neurons, drawn from their traced
+skeletons, inside the FAFB v783 neuropil surfaces. Drawing the surfaces turns
+the whole-brain cloud off, which is why there are no dots here and the optic
+lobes read as layered shells. See
 [Reading the images](#reading-the-images).*
 
 ![Neuropil flow across the whole brain, strongest 100 pairs](images/flow_all.png)
