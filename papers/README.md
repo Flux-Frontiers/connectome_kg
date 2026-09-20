@@ -32,9 +32,40 @@ of the repository; the DOIs below are enough to rebuild.
 These two are the source of the data the graph is built from: the first
 reconstructed the wiring, the second annotated it.
 
+## Worth adding
+
+Every citation below was taken from the reference lists of the two papers
+above, not from memory. Ordered by what each buys.
+
+### Explains a field the graph already carries
+
+| paper | DOI | why |
+|---|---|---|
+| Eckstein, N. et al. (2024). *Neurotransmitter classification from electron microscopy images at synaptic sites in Drosophila melanogaster.* Cell 187, 2574-2594.e23. | [10.1016/j.cell.2024.03.016](https://doi.org/10.1016/j.cell.2024.03.016) | the source of `nt_type`, `nt_score` and therefore every `sign` on every edge |
+| Matsliah, A. et al. (2024). *Neuronal parts list and wiring diagram for a visual system.* Nature. | [10.1038/s41586-024-07981-1](https://doi.org/10.1038/s41586-024-07981-1) | the optic lobe: where LC4, LPLC2 and the visual families come from |
+| Namiki, S. et al. (2018). *The functional organization of descending sensory-motor pathways in Drosophila.* eLife 7, e34272. | [10.7554/eLife.34272](https://doi.org/10.7554/eLife.34272) | where the DNp nomenclature comes from, DNp01 included |
+
+### Answers circuit questions
+
+| paper | DOI | why |
+|---|---|---|
+| Morimoto, M. M. et al. (2020). *Spatial readout of visual looming in the central brain of Drosophila.* eLife 9, e57685. | [10.7554/eLife.57685](https://doi.org/10.7554/eLife.57685) | what the looming detectors compute |
+| Kim, H. et al. (2020). *Wiring patterns from auditory sensory neurons to the escape and song-relay pathways in fruit flies.* J. Comp. Neurol. 528, 2068-2098. | [10.1002/cne.24877](https://doi.org/10.1002/cne.24877) | the escape pathway, from the auditory side |
+
+### For work not yet started
+
+| paper | DOI | for |
+|---|---|---|
+| Shiu, P. K. et al. (2024). *A Drosophila computational brain model reveals sensorimotor processing.* Nature. | [10.1038/s41586-024-07763-9](https://doi.org/10.1038/s41586-024-07763-9) | the LIF contract, if the simulation is ever built |
+| Scheffer, L. K. et al. (2020). *A connectome and analysis of the adult Drosophila central brain.* eLife 9, e57443. | [10.7554/eLife.57443](https://doi.org/10.7554/eLife.57443) | hemibrain, if a second dataset is added |
+
+The first three are the ones to fetch if only three are fetched: each explains
+something the graph asserts but cannot justify on its own.
+
 ## Rebuild
 
-Put the PDFs in this directory under the file names in `extract.py`, then:
+Put the PDFs in this directory -- any file name; the title and DOI are read
+from the PDF itself -- then:
 
 ```bash
 poetry run python papers/extract.py
@@ -63,10 +94,8 @@ exactly the caveat behind every `sign` the graph carries.
 
 **It does not answer circuit questions.** `DNp01`, `LC4` and `LPLC2` appear
 **zero times** in either paper. These are the dataset and cell-typing papers;
-they describe the resource, not what any particular circuit does. A question
-like "what does the giant fibre do" needs the papers that study it -- von Reyn
-et al. on the giant fibre escape, Ache et al. on looming -- which are not in
-this corpus.
+they describe the resource, not what any particular circuit does. A question like "what does the
+giant fibre do" needs the papers that study it, which are listed under
+[Worth adding](#worth-adding).
 
-Worth knowing before relying on it, and worth adding those papers if circuit
-questions are what you want answered.
+Worth knowing before relying on it.

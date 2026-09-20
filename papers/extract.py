@@ -32,20 +32,24 @@ from pathlib import Path
 
 import pymupdf
 
-#: ``pdf file name -> (title, citation, DOI)``. The DOI's last segment is the
-#: output stem, so the text file is traceable to the paper without opening it.
-PAPERS: dict[str, tuple[str, str, str]] = {
-    "s41586-024-07558-y.pdf": (
-        "Neuronal wiring diagram of an adult brain",
-        "Dorkenwald, S. et al. (2024). Nature 634, 124-138.",
-        "10.1038/s41586-024-07558-y",
-    ),
-    "s41586-024-07686-5.pdf": (
-        "Whole-brain annotation and multi-connectome cell typing of Drosophila",
-        "Schlegel, P. et al. (2024). Nature 634, 139-152.",
-        "10.1038/s41586-024-07686-5",
-    ),
+#: Human citations for papers already in the corpus, keyed by DOI. Everything
+#: else -- the title, the DOI itself -- is read from the PDF, so adding a paper
+#: is dropping its file in this directory and running this script. A paper with
+#: no entry here is still extracted; it just carries no citation line.
+CITATIONS: dict[str, str] = {
+    "10.1038/s41586-024-07558-y": "Dorkenwald, S. et al. (2024). Nature 634, 124-138.",
+    "10.1038/s41586-024-07686-5": "Schlegel, P. et al. (2024). Nature 634, 139-152.",
+    "10.1038/s41586-024-07981-1": "Matsliah, A. et al. (2024). Nature 634, 166-180.",
+    "10.1038/s41586-024-07763-9": "Shiu, P. K. et al. (2024). Nature 634, 210-219.",
+    "10.1016/j.cell.2024.03.016": "Eckstein, N. et al. (2024). Cell 187, 2574-2594.e23.",
+    "10.7554/eLife.57443": "Scheffer, L. K. et al. (2020). eLife 9, e57443.",
+    "10.7554/eLife.34272": "Namiki, S. et al. (2018). eLife 7, e34272.",
+    "10.7554/eLife.57685": "Morimoto, M. M. et al. (2020). eLife 9, e57685.",
 }
+
+#: ``Nature, doi:10.1038/...`` in a PDF's Subject field, or a bare DOI anywhere
+#: in it. Publishers differ; this covers the two shapes seen so far.
+_DOI_IN_METADATA = re.compile(r"(10\.\d{4,9}/[^\s,;]+)")
 
 #: A newline that is not after sentence-ending punctuation and not before a
 #: blank line or a bullet: the hard wrapping of a justified column.
@@ -57,12 +61,29 @@ HERE = Path(__file__).parent
 TEXT_DIR = HERE / "text"
 
 
+def describe(pdf: Path) -> tuple[str, str]:
+    """A paper's title and DOI, read from the PDF itself.
+
+    :param pdf: The PDF to inspect.
+    :return: ``(title, doi)``; either may fall back to the file's stem.
+    """
+    document = pymupdf.open(pdf)
+    try:
+        metadata = document.metadata or {}
+    finally:
+        document.close()
+    title = (metadata.get("title") or "").strip() or pdf.stem
+    fields = " ".join(str(metadata.get(k) or "") for k in ("subject", "keywords", "title"))
+    found = _DOI_IN_METADATA.search(fields)
+    return title, found.group(1) if found else pdf.stem
+
+
 def extract(pdf: Path, title: str, citation: str, doi: str) -> tuple[Path, int, int]:
     """Write one paper's body text as Markdown.
 
     :param pdf: The PDF to read.
     :param title: The paper's title, used as the document's only heading.
-    :param citation: A human citation line.
+    :param citation: A human citation line, or empty.
     :param doi: The DOI; its last segment names the output file.
     :return: ``(path, characters kept, characters dropped as references)``.
     """
@@ -81,23 +102,27 @@ def extract(pdf: Path, title: str, citation: str, doi: str) -> tuple[Path, int, 
         body = body[: cut.start()]
 
     out = TEXT_DIR / f"{doi.split('/')[-1]}.md"
-    out.write_text(
-        f"# {title}\n\n{citation}\n\nDOI: https://doi.org/{doi}\n\n{body}\n", encoding="utf-8"
-    )
+    header = f"# {title}\n\n"
+    if citation:
+        header += f"{citation}\n\n"
+    header += f"DOI: https://doi.org/{doi}\n\n"
+    out.write_text(header + body + "\n", encoding="utf-8")
     return out, len(body), dropped
 
 
 def main() -> None:
     TEXT_DIR.mkdir(parents=True, exist_ok=True)
-    missing = [name for name in PAPERS if not (HERE / name).is_file()]
-    if missing:
+    pdfs = sorted(HERE.glob("*.pdf"))
+    if not pdfs:
         raise SystemExit(
-            f"missing from {HERE}: {', '.join(missing)}\n"
-            "See papers/README.md for the DOIs; the PDFs are not in the repository."
+            f"no PDFs in {HERE}. See papers/README.md for which papers and their DOIs; "
+            "they are not in the repository."
         )
-    for name, (title, citation, doi) in PAPERS.items():
-        out, kept, dropped = extract(HERE / name, title, citation, doi)
-        print(f"{out.name}  kept {kept:>8,}  dropped {dropped:>7,} chars of references")
+    for pdf in pdfs:
+        title, doi = describe(pdf)
+        out, kept, dropped = extract(pdf, title, CITATIONS.get(doi, ""), doi)
+        note = "" if doi in CITATIONS else "   (no citation line; add one to CITATIONS)"
+        print(f"{out.name:<28} kept {kept:>8,}  dropped {dropped:>7,} refs{note}")
 
 
 if __name__ == "__main__":
