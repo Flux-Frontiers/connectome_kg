@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from connectomekg import scene
-from connectomekg.colors import REGION_COLOR, UNKNOWN_COLOR
+from connectomekg.colors import HOP_RAMP, REGION_COLOR, UNKNOWN_COLOR, hop_color
 from connectomekg.neuropils import NEUROPIL_NAMES, NEUROPIL_REGION, REGION_NAMES
 from connectomekg.skeletons import Skeleton, write_swc
 
@@ -412,3 +412,124 @@ def test_flow_view_thins_the_context_cloud_to_one_neutral_grey(kg):
     assert f_radius == scene._FLOW_CONTEXT_RADIUS
     c_ids, _, c_colors, _ = scene._context_for_view("circuit", ids, points, colors)
     assert c_ids == ids and c_colors == colors
+
+
+def test_circuit_records_one_pick_owner_per_drawn_neuron(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    specs = ["GRN_sugar"]
+    info = scene.build_brain_scene(plotter, kg, specs=specs, cloud=False, neuropils=False)
+    picks = info.picks
+    assert info.n_circuit > 0
+    # Every circuit neuron is clickable: either its skeleton or its fallback sphere.
+    assert set(picks.neuron_ids) == set(scene.circuit_neurons(kg, specs))
+    assert len(picks.points) == len(picks.owner)
+    assert picks.owner.max() < len(picks.neuron_ids)
+    # And each one's own points resolve back to it.
+    for i, node_id in enumerate(picks.neuron_ids):
+        mine = picks.points[picks.owner == i]
+        assert len(mine)
+        assert picks.nearest(mine[0]) == node_id
+
+
+def test_the_flow_view_has_nothing_to_pick(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, view="flow", cloud=False, neuropils=False)
+    assert len(info.picks) == 0
+    assert info.picks.nearest([0.0, 0.0, 0.0]) is None
+
+
+def test_pick_points_are_the_drawn_world_coordinates(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, specs=["MN9"], cloud=False, neuropils=False)
+    # info.points is every drawn point; the pick targets are a subset of it,
+    # in the same frame, so they must sit inside its bounding box.
+    lo, hi = info.points.min(axis=0), info.points.max(axis=0)
+    assert (info.picks.points >= lo - 1e-3).all()
+    assert (info.picks.points <= hi + 1e-3).all()
+
+
+def test_hop_colors_span_the_ramp_in_order():
+    assert hop_color(0, 1) == HOP_RAMP[0]
+    assert hop_color(0, 4) == HOP_RAMP[0] and hop_color(3, 4) == HOP_RAMP[-1]
+
+    # Luminance rises monotonically, which is what carries the order to a
+    # colour-blind reader.
+    def luminance(c):
+        r, g, b = (int(c[i : i + 2], 16) for i in (1, 3, 5))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    values = [luminance(hop_color(i, 6)) for i in range(6)]
+    assert values == sorted(values)
+    assert all(_HEX.match(hop_color(i, 6)) for i in range(6))
+    # Out-of-range hops clamp rather than raise or wrap.
+    assert hop_color(-1, 4) == HOP_RAMP[0] and hop_color(99, 4) == HOP_RAMP[-1]
+
+
+def test_groups_override_the_cell_type_grouping(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    sugar, mn9 = kg.neurons_of("GRN_sugar"), kg.neurons_of("MN9")
+    groups = [
+        scene.NeuronGroup("hop 0", sugar, "#440154"),
+        scene.NeuronGroup("hop 1", mn9, "#FDE725"),
+    ]
+    info = scene.build_brain_scene(plotter, kg, groups=groups, cloud=False, neuropils=False)
+
+    assert info.n_circuit == len(set(sugar) | set(mn9))
+    # Actors are named for the group, not for a cell type.
+    names = set(plotter.renderer.actors)
+    assert any(n.startswith("skeleton:hop 0") or n.startswith("fallback:hop 0") for n in names)
+    assert any(n.startswith("skeleton:hop 1") or n.startswith("fallback:hop 1") for n in names)
+    # Every grouped neuron is still pickable.
+    assert set(info.picks.neuron_ids) <= set(sugar) | set(mn9)
+
+
+def test_groups_are_capped_like_specs(kg, monkeypatch):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    monkeypatch.setattr(scene, "MAX_SCENE_NEURONS", 1)
+    groups = [scene.NeuronGroup("all", kg.neurons_of("GRN_sugar"), "#440154")]
+    with pytest.raises(ValueError, match="over the cap"):
+        scene.build_brain_scene(plotter, kg, groups=groups, cloud=False, neuropils=False)
+
+
+def test_every_scene_is_lit_by_the_three_point_rig(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    scene.build_brain_scene(plotter, kg, specs=["GRN_sugar"], cloud=False, neuropils=False)
+    lights = plotter.renderer.lights
+    assert len(lights) == len(scene._STUDIO_LIGHTS)
+    # Camera-relative, not world-fixed: a world-fixed key turns its lit side
+    # away from a brain seen front-on, which measured darker and less
+    # saturated than PyVista's own default.
+    assert all(light.light_type.name == "CAMERA_LIGHT" for light in lights)
+    # And off the view axis, or nothing gets any relief.
+    assert any(abs(x) > 0.1 or abs(y) > 0.1 for (x, y, _), _ in scene._STUDIO_LIGHTS)
+
+
+def test_the_floor_keeps_the_rig_and_adds_a_shadow_light(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, specs=["GRN_sugar"], cloud=False, neuropils=False)
+    scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    scene.add_floor(plotter)
+
+    lights = plotter.renderer.lights
+    # The rig survives: replacing it left the shells and the cloud unlit.
+    assert len(lights) == len(scene._STUDIO_LIGHTS) + 1
+    positional = [light for light in lights if light.positional]
+    assert len(positional) == 1, "exactly one light casts the shadow"
+    assert "floor" in plotter.renderer.actors
+
+
+def test_the_floor_is_culled_from_below(kg):
+    """Orbiting under the scene must not put an opaque plane in front of it."""
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, specs=["GRN_sugar"], cloud=False, neuropils=False)
+    scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    scene.add_floor(plotter)
+    assert plotter.renderer.actors["floor"].prop.culling == "back"

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -44,7 +44,9 @@ from kg_utils.viz3d import seed_from_key
 from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
 from connectomekg.neuropil_meshes import Mesh, load_neuropil_meshes, neuropil_mesh_path
 from connectomekg.neuropils import neuropil_region
+from connectomekg.picking import PickTargets, _Collector
 from connectomekg.skeleton_cache import (
+    DEFAULT_CACHE_STEP,
     cache_info,
     effective_step,
     load_cached_skeletons,
@@ -55,6 +57,7 @@ from connectomekg.validation import (
     MAX_FLOW_PAIRS,
     MAX_SCENE_NEURONS,
     MAX_SKELETON_STEP,
+    SCENE_POINT_BUDGET,
     bounded_int,
     require_choice,
 )
@@ -94,6 +97,9 @@ _CONTEXT_DIM: Final = 0.85
 #: context cloud all but disappears; on this grey it reads as the brain's
 #: outline without competing with the subject.
 BACKGROUND: Final = "#5A5D62"
+#: The floor, a step darker than the background so the horizon and the lit
+#: pool are visible; see :func:`add_floor`.
+FLOOR_COLOR: Final = "#44474B"
 #: The flow view thins the context cloud to every Nth neuron, drawn with
 #: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
@@ -129,6 +135,29 @@ _NEUROPIL_SHELL_COLOR: Final = "#C8CCD2"
 _NEUROPIL_SHELL_OPACITY: Final = 0.10
 _NEUROPIL_TINT_OPACITY: Final = 0.15
 
+#: Three-point rig for a scene with no floor (:func:`add_studio_lighting`),
+#: as ``(position in camera space, intensity)``. Camera space puts the viewer
+#: at the origin looking down -Z, with +X right and +Y up.
+#:
+#: These are *camera* lights, like PyVista's own default, and deliberately so.
+#: The default's flaw is not that its lights follow the camera but that all
+#: five sit on the view axis, so every surface is lit head-on and a tube reads
+#: as a flat ribbon. Offsetting the key up and to the left models the form
+#: while still facing the subject, which is what keeps the picture bright.
+#:
+#: Fixing the lights in the brain's frame instead was tried and measured
+#: worse: on the LPLC2-DNp01 scene it came out at mean luminance 86.0 and
+#: saturation 11.7 against the default's 92.0 and 16.3, because a brain seen
+#: front-on turns its lit side away from a key placed in world coordinates.
+#: This rig measures 93.8 and 17.5 -- brighter and more saturated than the
+#: default it replaces, which matters because the palette has to survive the
+#: shading: a darkened Okabe-Ito yellow reads as orange.
+_STUDIO_LIGHTS: Final[tuple[tuple[tuple[float, float, float], float], ...]] = (
+    ((-0.6, 0.6, 1.0), 0.95),  # key, upper left, toward the viewer
+    ((0.8, -0.2, 0.7), 0.40),  # fill, lower right, keeps the shadow side open
+    ((0.0, 0.4, -1.0), 0.25),  # rim, behind, separates subject from background
+)
+
 #: Floor and shadow rig for :func:`add_floor`, world units. The floor sits a
 #: little below the subject and is far larger than any frame, so it fills the
 #: view behind the brain. The key light is a wide spotlight high above: a
@@ -140,9 +169,15 @@ _FLOOR_DROP: Final = 0.15
 _FLOOR_SIZE: Final = 120.0
 _KEY_LIGHT_HEIGHT: Final = 20.0
 _KEY_LIGHT_OFFSET: Final = (-4.0, -6.0)
-_KEY_LIGHT_CONE: Final = 75.0
-_KEY_LIGHT_INTENSITY: Final = 0.9
-_FILL_LIGHT_INTENSITY: Final = 0.35
+#: A narrower cone throws a sharper shadow edge: the penumbra widens with the
+#: angular size of the light, so 75 degrees gave a shadow so soft it read as a
+#: smudge. Narrow enough to define the subject, still wide enough not to show
+#: the cone's own circular edge on a floor this size.
+_KEY_LIGHT_CONE: Final = 42.0
+#: The shadow-casting light only. It sits on top of the three-point rig rather
+#: than replacing it, so it needs to be bright enough to throw a legible
+#: shadow and no brighter -- the rig is already lighting the scene.
+_KEY_LIGHT_INTENSITY: Final = 0.55
 _SHADOW_MAP_RESOLUTION: Final = 8192
 
 #: The views :func:`build_brain_scene` composes.
@@ -232,6 +267,31 @@ def world_frame(store: GraphStore) -> WorldFrame:
         raise ValueError("no neuron in this graph has x/y/z coordinates")
     center = np.median(np.asarray(rows, dtype=np.float64), axis=0)
     return WorldFrame(center=center)
+
+
+#: Points one FAFB v783 neuron contributes at stride 4, measured over the
+#: cached skeletons. Only used to pick a stride, so an approximation is fine.
+_POINTS_PER_NEURON_AT_STRIDE_4: Final = 1200
+
+
+def auto_skeleton_step(n_neurons: int, *, budget: int = SCENE_POINT_BUDGET) -> int:
+    """The stride to draw *n_neurons* at so the scene stays near ``budget`` points.
+
+    A stride of 4 is the finest the skeleton cache holds, so that is the floor
+    and a small scene simply gets it. Past roughly a thousand neurons the
+    stride grows to keep the point count flat, which is what lets
+    :data:`connectomekg.validation.MAX_SCENE_NEURONS` be five thousand rather
+    than five hundred: the cost of a scene stops tracking the neuron count.
+
+    :param n_neurons: Neurons the scene will draw.
+    :param budget: Points to aim for across all of them.
+    :return: A stride between :data:`DEFAULT_CACHE_STEP` and
+        :data:`connectomekg.validation.MAX_SKELETON_STEP`.
+    """
+    if n_neurons <= 0:
+        return DEFAULT_CACHE_STEP
+    wanted = DEFAULT_CACHE_STEP * n_neurons * _POINTS_PER_NEURON_AT_STRIDE_4 / max(budget, 1)
+    return int(min(MAX_SKELETON_STEP, max(DEFAULT_CACHE_STEP, round(wanted))))
 
 
 def context_points(
@@ -429,6 +489,25 @@ def flow_arc(
     return (1 - t) ** 2 * start + 2 * (1 - t) * t * control + t**2 * end
 
 
+@dataclass(frozen=True)
+class NeuronGroup:
+    """Neurons drawn together in one colour, under one label.
+
+    The circuit view otherwise groups by cell type and colours by name, which
+    is right when the question is "show me LC4" and wrong when it is "show me
+    the answer": a path's hops are an order, and the neurons in one hop rarely
+    share a type. A group lets the caller say what belongs together.
+
+    :param label: Names the group in the scene's title and its actor names.
+    :param neuron_ids: Neuron node ids in this group.
+    :param color: ``#RRGGBB`` for every neuron in it.
+    """
+
+    label: str
+    neuron_ids: Sequence[str]
+    color: str
+
+
 @dataclass
 class SceneInfo:
     """What a composed brain scene contains.
@@ -451,6 +530,8 @@ class SceneInfo:
     :param n_context_somas: Context-cloud neurons drawn at a real soma rather
         than at FlyWire's marked point; 0 until ``connkg skeletons`` has
         back-filled somas.
+    :param picks: Every circuit point with the neuron that owns it, so a click
+        in the viewer resolves to a neuron. Empty for the flow view.
     """
 
     title: str
@@ -465,6 +546,7 @@ class SceneInfo:
     n_flow_total: int = 0
     n_neuropil_meshes: int = 0
     n_context_somas: int = 0
+    picks: PickTargets = field(default_factory=PickTargets.empty)
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -675,6 +757,26 @@ def aim_camera(
     return frame_and_focus(plotter, fov=fov, spec=spec)
 
 
+def add_studio_lighting(plotter: pv.Plotter) -> None:
+    """Light a floorless scene so its geometry reads as solid.
+
+    Replaces PyVista's five on-axis camera lights with three offset ones; see
+    :data:`_STUDIO_LIGHTS` for why the offset is the whole point and why they
+    stay camera-relative. Skeletons drawn as lines are unaffected either way
+    -- a line has no surface to shade, so ``--tubes`` is what makes lighting
+    visible at all on a circuit.
+
+    :param plotter: Plotter with the scene composed.
+    """
+    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
+
+    plotter.remove_all_lights()
+    for position, intensity in _STUDIO_LIGHTS:
+        light = pv.Light(position=position, focal_point=(0.0, 0.0, 0.0), light_type="camera light")
+        light.intensity = intensity
+        plotter.add_light(light)
+
+
 def add_floor(plotter: pv.Plotter) -> None:
     """Put a shadow-receiving floor under the composed scene, lit from above.
 
@@ -700,9 +802,30 @@ def add_floor(plotter: pv.Plotter) -> None:
         i_resolution=1,
         j_resolution=1,
     )
-    plotter.add_mesh(floor, color=BACKGROUND, ambient=0.25, diffuse=0.8, specular=0.0, name="floor")
+    # Darker than the background, not equal to it: a floor the same colour as
+    # the void behind it shows no horizon and no lit pool, so the shadow has
+    # nothing to be a shadow *on*.
+    # Culled from behind, so orbiting under the scene does not put an opaque
+    # 120-unit plane between the camera and the subject. A floor is a surface
+    # to stand on, not a wall, and it has no underside worth seeing.
+    plotter.add_mesh(
+        floor,
+        color=FLOOR_COLOR,
+        ambient=0.12,
+        diffuse=0.95,
+        specular=0.0,
+        culling="back",
+        name="floor",
+    )
 
-    plotter.remove_all_lights()
+    # The three-point rig stays. Only a positional light can cast a shadow in
+    # VTK, so one is added for that job -- but replacing the rig with it, as
+    # this used to, left everything the narrow cone missed unlit: the neuropil
+    # shells at 10 % opacity and the whole-brain cloud simply vanished, which
+    # is a poor trade for a shadow. Lighting and shadow-casting are separate
+    # jobs here, and the key is dimmer than it was because it is no longer
+    # also responsible for lighting the scene.
+    add_studio_lighting(plotter)
     dx, dy = _KEY_LIGHT_OFFSET
     key = pv.Light(
         position=(cx + dx, cy + dy, zmax + _KEY_LIGHT_HEIGHT),
@@ -713,7 +836,6 @@ def add_floor(plotter: pv.Plotter) -> None:
     key.positional = True
     key.cone_angle = _KEY_LIGHT_CONE
     plotter.add_light(key)
-    plotter.add_light(pv.Light(light_type="headlight", intensity=_FILL_LIGHT_INTENSITY))
     plotter.enable_shadows()  # ty: ignore[missing-argument]
     # PyVista exposes no setter for the shadow map size.
     shadow_pass = plotter.renderer._render_passes._shadow_map_pass
@@ -729,11 +851,12 @@ def build_brain_scene(
     view: str = "circuit",
     data_dir: str | Path | None = None,
     color_by: str = "super_class",
-    skeleton_step: int = 4,
+    skeleton_step: int | None = None,
     tubes: bool = False,
     top: int = 100,
     neuropils: bool = True,
     cloud: bool | None = None,
+    groups: Sequence[NeuronGroup] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> SceneInfo:
     """Compose the whole-brain context cloud plus a circuit or neuropil flow into *plotter*.
@@ -750,7 +873,8 @@ def build_brain_scene(
         flow view.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
         The flow view ignores it and draws the cloud in neutral grey.
-    :param skeleton_step: Skeleton simplification stride, bounded to
+    :param skeleton_step: Skeleton simplification stride; ``None`` chooses one
+        by neuron count via :func:`auto_skeleton_step`. Bounded to
         ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first, bounded to
@@ -771,7 +895,10 @@ def build_brain_scene(
     import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
 
     view = require_choice("view", view, VIEWS)
-    skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
+    if skeleton_step is None:
+        skeleton_step = 0  # resolved once the circuit's size is known
+    else:
+        skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
     top = bounded_int("top", top, 1, MAX_FLOW_PAIRS)
 
     def _say(message: str) -> None:
@@ -831,6 +958,7 @@ def build_brain_scene(
 
     if view == "flow":
         n_pairs, n_total = _draw_flow(plotter, kg, specs, frame, top, world_points, _say)
+        add_studio_lighting(plotter)
         points = np.concatenate(world_points, axis=0) if world_points else np.zeros((1, 3))
         scope = f" via {', '.join(specs)}" if specs else ""
         title = (
@@ -853,22 +981,47 @@ def build_brain_scene(
             n_context_somas=n_context_somas,
         )
 
-    circuit_ids = circuit_neurons(kg, specs) if specs else []
+    if groups is not None:
+        circuit_ids = sorted({nid for g in groups for nid in g.neuron_ids})
+        if len(circuit_ids) > MAX_SCENE_NEURONS:
+            raise ValueError(
+                f"{len(circuit_ids)} neurons in these groups, over the cap of "
+                f"{MAX_SCENE_NEURONS} for one scene"
+            )
+    else:
+        circuit_ids = circuit_neurons(kg, specs) if specs else []
     n_circuit = len(circuit_ids)
 
     _say(f"resolving {n_circuit} circuit neurons")
-    neurons_by_type: dict[str, list[dict]] = {}
+    metas: dict[str, dict] = {}
     root_ids: list[int] = []
     for nid in circuit_ids:
         node = kg.store.node(nid)
         if node is None:
             continue
-        meta = node.get("metadata") or {}
-        cell_type = str(meta.get("cell_type") or "unknown")
-        neurons_by_type.setdefault(cell_type, []).append(meta)
-        root_id = meta.get("root_id")
+        metas[nid] = node.get("metadata") or {}
+        root_id = metas[nid].get("root_id")
         if root_id is not None:
             root_ids.append(int(root_id))
+
+    # Either the caller said what belongs together, or cell type decides.
+    if groups is not None:
+        draw_groups: list[tuple[str, str, list[tuple[str, dict]]]] = [
+            (g.label, g.color, [(nid, metas[nid]) for nid in g.neuron_ids if nid in metas])
+            for g in groups
+        ]
+    else:
+        by_type: dict[str, list[tuple[str, dict]]] = {}
+        for nid in circuit_ids:
+            if nid in metas:
+                by_type.setdefault(str(metas[nid].get("cell_type") or "unknown"), []).append(
+                    (nid, metas[nid])
+                )
+        draw_groups = [(n, type_color(n), m) for n, m in by_type.items()]
+
+    if not skeleton_step:
+        skeleton_step = auto_skeleton_step(n_circuit)
+        _say(f"stride {skeleton_step} for {n_circuit} neurons")
 
     skeletons_by_root: dict[int, Skeleton] = {}
     missing_skeletons: list[int] = list(root_ids)
@@ -889,14 +1042,14 @@ def build_brain_scene(
 
     n_skeletons = 0
     soma_fallbacks = 0
+    collector = _Collector()
     if circuit_ids:
         _say(f"drawing {n_circuit} circuit neurons")
-    for cell_type, metas in neurons_by_type.items():
-        color = type_color(cell_type)
+    for label, color, members in draw_groups:
         segment_batches: list[np.ndarray] = []
         soma_world: list[np.ndarray] = []
         fallback_world: list[np.ndarray] = []
-        for meta in metas:
+        for nid, meta in members:
             root_id = meta.get("root_id")
             skeleton = skeletons_by_root.get(int(root_id)) if root_id is not None else None
             if skeleton is not None:
@@ -904,7 +1057,9 @@ def build_brain_scene(
                 step = cached_step if skeleton.root_id in cached_roots else skeleton_step
                 segs_nm = segments(skeleton, step=step)
                 if segs_nm.size:
-                    segment_batches.append(frame.to_world(segs_nm.reshape(-1, 3)).reshape(-1, 2, 3))
+                    drawn = frame.to_world(segs_nm.reshape(-1, 3))
+                    segment_batches.append(drawn.reshape(-1, 2, 3))
+                    collector.add(nid, drawn)
                 soma_nm, is_soma = soma(skeleton)
                 if not is_soma:
                     soma_fallbacks += 1
@@ -913,30 +1068,35 @@ def build_brain_scene(
                 x, y, z = meta.get("x"), meta.get("y"), meta.get("z")
                 if x is None or y is None or z is None:
                     continue
-                fallback_world.append(frame.to_world(np.asarray([x, y, z], dtype=np.float64))[0])
+                marked = frame.to_world(np.asarray([x, y, z], dtype=np.float64))[0]
+                fallback_world.append(marked)
+                # A neuron with no skeleton is one sphere, and that sphere is
+                # the only thing there is to click on.
+                collector.add(nid, marked)
 
         if segment_batches:
             segs = np.concatenate(segment_batches, axis=0)
             mesh = _segments_to_polydata(segs)
             if tubes:
                 mesh = mesh.tube(radius=_TUBE_RADIUS, n_sides=6)
-            plotter.add_mesh(mesh, color=color, line_width=2, name=f"skeleton:{cell_type}")
+            plotter.add_mesh(mesh, color=color, line_width=2, name=f"skeleton:{label}")
             world_points.append(segs.reshape(-1, 3))
         if soma_world:
             arr = np.asarray(soma_world)
             glyph = pv.PolyData(arr).glyph(
                 geom=pv.Sphere(radius=_SOMA_RADIUS), orient=False, scale=False
             )
-            plotter.add_mesh(glyph, color=color, name=f"soma:{cell_type}")
+            plotter.add_mesh(glyph, color=color, name=f"soma:{label}")
             world_points.append(arr)
         if fallback_world:
             arr = np.asarray(fallback_world)
             glyph = pv.PolyData(arr).glyph(
                 geom=pv.Sphere(radius=_FALLBACK_RADIUS), orient=False, scale=False
             )
-            plotter.add_mesh(glyph, color=color, name=f"fallback:{cell_type}")
+            plotter.add_mesh(glyph, color=color, name=f"fallback:{label}")
             world_points.append(arr)
 
+    add_studio_lighting(plotter)
     points = np.concatenate(world_points, axis=0) if world_points else np.zeros((1, 3))
     cloud_kind = "somas" if n_context_somas else "context"
     title = f"{dataset_name} | {cloud_kind}={n_context} circuit={n_circuit} skeletons={n_skeletons}"
@@ -951,6 +1111,7 @@ def build_brain_scene(
         soma_fallbacks=soma_fallbacks,
         n_neuropil_meshes=n_meshes,
         n_context_somas=n_context_somas,
+        picks=collector.build(),
     )
 
 
@@ -963,6 +1124,8 @@ __all__ = [
     "SceneInfo",
     "WorldFrame",
     "add_floor",
+    "add_studio_lighting",
+    "auto_skeleton_step",
     "aim_camera",
     "build_brain_scene",
     "circuit_neurons",

@@ -48,7 +48,21 @@ DATASET = "fafb783"
 #: marked points where `connkg skeletons` has back-filled them. Drawing the
 #: surfaces turns the cloud off by default, so an entry that wants both says
 #: so with `cloud=True`.
+#:
+#: Circuits are drawn as tubes here even though `--tubes` is opt-in on the
+#: CLI. A line has no surface, so no lighting can shade it and the result
+#: reads flat however the scene is lit; a tube is a surface and takes the
+#: three-point rig. These are the pictures the project is judged by, so they
+#: pay the extra geometry.
 IMAGES = [
+    # The hero, on the README and the documentation site. Flow rather than a
+    # circuit because it shows the whole brain at once, and over a floor
+    # because the shadow is what gives it depth: the same scene without one
+    # reads flat, which is the note that prompted it.
+    # cloud=True explicitly: drawing the neuropil surfaces turns the cloud off
+    # by default, and here the brain's outline in dots is what the flow map
+    # hangs in. Without it the arcs float in an empty frame.
+    ("flow_all_floor", {"view": "flow", "top": 100, "cloud": True}, True, False),
     (
         "anatomy_lplc2_dnp01",
         {
@@ -57,10 +71,19 @@ IMAGES = [
             "tubes": True,
             "cloud": True,
         },
+        True,
+        False,
+    ),
+    (
+        "circuit_dnp01",
+        {"specs": ["DNp01"], "data_dir": "fafb_v783", "tubes": True},
         False,
         False,
     ),
-    ("circuit_dnp01", {"specs": ["DNp01"], "data_dir": "fafb_v783"}, False, False),
+    # A floor needs the camera tilted down onto it, which `add_floor` pairs
+    # with FLOOR_ELEVATION. Given that tilt it suits the flow view as well as
+    # any other -- an earlier note here claimed flow was seen too nearly
+    # front-on for a floor to read, which the hero below disproves.
     ("flow_all", {"view": "flow", "top": 100}, False, True),
     ("flow_lc4", {"view": "flow", "specs": ["LC4"]}, False, True),
     (

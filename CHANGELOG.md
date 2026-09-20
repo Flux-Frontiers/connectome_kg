@@ -9,6 +9,239 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The 3-D viewer no longer refuses to build when there is no interactor.**
+  Picking is an interactor event, and a `QtInteractor` created while
+  `pyvista.OFF_SCREEN` is set has no interactor at all, so
+  `enable_point_picking` raised `AttributeError` in `BrainSceneWindow`'s
+  constructor and the window could not be built. It is skipped in that state
+  now -- an off-screen window is one nobody can point at. This is what CI runs
+  in, since pyvista's headless-display action exports `PYVISTA_OFF_SCREEN` and
+  a developer's machine does not: 21 viewer tests passed locally and failed
+  there. A test sets the flag itself, so the developer run catches it too.
+
+### Added
+
+- **The source papers as a searchable corpus**, in `papers/`. The graph says
+  LC4 makes 1,401 synapses onto DNp01; it does not say how the synapses were
+  detected or what a neurotransmitter prediction is worth. DocKG indexes
+  Dorkenwald et al. 2024 and Schlegel et al. 2024 beside the connectome, so
+  the same session can ask the graph a wiring question and the papers a
+  provenance one. `papers/extract.py` and `papers/README.md` are tracked; the
+  PDFs and the text derived from them are not, since the publishers' files are
+  theirs to distribute.
+
+  Eight papers, about a million characters: the two FlyWire papers, Eckstein
+  on neurotransmitter classification, Matsliah on the optic lobe, Namiki on
+  descending neurons, Morimoto on looming, Scheffer on hemibrain and Shiu on
+  the brain model.
+
+  The extraction undoes the hard wrapping of a two-column PDF, without which
+  chunk boundaries fall mid-clause, and cuts the reference lists, which are
+  a third to a half of each paper and which retrieve -- before cutting them a
+  query for looming visual projection neurons returned a bibliography entry
+  rather than any prose. Journals differ enough that this is three rules:
+  Nature prints no "References" heading in its extracted text, so its first
+  numbered citation is the anchor; eLife and Cell print one, in their own
+  case; and a heading only counts when citations crowd in behind it, since
+  "References" occurs in prose too. Cell prints 90,000 characters of methods
+  *after* its references, so the list is cut as a span rather than a tail.
+  eLife's per-figure DOIs are stripped as well -- one paper carried 105 of
+  them inline.
+
+  Asked what the giant fibre does in the escape response, the corpus returns a
+  passage naming DNp01, the looming stimulus and the fast mode of takeoff: the
+  same DNp01 the graph holds as a node, which is what this was for. With only
+  the first two papers that query returned nothing useful, since `DNp01`,
+  `LC4` and `LPLC2` appeared zero times in either.
+
+### Fixed
+
+- **A toggle in the 3-D viewer no longer throws away the rotation.** Every
+  overlay toggle recomposed the scene and re-aimed the camera, so turning the
+  floor on after orbiting put the view back where it started. A toggle changes
+  what is drawn, not what is being looked at, so the camera is kept; a new
+  spec or answer still re-frames, since the old camera may not contain it.
+- **The floor no longer blocks the scene from below.** It was an opaque
+  120-unit plane visible from both sides, so orbiting under the subject put it
+  between the camera and the brain -- nothing was visible at all. It is culled
+  from behind now: a floor is a surface to stand on, not a wall. (Viewed from
+  underneath the subject is still dark, which is the shadow rather than the
+  floor: the only shadow-casting light is above it.)
+
+
+### Changed
+
+- **A new hero image**, on the README and the documentation site: the
+  whole-brain flow map over a floor, `docs/images/flow_all_floor.png`. The
+  previous hero was a circuit drawn flat, and the shadow is what it was
+  missing. Passing `cloud=True` explicitly is load-bearing here -- drawing
+  the neuropil surfaces turns the cloud off by default, and it is the brain's
+  outline in cell bodies that the flow map hangs in.
+
+  A note in `render_images.py` had claimed the flow view was seen too nearly
+  front-on for a floor to read. With the camera tilted by `FLOOR_ELEVATION`,
+  which `add_floor` is designed to pair with, that is not so.
+
+### Added
+
+- **`connkg specs`** prints every form a SPEC takes, with examples, and the
+  answer forms beside them. One list in `connectomekg.answers` feeds the
+  command, the README and the 3-D viewer's own panel, and a test asserts every
+  example parses -- three were wrong when first written (two synthetic
+  fixture names that do not exist on v783, and two cones that blow the scene
+  cap) and were caught by running them against the real graph.
+- **A control panel in the 3-D viewer.** Toggles for the whole-brain cloud,
+  the neuropil surfaces, the floor and tubes; a stride spinner where 0 means
+  automatic; a minimum-synapse spinner that brings an over-cap cone back under
+  it; and the spec examples listed beside them. The fleet's other viewers
+  (`gutenberg_kg`, `pycode_kg`, `Metabo_kg`) all have a panel like this;
+  only `genealogy_kg`, which this viewer was modelled on, does not.
+
+### Changed
+
+- **`MAX_SCENE_NEURONS` is 5,000, up from 500**, and the skeleton stride now
+  defaults to one chosen by neuron count rather than a fixed 4. The old cap
+  was set when drawing 500 neurons meant 500 SWC parses out of a 31 GB
+  download; the skeleton cache made that a filtered read of one Parquet
+  directory. Measured on FAFB v783: 4,000 neurons compose in 4.5 s and render
+  in 0.4 s, and the automatic stride holds the point count near
+  `SCENE_POINT_BUDGET` so the cost stops tracking the neuron count. `cone:LC4`
+  is 489 neurons and `cone:DNp01<1` is 663 -- both refused before, both drawn
+  now.
+
+
+### Added
+
+- **Answers in the 3-D viewer.** `connkg viz3d "path:LPLC2>DNp01"` opens on the
+  answer rather than on a cell type, drawn hop-coloured; so does typing the
+  same thing into the viewer's Show box, which means a question can be
+  re-asked and re-seen without restarting. The forms are `path:FROM>TO`,
+  `cone:SPEC`, `cone:SPEC>HOPS` downstream and `cone:SPEC<HOPS` upstream, the
+  arrow pointing the way the signal travels. They follow the `label:` prefix
+  the spec grammar already had, so anywhere a spec is taken an answer can be
+  too.
+
+  The new `connectomekg.answers` holds the grammar and the group-building, and
+  `connkg path --render` and `connkg cone --render` now go through it as well
+  rather than each building their own groups. An answer that reaches nothing,
+  or that holds more neurons than one scene may draw, is refused with the
+  reason and leaves the view as it was -- `cone:DNp01<1` is 663 neurons on
+  FAFB v783 and says so.
+
+
+### Changed
+
+- **Every 3-D scene is lit by a three-point rig**, replacing PyVista's five
+  default lights. The default's flaw is not that its lights follow the camera
+  but that all five sit on the view axis, so every surface is lit head-on and
+  a tube reads as a flat ribbon. Offsetting the key up and to the left models
+  the form while still facing the subject. Measured on the LPLC2-DNp01 scene,
+  the new rig is brighter and more saturated than the default it replaces
+  (luminance 93.8 against 92.0, saturation 17.5 against 16.3). Fixing the
+  lights in the brain's frame instead was tried and measured *worse* -- 86.0
+  and 11.7, because a brain seen front-on turns its lit side away from a key
+  placed in world coordinates -- and the numbers are recorded in the code so
+  nobody repeats it.
+- **`--floor` no longer unlights the scene.** It replaced the lighting with a
+  single narrow spotlight, which threw a shadow and left everything the cone
+  missed dark: the neuropil surfaces at 10 % opacity and the whole-brain cloud
+  both disappeared, turning a circuit render into a lone neuron in the void.
+  The shadow-casting light now sits on top of the three-point rig rather than
+  replacing it, so a floored scene keeps its anatomy. The shadow itself is
+  sharper and darker (cone 75 to 42 degrees, since a penumbra widens with the
+  light's angular size), and the floor is no longer the exact colour of the
+  background, which had left it with no horizon and no lit pool for a shadow
+  to fall on.
+- **The documentation images are drawn as tubes and stand on the ground.** A
+  line has no surface, so no lighting can shade it and a line-drawn circuit
+  reads flat however the scene is lit. `--tubes` stays opt-in on the CLI.
+
+### Added
+
+- **`connkg path --render` and `connkg cone --render` draw the answer.** The
+  query already knows which neurons answer the question and in what order; the
+  flag draws them. A path becomes its hops as traced skeletons, one colour per
+  hop running dark to bright along the route and labelled with the synapses
+  entering it; a cone becomes its shells, dark at the seed and bright outward.
+  Tubes on a floor, written as a 4K still under `renders/stills/`. Needs the
+  viz3d extra, and says so if it is missing.
+
+  An answer render draws no neuropil surfaces and no whole-brain cloud, which
+  is not about speed: the camera frames the scene's bounds, so leaving the
+  brain in makes the brain the thing framed and the answer ends up a quarter
+  of the frame wide. A cone over `MAX_SCENE_NEURONS` is refused with the count
+  and the remedy, after its text answer has printed -- the query succeeded,
+  only the drawing of it did not.
+
+- **`connectomekg.scene.NeuronGroup`**, so a caller can say which neurons
+  belong together and in what colour, rather than having cell type decide. The
+  circuit view groups by type and colours by name, which is right for "show me
+  LC4" and wrong for "show me the answer": a path's hops are an order, and the
+  neurons in one hop rarely share a type. With `connectomekg.colors.hop_color`,
+  a viridis-style ramp that rises monotonically in luminance so the order
+  survives colour blindness, this is what `--render` draws with.
+
+
+### Fixed
+
+- **`connkg viz3d` could not open at all.** It died with `ZeroDivisionError:
+  division by zero` before showing a window, on every invocation, and 0.4.0
+  shipped that way. `BrainSceneWindow` aimed the camera during construction,
+  but `quiltwright.frame_and_focus` divides by the render window's height to
+  get the horizontal half-angle, and a `QtInteractor` reports `(0, 0)` until it
+  is shown -- which `launch()` only did afterwards. The window now sizes its
+  render window before composing, and `--width`/`--height` reach it rather than
+  being applied after the fact. The viewer had one test, an import, which is
+  why nothing caught this; it now has six that build the window offscreen, and
+  five of them fail without the fix.
+
+### Added
+
+- **Effective connectivity: `connkg influence`, and an `influence` MCP tool.**
+  How much one population drives another, hop by hop and signed, as a share of
+  the receiving neuron's input synapses averaged over those neurons -- so 0.15
+  reads as "the average target gets 15 % of its input from the source". A
+  negative value is net inhibition, and two routes of opposite sign cancel,
+  which is what this answers that counting paths does not. Without `--to` it
+  ranks the cell types a population drives most.
+
+  It follows the convention `connkg path` already uses, from
+  connectome-interpreter, and is anchored to an identity that holds by
+  construction: unsigned, at hop 1, the value *is* the source's share of the
+  target's input synapses. On FAFB v783, LC4 onto DNp01 measures +0.1482 both
+  ways. Signed, the same pair reads +0.1469, the difference being one LC4
+  neuron of 104 whose transmitter is unresolved and which therefore carries
+  nothing.
+
+  Computed by propagating a sparse vector rather than raising the matrix to a
+  power: the matrix is 139,255 square, so one dense power would be 1.5e10
+  entries, while three hops over the 3.7 M edges take 0.02 s.
+
+- **Picking in the 3-D viewer.** Point at a neuron in `connkg viz3d` and press
+  P: a panel names it, gives the description the graph already stores for it,
+  and lists its strongest partner types in each direction. Picking is bound to
+  the key rather than to a left click, because a left click is where VTK begins
+  a rotation and picking there would re-answer the question on every orbit.
+
+  The toolbar's **Show** box takes the same specs the command does and redraws
+  in place, so exploring no longer means restarting. It refuses a spec that
+  matches nothing, or one over `MAX_SCENE_NEURONS`, and leaves the scene as it
+  was -- including when only one spec of several is bad, since drawing the rest
+  would look like a scene that contained them all.
+
+  A whole cell type shares one actor, so VTK can report which type was hit but
+  never which neuron -- and that is the question a click asks. The new
+  `connectomekg.picking` carries identity beside the geometry instead: every
+  drawn point with the neuron that owns it, resolved by nearest-point lookup
+  (1.02 M points and 12.3 MB for a 212-neuron scene, 4.4 microseconds a pick).
+  That makes it indifferent to `--tubes`, to the simplification stride, and to
+  whether VTK propagates point data through `tube()` and `glyph()`. A pick more
+  than 25 microns from any drawn neuron is reported as a miss rather than as
+  whichever neuron happened to be nearest.
+
+
+### Fixed
+
 - **`docs/scripts/render_images.py` runs again.** It opened `ConnectomeKG(".")`,
   which has looked for `./.connectomekg/graph.sqlite` since 0.3.0 moved each
   dataset into `connectomes/<dataset>/`, so it failed on its first line and

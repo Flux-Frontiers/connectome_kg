@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -183,3 +184,86 @@ def test_quilt_with_floor_reports_depth_and_writes_a_quilt(kg, tmp_path, monkeyp
     assert "adjacent-view disparity" in result.output
     assert "35.0 deg" in result.output  # --view-cone default, not the preset's 50
     assert len(list(tmp_path.glob("flow_qs2x1a*.png"))) == 1
+
+
+# ---------------------------------------------------------------------------
+# connkg path --render / connkg cone --render
+# ---------------------------------------------------------------------------
+
+
+def test_render_answer_draws_the_groups_it_is_given(kg, tmp_path, monkeypatch):
+    """The one test here that renders, at a tile small enough to be cheap."""
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
+    monkeypatch.setattr(mod, "STILL_HEIGHT", 120)
+    sugar, mn9 = kg.neurons_of("GRN_sugar"), kg.neurons_of("MN9")
+    groups = [
+        scene_mod.NeuronGroup("hop 0", sugar, "#440154"),
+        scene_mod.NeuronGroup("hop 1", mn9, "#FDE725"),
+    ]
+    written = mod.render_answer(
+        kg, groups, stem="test_answer", data_dir=None, out_dir=tmp_path,
+        labels=[(mn9[0], "MN9  42 syn")],
+    )  # fmt: skip
+    assert written.exists() and written.stat().st_size > 0
+    assert written.parent == tmp_path
+    assert "test_answer" in written.name
+
+
+def test_render_answer_needs_the_extra(kg, monkeypatch, tmp_path):
+    monkeypatch.setattr(mod.importlib.util, "find_spec", lambda name: None)
+    with pytest.raises(click.UsageError, match="viz3d"):
+        mod.render_answer(kg, [], stem="x", data_dir=None, out_dir=tmp_path)
+
+
+def test_path_render_writes_a_still(kg, kg_root, tmp_path, monkeypatch):
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
+    monkeypatch.setattr(mod, "STILL_HEIGHT", 120)
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        ["--root", str(kg_root), "path", "--from", "GRN_sugar", "--to", "MN9", "--render"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Wrote" in result.output
+    written = list((tmp_path / "renders" / "stills").glob("path_GRN_sugar_to_MN9*.png"))
+    assert len(written) == 1, result.output
+
+
+def test_cone_render_writes_a_still(kg, kg_root, tmp_path, monkeypatch):
+    pytest.importorskip("pyvista")
+    pytest.importorskip("quiltwright")
+    monkeypatch.setattr(mod, "STILL_HEIGHT", 120)
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg_root), "cone", "GRN_sugar", "--hops", "1", "--render"]
+    )
+    assert result.exit_code == 0, result.output
+    written = list((tmp_path / "renders" / "stills").glob("cone_GRN_sugar_down*.png"))
+    assert len(written) == 1, result.output
+
+
+def test_cone_render_over_the_cap_is_a_usage_error(kg, kg_root, monkeypatch):
+    pytest.importorskip("pyvista")
+    # Patched where it is read: answers.py binds the cap at import, so
+    # patching validation's own attribute would not reach it.
+    monkeypatch.setattr("connectomekg.answers.MAX_SCENE_NEURONS", 1)
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg_root), "cone", "GRN_sugar", "--hops", "1", "--render"]
+    )
+    assert result.exit_code == 2, result.output
+    assert "over the cap of 1" in result.output
+    # The text answer still printed before the refusal: the query succeeded,
+    # only the drawing of it did not.
+    assert "hop 0:" in result.output
+
+
+def test_path_without_render_draws_nothing(kg, kg_root, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        cli, ["--root", str(kg_root), "path", "--from", "GRN_sugar", "--to", "MN9"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Wrote" not in result.output
+    assert not (tmp_path / "renders").exists()

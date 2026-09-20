@@ -82,6 +82,7 @@ async def test_every_tool_is_registered(graph_root):
         "neurons_of",
         "type_partners",
         "strongest_path",
+        "influence",
         "cone",
         "neuroglancer_link",
         "query_connectome",
@@ -201,3 +202,30 @@ async def test_lifespan_is_a_noop_when_no_graph_was_set():
     assert mcp_server._kg is None
     async with create_connected_server_and_client_session(mcp_server.mcp):
         pass
+
+
+async def test_influence_tool(graph_root):
+    async with _session(graph_root) as s:
+        result = await _call(s, "influence", source="GRN_sugar", target="MN9", hops=2, signed=False)
+        assert result["n_sources"] > 0 and result["n_targets"] > 0
+        assert len(result["onto"]) == 2
+        assert result["onto_total"] == pytest.approx(sum(result["onto"]))
+        assert "share of the receiving neuron's input" in result["units"]
+        # Two hops from sugar to the motor neuron, via the planted interneuron.
+        assert result["onto"][1] > 0
+        assert "SEZ_IN1" in {r["cell_type"] for r in result["ranked"][0]}
+
+        # No target ranks cell types instead of measuring a population.
+        ranked = await _call(s, "influence", source="GRN_sugar", limit=2)
+        assert ranked["target"] is None and ranked["onto"] == []
+        assert all(len(hop) <= 2 for hop in ranked["ranked"])
+
+
+async def test_influence_rejects_out_of_range_arguments(graph_root):
+    async with _session(graph_root) as s:
+        assert "hops must be between 1 and 5" in await _error(
+            s, "influence", source="GRN_sugar", hops=6
+        )
+        assert "limit must be between 1 and 500" in await _error(
+            s, "influence", source="GRN_sugar", limit=0
+        )

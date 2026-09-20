@@ -12,13 +12,16 @@
 
 <!-- An absolute raw URL, not a repo-relative path: PyPI re-hosts this README
      and repo-relative images do not resolve there. Pinned to main rather than
-     to a tag on purpose. A tag-pinned hero has to be bumped every release and
-     fails silently when it is not, serving the previous release's image at
-     200 OK; and this one could not be pinned to v0.4.0 in any case, because
-     the tag was cut before the image existed. -->
-![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/anatomy_lplc2_dnp01.png)
+     to a tag on purpose -- a tag-pinned hero has to be bumped every release
+     and fails silently when it is not, serving the previous release's image
+     at 200 OK. -->
+![The FlyWire FAFB v783 fly brain seen from the front and slightly above, standing on a floor with its shadow below. Coloured spheres mark the 79 neuropils, linked by curved tubes showing where signal flows between them, inside a haze of grey dots, one for each of the 139,255 neurons' cell bodies.](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
 
-*The escape circuit in its anatomy. Pink is LPLC2, the looming detectors whose dendrites fill the lobula of each optic lobe; blue is DNp01, the giant fibre, which collects from them in the central brain and sends the two axons leaving the bottom of the frame down to the nerve cord. Behind them the brain's 78 neuropil surfaces, and one dot for each of the 139,255 neurons placed at its cell body. One command draws it, over the same spec grammar the path and cone queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
+**The whole fly brain, and where its signal goes.** Each sphere is one of the 79 neuropils, placed at the synapse-weighted centre of its neurons and coloured by brain region -- orange for the optic lobes down each side, yellow for the superior neuropils and lateral horn across the top, green for the antennal lobe and the neuropils around the oesophagus below, blue and light blue for the inferior, ventromedial and ventrolateral neuropils between them. A sphere's width grows with the cube root of its synapse count, so one twice as wide holds about eight times as many.
+
+The tubes are the strongest 100 of 5,786 directed neuropil pairs. Thickness grows with the square root of the flow, and each tube bows to the right of its direction of travel, so a tube bulging toward you runs left to right. Flow is carried by neurons rather than counted from synapses: each neuron's output synapses in B, apportioned by the share of its input lying in A, summed over every neuron.
+
+Behind them, one grey dot per neuron at its cell body -- all 139,255 of them, which is what gives the brain its outline. The floor and shadow carry no data; they are there for depth. One command draws it: `connkg quilt --view flow --floor --cloud --still`.
 
 *Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same licence, not under the software's Elastic License 2.0.*
 
@@ -173,11 +176,14 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Make a test connectome** | `connkg fixture --out DIR` |
 | **Build the graph** | `connkg build` |
 | **List the connectomes built under a root** | `connkg datasets` |
+| **List every SPEC and answer form, with examples** | `connkg specs` |
 | **Count nodes and edges** | `connkg stats` |
 | **Get a Markdown report: hubs, top type-to-type links, neuropils, coverage** | `connkg analyze` |
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
+| **Measure how much one population drives another, signed** | `connkg influence --from A --to B --hops N` |
+| **Draw the answer: a path's hops or a cone's shells, hop-coloured** | `connkg path --from A --to B --render`, `connkg cone SPEC --render` (the `viz3d` extra) |
 | **Open neurons as FlyWire meshes in the browser, no login** | `connkg link SPEC [SPEC...]` (FAFB v783) |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |
@@ -188,6 +194,32 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |
+
+### What a SPEC can be
+
+Every command that takes neurons takes the same grammar, and `connkg specs` prints it.
+
+| spec | means |
+|---|---|
+| `LC4` | every neuron of a cell type, by exact name (case-sensitive) |
+| `DNp01` | the two giant fibre descending neurons |
+| `720575940622838154` | one neuron, by FlyWire root id |
+| `connectome:fafb783:n:720575940622838154` | the same neuron, by node id |
+| `label:giant fib` | every neuron a community label matches, as a regex |
+| `label:^LPLC2_` | anchored, so it matches the label's start |
+
+An **answer** goes anywhere a spec does, and draws the query rather than naming it:
+
+| answer | means |
+|---|---|
+| `path:LPLC2>DNp01` | the strongest signed path, hop by hop |
+| `path:LC4>DNp01` | looming detectors to the giant fibre: the escape circuit |
+| `path:label:giant fib>DNp04` | a path may start from a label |
+| `cone:LC4` | everything one hop downstream: 489 neurons |
+| `cone:DNp01<1` | one hop upstream -- the arrow follows the signal: 663 |
+| `cone:label:giant fib<1` | a spec may itself carry a prefix |
+
+The arrow follows the signal, which is why upstream is `<`. Specs are case-sensitive, and a `label:` pattern is a regular expression. An answer that will not fit in one scene is refused; narrow it with `--min-syn`.
 
 `--root` and `--dataset` come before the command. Run `connkg <command> --help` for every option.
 
@@ -247,6 +279,7 @@ dataset is built. Serve two datasets as two entries. In a project's
 | `find_nodes`, `get_node`, `node_edges` | find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
 | `neurons_of`, `type_partners` | resolve a spec to neurons; a type's partner types by synapses |
 | `strongest_path`, `cone` | the strongest synaptic route; everything within N hops |
+| `influence` | effective connectivity: the share of a target's input the source drives, per hop, signed |
 | `neuroglancer_link` | a Neuroglancer URL showing up to seven specs as meshes, one colour each |
 | `query_connectome`, `pack_connectome` | semantic search (needs a build with the vector index) |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | saved metric snapshots |
