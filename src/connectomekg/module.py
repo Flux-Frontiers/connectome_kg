@@ -14,7 +14,7 @@ from kg_utils.specs import QueryResult, SnippetPack
 
 from connectomekg.extractor import DEFAULT_RELS, EDGE_KINDS, NODE_KINDS, ConnectomeExtractor
 from connectomekg.neuroglancer import SPEC_COLORS, neuroglancer_url
-from connectomekg.paths import PathResult, SynapseGraph
+from connectomekg.paths import InfluenceResult, PathResult, SynapseGraph
 from connectomekg.readers.codex import read_codex
 from connectomekg.readers.synthetic import synthetic_tables
 from connectomekg.schema import FAFB_783, ConnectomeTables, DatasetInfo
@@ -248,6 +248,82 @@ class ConnectomeKG(KGModule):
         # Resolve (and so validate) both specs before loading the synapse graph.
         sources, targets = self.neurons_of(source), self.neurons_of(target)
         return self.graph.strongest_path(sources, targets)
+
+    def influence(
+        self,
+        source: str,
+        target: str | None = None,
+        *,
+        hops: int = 3,
+        signed: bool = True,
+        limit: int = 20,
+    ) -> InfluenceResult:
+        """Effective connectivity: how much one population drives another, hop by hop.
+
+        A value is the share of the receiving neuron's input synapses that the
+        source drives, averaged over the receiving neurons, so 0.15 reads as
+        "the average target gets 15 % of its input from the source". Signed,
+        a negative value is net inhibition, and two routes of opposite sign
+        cancel -- which is what makes this different from counting paths.
+
+        At hop 1 and unsigned, the value is exactly the source's share of the
+        target's input synapses. Signed, a source neuron whose transmitter is
+        unresolved contributes nothing, so the signed value is the lower of the
+        two by however much of the population that is.
+
+        :param source: See :meth:`neurons_of`.
+        :param target: See :meth:`neurons_of`; ``None`` ranks cell types
+            instead of measuring one population.
+        :param hops: Hops to propagate, 1-5.
+        :param signed: Apply transmitter signs.
+        :param limit: Cell types listed per hop, 1-500.
+        :return: :class:`InfluenceResult`.
+        :raises ValueError: On an out-of-range argument or an unresolvable spec.
+        """
+        hops = bounded_int("hops", hops, 1, MAX_HOP)
+        limit = bounded_int("limit", limit, 1, MAX_LIMIT)
+        sources = self.neurons_of(source)
+        targets = self.neurons_of(target) if target is not None else []
+        graph = self.graph
+        per_hop = graph.influence(sources, hops=hops, signed=signed)
+
+        onto: list[float] = []
+        if target is not None:
+            columns = [graph.index[t] for t in targets if t in graph.index]
+            # Mean, not sum: see InfluenceResult. An empty target set averages
+            # to nothing rather than dividing by zero.
+            onto = [float(row[columns].mean()) if columns else 0.0 for row in per_hop]
+
+        types = self._types_by_index(graph.ids)
+        ranked: list[list[tuple[str, float]]] = []
+        for row in per_hop:
+            totals: dict[str, list[float]] = {}
+            for name, value in zip(types, row, strict=True):
+                if name:
+                    totals.setdefault(name, []).append(float(value))
+            means = [(n, sum(v) / len(v)) for n, v in totals.items()]
+            means.sort(key=lambda nv: (-abs(nv[1]), nv[0]))
+            ranked.append([nv for nv in means[:limit] if nv[1] != 0.0])
+
+        return InfluenceResult(
+            source=source,
+            target=target,
+            hops=hops,
+            signed=signed,
+            n_sources=len(sources),
+            n_targets=len(targets),
+            onto=onto,
+            ranked=ranked,
+        )
+
+    def _types_by_index(self, ids: list[str]) -> list[str]:
+        """Each neuron's cell type, aligned to ``ids``, empty where untyped."""
+        rows = dict(
+            self.store.con.execute(
+                "SELECT id, json_extract(metadata,'$.cell_type') FROM nodes WHERE kind='neuron'"
+            )
+        )
+        return [str(rows.get(i) or "") for i in ids]
 
     def cone(self, spec: str, *, hops: int = 1, min_syn: int = 1, direction: str = "down"):
         """Downstream or upstream cone of a spec, as ``{node_id: hop}``.
