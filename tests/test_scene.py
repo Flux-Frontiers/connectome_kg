@@ -523,3 +523,13 @@ def test_the_floor_keeps_the_rig_and_adds_a_shadow_light(kg):
     positional = [light for light in lights if light.positional]
     assert len(positional) == 1, "exactly one light casts the shadow"
     assert "floor" in plotter.renderer.actors
+
+
+def test_the_floor_is_culled_from_below(kg):
+    """Orbiting under the scene must not put an opaque plane in front of it."""
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, specs=["GRN_sugar"], cloud=False, neuropils=False)
+    scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    scene.add_floor(plotter)
+    assert plotter.renderer.actors["floor"].prop.culling == "back"

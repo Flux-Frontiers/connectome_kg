@@ -805,8 +805,17 @@ def add_floor(plotter: pv.Plotter) -> None:
     # Darker than the background, not equal to it: a floor the same colour as
     # the void behind it shows no horizon and no lit pool, so the shadow has
     # nothing to be a shadow *on*.
+    # Culled from behind, so orbiting under the scene does not put an opaque
+    # 120-unit plane between the camera and the subject. A floor is a surface
+    # to stand on, not a wall, and it has no underside worth seeing.
     plotter.add_mesh(
-        floor, color=FLOOR_COLOR, ambient=0.12, diffuse=0.95, specular=0.0, name="floor"
+        floor,
+        color=FLOOR_COLOR,
+        ambient=0.12,
+        diffuse=0.95,
+        specular=0.0,
+        culling="back",
+        name="floor",
     )
 
     # The three-point rig stays. Only a positional light can cast a shadow in

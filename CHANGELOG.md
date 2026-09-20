@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A toggle in the 3-D viewer no longer throws away the rotation.** Every
+  overlay toggle recomposed the scene and re-aimed the camera, so turning the
+  floor on after orbiting put the view back where it started. A toggle changes
+  what is drawn, not what is being looked at, so the camera is kept; a new
+  spec or answer still re-frames, since the old camera may not contain it.
+- **The floor no longer blocks the scene from below.** It was an opaque
+  120-unit plane visible from both sides, so orbiting under the subject put it
+  between the camera and the brain -- nothing was visible at all. It is culled
+  from behind now: a floor is a surface to stand on, not a wall. (Viewed from
+  underneath the subject is still dark, which is the shadow rather than the
+  floor: the only shadow-casting light is above it.)
+
+
 ### Changed
 
 - **A new hero image**, on the README and the documentation site: the

@@ -320,3 +320,40 @@ def test_the_controls_list_the_spec_examples(qapp, kg):
             assert example in shown, example
     finally:
         window.close()
+
+
+def test_a_toggle_keeps_the_camera_where_the_viewer_put_it(qapp, kg):
+    """Toggling an overlay changes what is drawn, not what is being looked at."""
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window.plotter.camera.azimuth = 55
+        window.plotter.camera.elevation = 20
+        rotated = np.array(window.plotter.camera_position.to_list())
+
+        for key in ("floor", "neuropils", "cloud", "tubes"):
+            window._toggles[key].setChecked(not window._toggles[key].isChecked())
+            now = np.array(window.plotter.camera_position.to_list())
+            assert np.allclose(now, rotated), f"{key} moved the camera"
+    finally:
+        window.close()
+
+
+def test_a_new_subject_is_reframed(qapp, kg):
+    """A camera framed on one spec may not contain the next, so it is re-aimed."""
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window.plotter.camera.azimuth = 55
+        rotated = np.array(window.plotter.camera_position.to_list())
+        window._filter_box.setText("MN9")
+        window._apply_filter()
+        assert not np.allclose(np.array(window.plotter.camera_position.to_list()), rotated)
+    finally:
+        window.close()
