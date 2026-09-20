@@ -46,6 +46,7 @@ from connectomekg.neuropil_meshes import Mesh, load_neuropil_meshes, neuropil_me
 from connectomekg.neuropils import neuropil_region
 from connectomekg.picking import PickTargets, _Collector
 from connectomekg.skeleton_cache import (
+    DEFAULT_CACHE_STEP,
     cache_info,
     effective_step,
     load_cached_skeletons,
@@ -56,6 +57,7 @@ from connectomekg.validation import (
     MAX_FLOW_PAIRS,
     MAX_SCENE_NEURONS,
     MAX_SKELETON_STEP,
+    SCENE_POINT_BUDGET,
     bounded_int,
     require_choice,
 )
@@ -265,6 +267,31 @@ def world_frame(store: GraphStore) -> WorldFrame:
         raise ValueError("no neuron in this graph has x/y/z coordinates")
     center = np.median(np.asarray(rows, dtype=np.float64), axis=0)
     return WorldFrame(center=center)
+
+
+#: Points one FAFB v783 neuron contributes at stride 4, measured over the
+#: cached skeletons. Only used to pick a stride, so an approximation is fine.
+_POINTS_PER_NEURON_AT_STRIDE_4: Final = 1200
+
+
+def auto_skeleton_step(n_neurons: int, *, budget: int = SCENE_POINT_BUDGET) -> int:
+    """The stride to draw *n_neurons* at so the scene stays near ``budget`` points.
+
+    A stride of 4 is the finest the skeleton cache holds, so that is the floor
+    and a small scene simply gets it. Past roughly a thousand neurons the
+    stride grows to keep the point count flat, which is what lets
+    :data:`connectomekg.validation.MAX_SCENE_NEURONS` be five thousand rather
+    than five hundred: the cost of a scene stops tracking the neuron count.
+
+    :param n_neurons: Neurons the scene will draw.
+    :param budget: Points to aim for across all of them.
+    :return: A stride between :data:`DEFAULT_CACHE_STEP` and
+        :data:`connectomekg.validation.MAX_SKELETON_STEP`.
+    """
+    if n_neurons <= 0:
+        return DEFAULT_CACHE_STEP
+    wanted = DEFAULT_CACHE_STEP * n_neurons * _POINTS_PER_NEURON_AT_STRIDE_4 / max(budget, 1)
+    return int(min(MAX_SKELETON_STEP, max(DEFAULT_CACHE_STEP, round(wanted))))
 
 
 def context_points(
@@ -815,7 +842,7 @@ def build_brain_scene(
     view: str = "circuit",
     data_dir: str | Path | None = None,
     color_by: str = "super_class",
-    skeleton_step: int = 4,
+    skeleton_step: int | None = None,
     tubes: bool = False,
     top: int = 100,
     neuropils: bool = True,
@@ -837,7 +864,8 @@ def build_brain_scene(
         flow view.
     :param color_by: Context cloud colouring, ``"super_class"`` or ``"sign"``.
         The flow view ignores it and draws the cloud in neutral grey.
-    :param skeleton_step: Skeleton simplification stride, bounded to
+    :param skeleton_step: Skeleton simplification stride; ``None`` chooses one
+        by neuron count via :func:`auto_skeleton_step`. Bounded to
         ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first, bounded to
@@ -858,7 +886,10 @@ def build_brain_scene(
     import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
 
     view = require_choice("view", view, VIEWS)
-    skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
+    if skeleton_step is None:
+        skeleton_step = 0  # resolved once the circuit's size is known
+    else:
+        skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
     top = bounded_int("top", top, 1, MAX_FLOW_PAIRS)
 
     def _say(message: str) -> None:
@@ -979,6 +1010,10 @@ def build_brain_scene(
                 )
         draw_groups = [(n, type_color(n), m) for n, m in by_type.items()]
 
+    if not skeleton_step:
+        skeleton_step = auto_skeleton_step(n_circuit)
+        _say(f"stride {skeleton_step} for {n_circuit} neurons")
+
     skeletons_by_root: dict[int, Skeleton] = {}
     missing_skeletons: list[int] = list(root_ids)
     cached_roots: set[int] = set()
@@ -1081,6 +1116,7 @@ __all__ = [
     "WorldFrame",
     "add_floor",
     "add_studio_lighting",
+    "auto_skeleton_step",
     "aim_camera",
     "build_brain_scene",
     "circuit_neurons",

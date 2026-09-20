@@ -243,3 +243,80 @@ def test_the_window_can_open_on_an_answer(qapp, kg):
         assert len(window._picks.neuron_ids) == len(answer)
     finally:
         window.close()
+
+
+def test_the_controls_toggle_what_the_scene_draws(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+
+        def kinds():
+            return {name.split(":")[0] for name in window.plotter.renderer.actors}
+
+        assert "context" not in kinds()
+        window._toggles["cloud"].setChecked(True)
+        assert "context" in kinds(), "the cloud is composed, not merely shown"
+        window._toggles["cloud"].setChecked(False)
+        assert "context" not in kinds()
+
+        window._toggles["floor"].setChecked(True)
+        assert "floor" in kinds()
+        window._toggles["floor"].setChecked(False)
+        assert "floor" not in kinds()
+    finally:
+        window.close()
+
+
+def test_the_stride_control_zero_means_automatic(qapp, kg):
+    from connectomekg.scene import auto_skeleton_step  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert window._stride.value() == 0
+        assert window._skeleton_step is None
+        window._stride.setValue(9)
+        window._on_toggle()
+        assert window._skeleton_step == 9
+        window._stride.setValue(0)
+        window._on_toggle()
+        assert window._skeleton_step is None
+        # And the automatic choice is the one the scene would make.
+        assert auto_skeleton_step(len(window._picks.neuron_ids)) >= 4
+    finally:
+        window.close()
+
+
+def test_min_syn_narrows_a_cone_answer(qapp, kg, monkeypatch):
+    from connectomekg import answers as answers_mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        # A cap the cone exceeds at min_syn 1 (78 neurons) but not once it is
+        # raised (6, the seed alone), so min_syn is what brings it back under.
+        monkeypatch.setattr(answers_mod, "MAX_SCENE_NEURONS", 10)
+        window._filter_box.setText("cone:GRN_sugar>1")
+        window._apply_filter()
+        assert "over the cap of 10" in window._info_panel.toPlainText()
+
+        window._min_syn.setValue(10_000)
+        window._apply_filter()
+        assert "cone GRN_sugar down 1" in window.windowTitle()
+    finally:
+        window.close()
+
+
+def test_the_controls_list_the_spec_examples(qapp, kg):
+    from connectomekg.answers import ANSWER_EXAMPLES, SPEC_EXAMPLES  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        panel = window._controls_dock.widget()
+        shown = "\n".join(w.toPlainText() for w in panel.findChildren(type(window._info_panel)))
+        for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES):
+            assert example in shown, example
+    finally:
+        window.close()

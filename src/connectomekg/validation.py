@@ -30,6 +30,7 @@ __all__ = [
     "MAX_MIN_SYN",
     "MAX_QUERY_LEN",
     "MAX_SCENE_NEURONS",
+    "SCENE_POINT_BUDGET",
     "MAX_SKELETON_JOBS",
     "MAX_SKELETON_STEP",
     "bounded_int",
@@ -53,10 +54,24 @@ MAX_MIN_SYN = 10_000
 MAX_QUERY_LEN = 500
 #: A ``label:`` regex. Label texts are short; a long pattern buys nothing.
 MAX_LABEL_PATTERN = 100
-#: Neurons drawn in one viz3d scene (connkg quilt / connkg viz3d). A hop-2
-#: cone of LC4 alone resolves to 5,998 neurons -- far beyond what reads or
-#: renders as individual skeletons.
-MAX_SCENE_NEURONS = 500
+#: Neurons drawn in one viz3d scene (connkg quilt / connkg viz3d). Raised from
+#: 500 once the skeleton cache made reading them cheap: a 500-neuron scene had
+#: meant 500 SWC parses out of a 31 GB download, and now means a filtered read
+#: of one Parquet directory. Measured on FAFB v783 at this cap, with the
+#: stride chosen by :func:`connectomekg.scene.auto_skeleton_step`, a scene
+#: composes in about 5 seconds and renders in well under one.
+#:
+#: It is a limit on what reads as individual skeletons, not on what the
+#: machine can manage. Past a few thousand arbours the picture is a thicket
+#: whatever the hardware does, and the whole-brain cloud is the view that
+#: answers "all of them".
+MAX_SCENE_NEURONS = 5000
+
+#: Points a scene aims to draw across every skeleton in it, which
+#: :func:`connectomekg.scene.auto_skeleton_step` meets by choosing a stride.
+#: At stride 4 a FAFB v783 neuron contributes about 1,200 points, so this is
+#: roughly 1,200 neurons at full detail, or 5,000 at a coarser stride.
+SCENE_POINT_BUDGET = 1_500_000
 #: Skeleton simplification stride (connectomekg.skeletons.segments' ``step``).
 #: Above this a "simplified" skeleton would drop nearly everything but its
 #: structural points.
