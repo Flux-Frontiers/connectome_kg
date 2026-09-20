@@ -79,7 +79,7 @@ def test_cli_rejects_out_of_range_options():
 def test_query_needs_semantic_extra(kg):
     pytest.importorskip("sentence_transformers")
     kg.build_index(wipe=True)
-    res = kg.query("looming detector giant fibre escape", k=5, hop=1)
+    res = kg.query("looming detector giant fiber escape", k=5, hop=1)
     names = {n["name"] for n in res.nodes}
     assert names & {"LC4", "LPLC2", "DNp01"}
 
@@ -142,10 +142,10 @@ def test_a_built_store_queries_without_its_source_data(tables, tmp_path):
     ConnectomeKG(home, tables=tables).build(wipe=True)
 
     reopened = ConnectomeKG(home)
-    res = reopened.query("looming detector giant fibre escape", k=5, hop=1)
+    res = reopened.query("looming detector giant fiber escape", k=5, hop=1)
     assert {n["name"] for n in res.nodes} & {"LC4", "LPLC2", "DNp01"}
 
-    out = CliRunner().invoke(cli, ["--root", str(tmp_path), "query", "giant fibre escape"])
+    out = CliRunner().invoke(cli, ["--root", str(tmp_path), "query", "giant fiber escape"])
     assert out.exit_code == 0, out.output
     assert "needs data_dir" not in out.output
 

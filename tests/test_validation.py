@@ -32,7 +32,7 @@ def test_bounded_int_rejects_non_integers(bad):
 
 
 def test_require_query_strips_and_caps():
-    assert require_query("  giant fibre  ") == "giant fibre"
+    assert require_query("  giant fiber  ") == "giant fiber"
     with pytest.raises(ValueError, match="must not be empty"):
         require_query("   ")
     with pytest.raises(ValueError, match=f"at most {MAX_QUERY_LEN}"):

@@ -15,17 +15,17 @@
      to a tag on purpose -- a tag-pinned hero has to be bumped every release
      and fails silently when it is not, serving the previous release's image
      at 200 OK. -->
-![The FlyWire FAFB v783 fly brain seen from the front and slightly above, standing on a floor with its shadow below. Coloured spheres mark the 79 neuropils, linked by curved tubes showing where signal flows between them, inside a haze of grey dots, one for each of the 139,255 neurons' cell bodies.](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
+![The FlyWire FAFB v783 fly brain seen from the front and slightly above, standing on a floor with its shadow below. Colored spheres mark the 79 neuropils, linked by curved tubes showing where signal flows between them, inside a haze of gray dots, one for each of the 139,255 neurons' cell bodies.](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
 
-**The whole fly brain, and where its signal goes.** Each sphere is one of the 79 neuropils, placed at the synapse-weighted centre of its neurons and coloured by brain region -- orange for the optic lobes down each side, yellow for the superior neuropils and lateral horn across the top, green for the antennal lobe and the neuropils around the oesophagus below, blue and light blue for the inferior, ventromedial and ventrolateral neuropils between them. A sphere's width grows with the cube root of its synapse count, so one twice as wide holds about eight times as many.
+**The whole fly brain, and where its signal goes.** Each sphere is one of the 79 neuropils, placed at the synapse-weighted center of its neurons and colored by brain region -- orange for the optic lobes down each side, yellow for the superior neuropils and lateral horn across the top, green for the antennal lobe and the neuropils around the esophagus below, blue and light blue for the inferior, ventromedial and ventrolateral neuropils between them. A sphere's width grows with the cube root of its synapse count, so one twice as wide holds about eight times as many.
 
 The tubes are the strongest 100 of 5,786 directed neuropil pairs. Thickness grows with the square root of the flow, and each tube bows to the right of its direction of travel, so a tube bulging toward you runs left to right. Flow is carried by neurons rather than counted from synapses: each neuron's output synapses in B, apportioned by the share of its input lying in A, summed over every neuron.
 
-Behind them, one grey dot per neuron at its cell body -- all 139,255 of them, which is what gives the brain its outline. The floor and shadow carry no data; they are there for depth. One command draws it: `connkg quilt --view flow --floor --cloud --still`.
+Behind them, one gray dot per neuron at its cell body -- all 139,255 of them, which is what gives the brain its outline. The floor and shadow carry no data; they are there for depth. One command draws it: `connkg quilt --view flow --floor --cloud --still`.
 
-*Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same licence, not under the software's Elastic License 2.0.*
+*Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same license, not under the software's Elastic License 2.0.*
 
-The first corpus is the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460 connected neuron pairs. ConnectomeKG reads the Codex export, normalises it into dataset-neutral tables, and writes a typed graph to SQLite. Neurons are instances of cell types, cell types sit under a super class and class taxonomy and belong to hemilineages, and both neurons and types connect to the neuropils they innervate. Each synapse edge carries its count and a transmitter sign. A vector index over the small human vocabulary (cell type names, neuropils, labels, taxa) lets a query like *"sugar sensing gustatory neurons"* find the right place to start.
+The first corpus is the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460 connected neuron pairs. ConnectomeKG reads the Codex export, normalizes it into dataset-neutral tables, and writes a typed graph to SQLite. Neurons are instances of cell types, cell types sit under a super class and class taxonomy and belong to hemilineages, and both neurons and types connect to the neuropils they innervate. Each synapse edge carries its count and a transmitter sign. A vector index over the small human vocabulary (cell type names, neuropils, labels, taxa) lets a query like *"sugar sensing gustatory neurons"* find the right place to start.
 
 From there you can ask wiring questions directly: the strongest signed path from a sensory neuron to a motor neuron, the downstream cone of a visual projection type, the hub neurons and strongest type-to-type connections. Because it is a `KGModule` built on [kgmodule-utils](https://github.com/Flux-Frontiers/KG_utils), the same graph also federates with the rest of the KGRAG fleet.
 
@@ -142,7 +142,7 @@ Measured on Apple silicon for the 0.2.0 release, September 2026: 3 minutes 2 sec
 | `CONTAINS` | Super class to class, and taxon to cell type |
 | `IN_NEUROPIL` | Neuron to neuropil, with pre- and postsynaptic counts |
 | `INNERVATES` | Cell type to its main neuropils |
-| `LABELED` | Neuron to a community label, with who labelled it and when |
+| `LABELED` | Neuron to a community label, with who labeled it and when |
 | `MIRROR_OF` | Left neuron to right neuron, for types with exactly one per side |
 | `IN_DATASET` | Neuron to its release |
 
@@ -183,7 +183,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
 | **Measure how much one population drives another, signed** | `connkg influence --from A --to B --hops N` |
-| **Draw the answer: a path's hops or a cone's shells, hop-coloured** | `connkg path --from A --to B --render`, `connkg cone SPEC --render` (the `viz3d` extra) |
+| **Draw the answer: a path's hops or a cone's shells, hop-colored** | `connkg path --from A --to B --render`, `connkg cone SPEC --render` (the `viz3d` extra) |
 | **Open neurons as FlyWire meshes in the browser, no login** | `connkg link SPEC [SPEC...]` (FAFB v783) |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |
@@ -202,7 +202,7 @@ Every command that takes neurons takes the same grammar, and `connkg specs` prin
 | spec | means |
 |---|---|
 | `LC4` | every neuron of a cell type, by exact name (case-sensitive) |
-| `DNp01` | the two giant fibre descending neurons |
+| `DNp01` | the two giant fiber descending neurons |
 | `720575940622838154` | one neuron, by FlyWire root id |
 | `connectome:fafb783:n:720575940622838154` | the same neuron, by node id |
 | `label:giant fib` | every neuron a community label matches, as a regex |
@@ -213,7 +213,7 @@ An **answer** goes anywhere a spec does, and draws the query rather than naming 
 | answer | means |
 |---|---|
 | `path:LPLC2>DNp01` | the strongest signed path, hop by hop |
-| `path:LC4>DNp01` | looming detectors to the giant fibre: the escape circuit |
+| `path:LC4>DNp01` | looming detectors to the giant fiber: the escape circuit |
 | `path:label:giant fib>DNp04` | a path may start from a label |
 | `cone:LC4` | everything one hop downstream: 489 neurons |
 | `cone:DNp01<1` | one hop upstream -- the arrow follows the signal: 663 |
@@ -280,7 +280,7 @@ dataset is built. Serve two datasets as two entries. In a project's
 | `neurons_of`, `type_partners` | resolve a spec to neurons; a type's partner types by synapses |
 | `strongest_path`, `cone` | the strongest synaptic route; everything within N hops |
 | `influence` | effective connectivity: the share of a target's input the source drives, per hop, signed |
-| `neuroglancer_link` | a Neuroglancer URL showing up to seven specs as meshes, one colour each |
+| `neuroglancer_link` | a Neuroglancer URL showing up to seven specs as meshes, one color each |
 | `query_connectome`, `pack_connectome` | semantic search (needs a build with the vector index) |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | saved metric snapshots |
 
@@ -304,7 +304,7 @@ synapse edges; later calls reuse them.
 
 ## Data and licensing
 
-The FlyWire data is free for non-commercial use under **CC BY-NC-SA 4.0**. A graph built from it is a derived work under the same licence. Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository (`.gitignore` already does) and out of anything commercial.
+The FlyWire data is free for non-commercial use under **CC BY-NC-SA 4.0**. A graph built from it is a derived work under the same license. Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository (`.gitignore` already does) and out of anything commercial.
 
 The Codex portal is synchronised with the live FlyWire database, so its files drift from the October 2024 published release. For a build that has to be reproducible, use the static no-login snapshots listed in [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) and record which one you used.
 
@@ -342,7 +342,7 @@ If you use ConnectomeKG in research or a project, please cite it. The software i
 
 ## License
 
-[Elastic License 2.0](https://github.com/Flux-Frontiers/connectome_kg/blob/main/LICENSE) -- free for non-commercial and internal use; commercial redistribution or hosting requires a license from Flux-Frontiers. This covers the software only. The connectome data keeps its own licence (see above).
+[Elastic License 2.0](https://github.com/Flux-Frontiers/connectome_kg/blob/main/LICENSE) -- free for non-commercial and internal use; commercial redistribution or hosting requires a license from Flux-Frontiers. This covers the software only. The connectome data keeps its own license (see above).
 
 ---
 

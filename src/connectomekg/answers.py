@@ -1,8 +1,8 @@
-"""Turning a question into something drawable: a path or a cone as coloured groups.
+"""Turning a question into something drawable: a path or a cone as colored groups.
 
 ``connkg path`` and ``connkg cone`` already know which neurons answer a
 question and in what order. This turns that answer into
-:class:`connectomekg.scene.NeuronGroup` objects, one per hop, coloured along
+:class:`connectomekg.scene.NeuronGroup` objects, one per hop, colored along
 :func:`connectomekg.colors.hop_color` so the order is legible.
 
 It also gives the answers a spec-like written form, so anywhere that takes a
@@ -56,7 +56,7 @@ ANSWER_SYNTAX = "path:FROM>TO, cone:SPEC, cone:SPEC>HOPS (downstream), cone:SPEC
 #: FAFB v783 -- each one resolves against a built v783 graph.
 SPEC_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
     ("LC4", "every neuron of a cell type, by exact name (case-sensitive)"),
-    ("DNp01", "the two giant fibre descending neurons"),
+    ("DNp01", "the two giant fiber descending neurons"),
     ("720575940622838154", "one neuron, by FlyWire root id"),
     ("connectome:fafb783:n:720575940622838154", "the same neuron, by node id"),
     ("label:giant fib", "every neuron a community label matches, as a regex"),
@@ -69,7 +69,7 @@ SPEC_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
 #: is offered here as though it would.
 ANSWER_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
     ("path:LPLC2>DNp01", "the strongest signed path, hop by hop"),
-    ("path:LC4>DNp01", "looming detectors to the giant fibre: the escape circuit"),
+    ("path:LC4>DNp01", "looming detectors to the giant fiber: the escape circuit"),
     ("path:label:giant fib>DNp04", "a path may start from a label"),
     ("cone:LC4", "everything one hop downstream: 489 neurons"),
     ("cone:DNp01<1", "one hop upstream -- the arrow follows the signal: 663"),
@@ -80,7 +80,7 @@ ANSWER_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
 def spec_help() -> str:
     """The spec and answer grammar with examples, as plain text.
 
-    :return: Two labelled blocks, one line per form.
+    :return: Two labeled blocks, one line per form.
     """
     width = max(len(example) for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES))
     lines = ["A SPEC names neurons:", ""]
@@ -100,7 +100,7 @@ _CONE = re.compile(r"^cone:(?P<spec>.+?)(?:(?P<arrow>[<>])(?P<hops>\d+))?$", re.
 class Answer:
     """A drawable answer.
 
-    :param groups: One per hop, in order, each carrying its colour.
+    :param groups: One per hop, in order, each carrying its color.
     :param labels: ``(neuron node id, text)`` to draw at that neuron.
     :param title: Short description of what was asked.
     :param stem: Filesystem-safe stem for an output file.

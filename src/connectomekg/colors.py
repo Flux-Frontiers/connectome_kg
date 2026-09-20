@@ -1,4 +1,4 @@
-"""Colour constants shared by the 2-D and 3-D views of a connectome.
+"""Color constants shared by the 2-D and 3-D views of a connectome.
 
 Split out of :mod:`connectomekg.viz` so that :mod:`connectomekg.scene` (the
 viz3d scene builder) can use the same palette without importing ``viz.py`` --
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Final
 
-#: Colour per super class. Okabe-Ito first, for the classes most types belong to.
+#: Color per super class. Okabe-Ito first, for the classes most types belong to.
 SUPER_CLASS_COLOR: Final[dict[str, str]] = {
     "central": "#0072B2",
     "optic": "#009E73",
@@ -26,10 +26,10 @@ SUPER_CLASS_COLOR: Final[dict[str, str]] = {
     "endocrine": "#999933",
 }
 
-#: Fallback colour for a super class not in :data:`SUPER_CLASS_COLOR`.
+#: Fallback color for a super class not in :data:`SUPER_CLASS_COLOR`.
 UNKNOWN_COLOR: Final = "#9AA3AB"
 
-#: Colour per transmitter sign: excitatory warm, inhibitory cool, unknown grey.
+#: Color per transmitter sign: excitatory warm, inhibitory cool, unknown gray.
 SIGN_COLOR: Final[dict[int, str]] = {1: "#C8553D", -1: "#2E6F9E", 0: "#9AA3AB"}
 
 #: Sequential ramp for *ordered* groups -- the hops of a path or a cone, where
@@ -37,17 +37,17 @@ SIGN_COLOR: Final[dict[int, str]] = {1: "#C8553D", -1: "#2E6F9E", 0: "#9AA3AB"}
 #: sets above are categorical and carry no order, so reading "which hop is
 #: this" off them means consulting a key; these are the viridis anchors, which
 #: rise monotonically in luminance. That is what makes the order legible to a
-#: colour-blind reader too: the sequence survives as light-to-dark even when
+#: color-blind reader too: the sequence survives as light-to-dark even when
 #: the hues do not separate.
 HOP_RAMP: Final[tuple[str, ...]] = ("#440154", "#3B528B", "#21918C", "#5EC962", "#FDE725")
 
 
 def hop_color(hop: int, n_hops: int) -> str:
-    """The colour for one hop of an ordered sequence.
+    """The color for one hop of an ordered sequence.
 
     :param hop: Which hop, from 0.
     :param n_hops: How many there are; 1 draws the first anchor.
-    :return: A ``#RRGGBB`` colour from :data:`HOP_RAMP`, interpolated between
+    :return: A ``#RRGGBB`` color from :data:`HOP_RAMP`, interpolated between
         anchors so any number of hops spans the whole ramp.
     """
     if n_hops <= 1:
@@ -64,10 +64,10 @@ def hop_color(hop: int, n_hops: int) -> str:
     return "#" + "".join(f"{c:02X}" for c in channels)
 
 
-#: Colour per brain region (keys of ``connectomekg.neuropils.REGION_NAMES``),
+#: Color per brain region (keys of ``connectomekg.neuropils.REGION_NAMES``),
 #: for neuropil spheres and flow tubes. Only the eight saturated Okabe-Ito
-#: colours, which stay distinguishable under the common forms of colour
-#: blindness; no pastels. Thirteen regions do not fit in eight colours, so
+#: colors, which stay distinguishable under the common forms of color
+#: blindness; no pastels. Thirteen regions do not fit in eight colors, so
 #: regions that neighbour each other in the brain share one: the central and
 #: lateral complexes, the lateral horn and superior neuropils, the inferior and
 #: ventromedial neuropils, and the antennal lobe with the periesophageal

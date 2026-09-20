@@ -112,7 +112,7 @@ mcp = FastMCP(
         "- A neuron's neuropils, a column's neurons, a type's ontology terms: "
         "node_edges(node_id, rel=...).\n"
         "- See neurons as meshes: neuroglancer_link(['LPLC2', 'DNp01']) returns a URL "
-        "that opens them in Neuroglancer, one colour per spec, no login.\n"
+        "that opens them in Neuroglancer, one color per spec, no login.\n"
         "- Concept search: query_connectome or pack_connectome, only when the vector "
         "index was built; otherwise they return an error saying so.\n\n"
         "A spec (strongest_path, cone, neurons_of) is an exact, case-sensitive cell type "
@@ -304,7 +304,7 @@ def cone(
 
 @mcp.tool()
 def neuroglancer_link(specs: list[str], limit: int = 200) -> str:
-    """A Neuroglancer URL showing each spec's neurons as FlyWire meshes, one colour per spec.
+    """A Neuroglancer URL showing each spec's neurons as FlyWire meshes, one color per spec.
 
     Opens in a browser with no login, on the dataset's public segmentation
     (FAFB v783 only). Give the URL to the user; do not fetch it.

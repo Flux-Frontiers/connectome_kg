@@ -118,7 +118,7 @@ def cell_type_docstring(
     :param flow: Majority flow: afferent, intrinsic or efferent.
     :param visual_family: Visual neuron family, for optic lobe types.
     :param visual_subsystem: Visual subsystem, such as Motion or Color.
-    :param ontology: Fly Anatomy Ontology ids its members are labelled with.
+    :param ontology: Fly Anatomy Ontology ids its members are labeled with.
     :return: Docstring text.
     """
     n = n_left + n_right

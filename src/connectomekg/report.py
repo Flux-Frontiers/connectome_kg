@@ -147,8 +147,8 @@ def write_build_report(
             + (f", {dataset.organism}" if dataset.organism else "")
             + ".",
         ]
-        if dataset.licence:
-            lines.append(f"Licence {dataset.licence}.")
+        if dataset.license:
+            lines.append(f"License {dataset.license}.")
         if dataset.citation:
             lines += ["", f"Cite: {dataset.citation}"]
 

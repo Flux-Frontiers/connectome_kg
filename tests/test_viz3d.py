@@ -214,7 +214,7 @@ def test_the_show_box_takes_an_answer(qapp, kg):
         window._filter_box.setText("path:GRN_sugar>MN9")
         window._apply_filter()
         assert "path GRN_sugar to MN9" in window.windowTitle()
-        # Hop-coloured, not type-coloured: the actors are named for the hops.
+        # Hop-colored, not type-colored: the actors are named for the hops.
         names = set(window.plotter.renderer.actors)
         assert any("hop 0" in n for n in names) and any("hop 1" in n for n in names)
         # And the answer is still pickable.

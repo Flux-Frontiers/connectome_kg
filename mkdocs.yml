@@ -4,7 +4,7 @@ site_url: https://flux-frontiers.github.io/connectome_kg/
 repo_url: https://github.com/Flux-Frontiers/connectome_kg
 repo_name: Flux-Frontiers/connectome_kg
 edit_uri: edit/main/docs/
-# The licence note for docs/images/ is for readers of the repository, not a page.
+# The license note for docs/images/ is for readers of the repository, not a page.
 exclude_docs: |
   images/README.md
 

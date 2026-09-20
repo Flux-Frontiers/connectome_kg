@@ -16,7 +16,7 @@ for the fixture).
 
 | kind | id | notes and metadata |
 |---|---|---|
-| dataset | `P` | `version`, `organism`, `licence`, `url`, `citation`, `n_neurons`, `n_pairs`, `n_synapses` |
+| dataset | `P` | `version`, `organism`, `license`, `url`, `citation`, `n_neurons`, `n_pairs`, `n_synapses` |
 | taxon | `P:c:<super>`, `P:c:<super>/<class>`, `P:c:<super>/<class>/<sub>` | `level` = super_class, class or sub_class; `n_neurons`. A sub class with no class is `P:c:<super>//<sub>` |
 | taxon (visual) | `P:v:subsystem/<name>`, `P:v:family/<name>` | `level` = visual_subsystem or visual_family. Families are not a tree under subsystems |
 | hemilineage | `P:hl:<name>` | `n_neurons`, `n_types` |
@@ -24,7 +24,7 @@ for the fixture).
 | neuropil | `P:np:<abbrev>` | e.g. `P:np:LO_R`; `base`, `side`, `n_neurons`, `n_synapses` |
 | column | `P:col:<left or right>/<id>` | column ids repeat across hemispheres; `x`, `y`, `p`, `q` hex position |
 | connectivity_tag | `P:tag:<tag>` | only broadcaster, integrator, nsrn, highly_reciprocal_neuron |
-| ontology_term | `P:fbbt:FBbt_<8 digits>` | `description`, `n_neurons`, `url`; prefix spelling normalised to `FBbt_` |
+| ontology_term | `P:fbbt:FBbt_<8 digits>` | `description`, `n_neurons`, `url`; prefix spelling normalized to `FBbt_` |
 | cell_type | `P:t:<name>` | `n_neurons`, `n_left`, `n_right`, `super_class`, `class`, `sub_class`, `nt_type`, `sign`, `hemilineage`, `flow`, `visual_family`, `visual_subsystem`, `fbbt`, `median_length_nm` |
 | neuron | `P:n:<root id>` | see below |
 | label | `P:l:<12 hex>` | sha1 of the lowercased text; `qualname` is the label text |

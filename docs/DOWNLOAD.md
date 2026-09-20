@@ -213,10 +213,10 @@ the same v783 release that need no sign-in (a Zenodo record accompanies the
 annotation paper, and `flyconnectome/flywire_annotations` on GitHub carries the
 annotation tables). Any of them work as long as the directory ends up with a
 neurons table, a classification table and a connections table whose columns the
-reader recognises. Run `connkg verify --data-dir <dir> --no-checksums`
+reader recognizes. Run `connkg verify --data-dir <dir> --no-checksums`
 to see what it detects before building.
 
-## Licence reminder
+## License reminder
 
 The built index over FlyWire data is a derived work under CC BY-NC-SA 4.0.
 Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository

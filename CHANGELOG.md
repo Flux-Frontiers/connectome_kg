@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   eLife's per-figure DOIs are stripped as well -- one paper carried 105 of
   them inline.
 
-  Asked what the giant fibre does in the escape response, the corpus returns a
+  Asked what the giant fiber does in the escape response, the corpus returns a
   passage naming DNp01, the looming stimulus and the fast mode of takeoff: the
   same DNp01 the graph holds as a node, which is what this was for. With only
   the first two papers that query returned nothing useful, since `DNp01`,
@@ -55,10 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   automatic; a minimum-synapse spinner that brings an over-cap cone back under
   it; and the spec examples listed beside them. The fleet's other viewers
   (`gutenberg_kg`, `pycode_kg`, `Metabo_kg`) all have a panel like this;
-  only `genealogy_kg`, which this viewer was modelled on, does not.
+  only `genealogy_kg`, which this viewer was modeled on, does not.
 
 - **Answers in the 3-D viewer.** `connkg viz3d "path:LPLC2>DNp01"` opens on the
-  answer rather than on a cell type, drawn hop-coloured; so does typing the
+  answer rather than on a cell type, drawn hop-colored; so does typing the
   same thing into the viewer's Show box, which means a question can be
   re-asked and re-seen without restarting. The forms are `path:FROM>TO`,
   `cone:SPEC`, `cone:SPEC>HOPS` downstream and `cone:SPEC<HOPS` upstream, the
@@ -75,8 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`connkg path --render` and `connkg cone --render` draw the answer.** The
   query already knows which neurons answer the question and in what order; the
-  flag draws them. A path becomes its hops as traced skeletons, one colour per
-  hop running dark to bright along the route and labelled with the synapses
+  flag draws them. A path becomes its hops as traced skeletons, one color per
+  hop running dark to bright along the route and labeled with the synapses
   entering it; a cone becomes its shells, dark at the seed and bright outward.
   Tubes on a floor, written as a 4K still under `renders/stills/`. Needs the
   viz3d extra, and says so if it is missing.
@@ -89,12 +89,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the drawing of it did not.
 
 - **`connectomekg.scene.NeuronGroup`**, so a caller can say which neurons
-  belong together and in what colour, rather than having cell type decide. The
-  circuit view groups by type and colours by name, which is right for "show me
+  belong together and in what color, rather than having cell type decide. The
+  circuit view groups by type and colors by name, which is right for "show me
   LC4" and wrong for "show me the answer": a path's hops are an order, and the
   neurons in one hop rarely share a type. With `connectomekg.colors.hop_color`,
   a viridis-style ramp that rises monotonically in luminance so the order
-  survives colour blindness, this is what `--render` draws with.
+  survives color blindness, this is what `--render` draws with.
 
 - **Effective connectivity: `connkg influence`, and an `influence` MCP tool.**
   How much one population drives another, hop by hop and signed, as a share of
@@ -184,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The shadow-casting light now sits on top of the three-point rig rather than
   replacing it, so a floored scene keeps its anatomy. The shadow itself is
   sharper and darker (cone 75 to 42 degrees, since a penumbra widens with the
-  light's angular size), and the floor is no longer the exact colour of the
+  light's angular size), and the floor is no longer the exact color of the
   background, which had left it with no horizon and no lit pool for a shadow
   to fall on.
 - **The documentation images are drawn as tubes and stand on the ground.** A
@@ -283,7 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skeleton caches it is derived data, gitignored, and safe to delete.
 - **Neuroglancer links.** `connkg link SPEC [SPEC...]` prints a URL that opens
   the specs' neurons as FlyWire meshes in the public Neuroglancer, with no
-  login, each spec in its own Okabe-Ito colour inside a translucent brain
+  login, each spec in its own Okabe-Ito color inside a translucent brain
   outline. The same link comes from the MCP tool `neuroglancer_link` and from
   `ConnectomeKG.neuroglancer_link()`. The URL is the only thing on stdout,
   so `connkg link LC4 | pbcopy` works. A link selects root ids on the public
@@ -341,7 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  `connkg link SPEC [SPEC...]` prints a URL that opens
   the specs' neurons as FlyWire meshes in the public Neuroglancer, with no
-  login, each spec in its own Okabe-Ito colour inside a translucent brain
+  login, each spec in its own Okabe-Ito color inside a translucent brain
   outline. The same link comes from the MCP tool `neuroglancer_link` and from
   `ConnectomeKG.neuroglancer_link()`. The URL is the only thing on stdout,
   so `connkg link LC4 | pbcopy` works. A link selects root ids on the public
@@ -457,8 +457,8 @@ A KGRAG registry entry that points at the old path needs registering again.
   `docs/rendering.md` gains "Reading the images": swatches for the
   background, the context cloud's super classes and signs, what each shape,
   size, thickness and curve means in the circuit and flow views, a region
-  colour table, and a collapsible table of every labelled neuropil. The
-  swatches are generated from `connectomekg.colors` and show the colours as
+  color table, and a collapsible table of every labeled neuropil. The
+  swatches are generated from `connectomekg.colors` and show the colors as
   drawn. `docs/scripts/render_images.py` redraws the four doc images through
   the same steps as `connkg quilt --still` and labels neuropils in the flow
   images. `connectomekg.neuropils` gains `REGION_NAMES`, `NEUROPIL_REGION`
@@ -467,12 +467,12 @@ A KGRAG registry entry that points at the old path needs registering again.
 
 - **`--floor`, `--elevation` and `--still` for the 3-D views.** `--floor`
   (on `connkg quilt` and `connkg viz3d`) stands the scene over a floor in
-  the background grey, lit by a shadow-casting spotlight from above, with an
+  the background gray, lit by a shadow-casting spotlight from above, with an
   8192 px shadow map. The new `scene.add_floor` does it after framing, so the
   floor never decides the framing, and the viewer's Cast rebuilds it.
   `--elevation` tilts the camera to look down (default 25 degrees with a
   floor, which is invisible from level). `connkg quilt --still` renders the
-  quilt's centre view as one flat image at the preset's aspect, 3840 x 2160
+  quilt's center view as one flat image at the preset's aspect, 3840 x 2160
   for `16-landscape`, into `renders/stills/`. The rendering guide gains
   "Camera and framing" and "Floor and shadows" sections.
 
@@ -489,7 +489,7 @@ A KGRAG registry entry that points at the old path needs registering again.
   Neuropils are drawn as spheres at the synapse-weighted centroid of their
   neurons' marked points, sized by synapse count. The `--top` strongest
   directed pairs (default 100, capped at `MAX_FLOW_PAIRS` = 500) are drawn
-  as tubes, coloured by source neuropil and bowed to one side so A -> B and
+  as tubes, colored by source neuropil and bowed to one side so A -> B and
   B -> A stay apart. Flow is carried by neurons, not synapses. Flow A -> B is
   each neuron's output synapses in B, split by the share of its input
   synapses in A, summed over neurons, with A = B left out. The new
@@ -502,7 +502,7 @@ A KGRAG registry entry that points at the old path needs registering again.
 - **`connkg quilt` and `connkg viz3d`, real-geometry 3-D views of a connectome**
   (the new `viz3d` extra). Unlike the fleet's other viz3d consumers, this
   graph already has space: view A is every neuron's marked point as a dim
-  whole-brain context cloud, coloured by super class or transmitter sign; view
+  whole-brain context cloud, colored by super class or transmitter sign; view
   B is a spec's circuit -- neurons resolved via `ConnectomeKG.neurons_of`,
   drawn from their traced skeletons (read from `fafb_v783/sk_lod1_783_healed/`
   by the new `connectomekg.skeletons`, NumPy only) at full brightness, one
@@ -510,7 +510,7 @@ A KGRAG registry entry that points at the old path needs registering again.
   falls back to a larger sphere at its marked point, counted separately.
   `connectomekg.scene.build_brain_scene` composes both views into a
   caller-supplied `pv.Plotter`, framed with `kg_utils.viz3d.frame_tree` and
-  coloured deterministically per cell type via `seed_from_key`; it is Qt-free,
+  colored deterministically per cell type via `seed_from_key`; it is Qt-free,
   so `connkg quilt` (headless, `quiltwright.render_quilt`/`save_quilt`,
   printing `depth_report` every run, optional `--cast`) and `connkg viz3d`
   (an interactive PyQt5/pyvistaqt viewer with one Cast-to-Looking-Glass
@@ -522,10 +522,10 @@ A KGRAG registry entry that points at the old path needs registering again.
 
 - **`connkg viz`, 2-D views of a cell type's local circuit** (the new `viz`
   extra). `--view network` draws the type with its strongest input and output
-  partner types through the shared `kg_utils.viz` renderer: nodes coloured by
-  super class, edges labelled with synapse count and transmitter
-  (`28,530 ACH`) and coloured by sign, and partner-to-partner edges drawn only
-  when at least as strong as the weakest edge to the centre. `--view partners`
+  partner types through the shared `kg_utils.viz` renderer: nodes colored by
+  super class, edges labeled with synapse count and transmitter
+  (`28,530 ACH`) and colored by sign, and partner-to-partner edges drawn only
+  when at least as strong as the weakest edge to the center. `--view partners`
   draws the same partners as a plotly diverging bar chart. Both write one
   self-contained HTML file. `ConnectomeKG.cell_type_node` resolves a type by
   exact name and, when there is none, names the types containing it.
@@ -573,7 +573,7 @@ A KGRAG registry entry that points at the old path needs registering again.
   hemisphere and id (`IN_COLUMN`), `connectivity_tag` nodes for the four
   selective tags (`TAGGED`), and Fly Anatomy Ontology `ontology_term` nodes
   mapped from cell types (`MAPS_TO`), with the `Fbbt_`/`FBbt_` spelling
-  normalised. A type maps to a term only when at least half as many of its
+  normalized. A type maps to a term only when at least half as many of its
   neurons carry it as carry its best-supported term: on v783 that drops 247
   of 552 raw mappings, such as T4b to the T4a, T4c and T4d terms on 40, 6
   and 6 stray labels against 1,426 for its own. Neurons carry flow, nerve, transmitter scores, cable length,
@@ -620,18 +620,18 @@ A KGRAG registry entry that points at the old path needs registering again.
   `connkg quilt` and `docs/scripts/render_images.py`; framing is unchanged,
   and the doc images re-render byte-identical.
 
-- **Colour-blind-safe colours in the 3-D views, with no pastels.** Neuropil
-  spheres and flow tubes are coloured by brain region (`scene.region_color`)
-  instead of a 15-colour hash of the neuropil name, which had given unrelated
-  neuropils the same colour. The regions use the 8 saturated Okabe-Ito colours
-  (`colors.REGION_COLOR`); neighbouring regions share a colour where 13 do not
-  fit. Cell-type colours are the 7 non-black Okabe-Ito colours. The flow
-  view's context cloud is one neutral grey, so colour there means only region,
+- **Color-blind-safe colors in the 3-D views, with no pastels.** Neuropil
+  spheres and flow tubes are colored by brain region (`scene.region_color`)
+  instead of a 15-color hash of the neuropil name, which had given unrelated
+  neuropils the same color. The regions use the 8 saturated Okabe-Ito colors
+  (`colors.REGION_COLOR`); neighbouring regions share a color where 13 do not
+  fit. Cell-type colors are the 7 non-black Okabe-Ito colors. The flow
+  view's context cloud is one neutral gray, so color there means only region,
   and `--color-by` applies to the circuit view alone. The context cloud is
-  muted toward the grey background instead of lightened toward white, so a
+  muted toward the gray background instead of lightened toward white, so a
   skeleton that shares a hue with the dots around it still stands out.
   Neuropil spheres and tubes are lit more evenly (`_FLOW_AMBIENT`), because
-  shading turned the yellow region colour orange.
+  shading turned the yellow region color orange.
 
 - **`connkg quilt` frames with quiltwright's `frame_and_focus` and sweeps a
   35-degree view cone by default.** The new `scene.aim_camera` points the
@@ -645,10 +645,10 @@ A KGRAG registry entry that points at the old path needs registering again.
   A cast now goes through `save_and_cast_quilt`, so a missing Bridge never
   loses the quilt.
 
-- **3-D scenes render on a muted grey background, and the context cloud is
+- **3-D scenes render on a muted gray background, and the context cloud is
   drawn as sphere glyphs sized in world units.** The cloud used to be
   pixel-sized points on white. It disappeared in a HiDPI viewer window and
-  in quilt tiles. Its colours are now lightened 35% toward white instead of
+  in quilt tiles. Its colors are now lightened 35% toward white instead of
   darkened.
 
 - **The CLI is Click, and the command is `connkg`.** `connectome-kg` was long
@@ -705,7 +705,7 @@ A KGRAG registry entry that points at the old path needs registering again.
 
 ### Added
 
-- Initial import from the private KGRAG fleet prototype: normalised
+- Initial import from the private KGRAG fleet prototype: normalized
   connectome tables, the FlyWire FAFB v783 release manifest with checksums,
   the Codex reader, a seeded synthetic connectome with planted feeding,
   escape and grooming circuits, the extractor emitting neurons, cell types,

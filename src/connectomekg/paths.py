@@ -281,7 +281,7 @@ class SynapseGraph:
         drive on every source neuron and propagating it forward therefore gives,
         at hop 1, the share of each neuron's input that comes from the sources;
         at hop 2, the share arriving through one intermediary; and so on. The
-        values need no normalisation to be read, because a share of a neuron's
+        values need no normalization to be read, because a share of a neuron's
         input is already what they are.
 
         Signed, that share can be negative: a source reaching a target through

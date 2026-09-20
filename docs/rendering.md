@@ -20,7 +20,7 @@ Both render either as a Looking Glass quilt or in an interactive viewer.
 
 *The escape circuit in its anatomy. Pink is LPLC2, the looming detectors,
 whose dendrites fill the lobula of each optic lobe; blue is DNp01, the giant
-fibre, which collects from them in the central brain and sends the two axons
+fiber, which collects from them in the central brain and sends the two axons
 leaving the bottom of the frame down to the nerve cord. Behind them the 78
 neuropil surfaces, and one dot for each of the 139,255 neurons, placed at its
 cell body. Both populations come from a spec the query layer understands:
@@ -29,7 +29,7 @@ cell body. Both populations come from a spec the query layer understands:
 
 ![The two DNp01 descending neurons inside the brain's neuropil surfaces](images/circuit_dnp01.png)
 
-*Circuit view: the two DNp01 giant fibre neurons, drawn from their traced
+*Circuit view: the two DNp01 giant fiber neurons, drawn from their traced
 skeletons, inside the FAFB v783 neuropil surfaces. Drawing the surfaces turns
 the whole-brain cloud off, which is why there are no dots here and the optic
 lobes read as layered shells. See
@@ -38,43 +38,43 @@ lobes read as layered shells. See
 ![Neuropil flow across the whole brain, strongest 100 pairs](images/flow_all.png)
 
 *Flow view: the strongest 100 of 5,786 directed neuropil pairs, with each
-neuropil labelled. See [Reading the images](#reading-the-images).*
+neuropil labeled. See [Reading the images](#reading-the-images).*
 
-!!! note "Data credit and licence"
+!!! note "Data credit and license"
     The images on this page are renders of the
     [FlyWire](https://flywire.ai) FAFB v783 connectome: Dorkenwald, S. et al.
     (2024), *Nature* 634, 124-138, and Schlegel, P. et al. (2024), *Nature*
     634, 139-152. The data is licensed under
     [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
-    The renders are adaptations of it, shared under the same licence, not
+    The renders are adaptations of it, shared under the same license, not
     under the software's Elastic License 2.0.
 
 ## Reading the images
 
-Every image on this page has the same three layers: a grey background, the
+Every image on this page has the same three layers: a gray background, the
 context cloud, and the subject of the view. The keys below give what each
-colour, shape and size means.
+color, shape and size means.
 
-Region and cell-type colours are the saturated Okabe-Ito colours, which stay
-distinguishable under the common forms of colour blindness. The context cloud
-uses saturated colours too (Okabe-Ito for most super classes, with a wine,
+Region and cell-type colors are the saturated Okabe-Ito colors, which stay
+distinguishable under the common forms of color blindness. The context cloud
+uses saturated colors too (Okabe-Ito for most super classes, with a wine,
 indigo and olive for the three smallest), muted part of the way toward the
-grey background, so the subject of each view stands out from it. No colour is
-a pastel, and shapes and labels back up colour wherever the distinction
+gray background, so the subject of each view stands out from it. No color is
+a pastel, and shapes and labels back up color wherever the distinction
 matters.
 
 ### Background and context cloud
 
-The background is a flat grey, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`. It carries no data.
+The background is a flat gray, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`. It carries no data.
 
 Each small dot is one neuron, at its soma once `connkg skeletons` has
 back-filled somas, and at its marked point otherwise.
 
-In the **circuit view**, all 139,255 neurons are drawn, and a dot's colour is
+In the **circuit view**, all 139,255 neurons are drawn, and a dot's color is
 the neuron's super class, muted toward the background (the swatches show the
-colours as drawn):
+colors as drawn):
 
-| colour | super class | neurons in FAFB v783 |
+| color | super class | neurons in FAFB v783 |
 |---|---|---|
 | <span class="swatch" style="background:#28688E"></span> `#28688E` | `central` | 32,381 |
 | <span class="swatch" style="background:#28806B"></span> `#28806B` | `optic` | 77,873 |
@@ -87,54 +87,54 @@ colours as drawn):
 | <span class="swatch" style="background:#443C76"></span> `#443C76` | `motor` | 110 |
 | <span class="swatch" style="background:#7C7E48"></span> `#7C7E48` | `endocrine` | 80 |
 
-The broad regions of the brain follow from these colours. The two large
+The broad regions of the brain follow from these colors. The two large
 green masses are the optic lobes. The orange arcs outside them are sensory
 neurons, which are mostly visual: 11,426 of the 16,938 sensory neurons. The
 blue mass between the optic lobes is the central brain.
 
-With `--color-by sign`, the dots are coloured by transmitter sign instead:
+With `--color-by sign`, the dots are colored by transmitter sign instead:
 <span class="swatch" style="background:#96584D"></span> `#96584D` excitatory, <span class="swatch" style="background:#416683"></span> `#416683` inhibitory, and
 <span class="swatch" style="background:#7D838A"></span> `#7D838A` unknown.
 
 In the **flow view**, every 10th neuron is drawn and every dot is the same
-grey, <span class="swatch" style="background:#74787E"></span> `#74787E`, whatever `--color-by` says. The cloud there
-only outlines the brain, so that colour in the flow view means one thing: a
+gray, <span class="swatch" style="background:#74787E"></span> `#74787E`, whatever `--color-by` says. The cloud there
+only outlines the brain, so that color in the flow view means one thing: a
 neuropil's brain region.
 
 ### Circuit view
 
 | what you see | what it means |
 |---|---|
-| Branching lines in one colour | The traced skeleton of each neuron of one cell type. Every cell type has its own colour. |
-| A sphere in the same colour, on the skeleton | That neuron's soma (cell body), or the skeleton's root point if the skeleton has no soma. |
-| A larger sphere in the same colour, away from any skeleton | A neuron with no skeleton file, drawn at its marked point. |
+| Branching lines in one color | The traced skeleton of each neuron of one cell type. Every cell type has its own color. |
+| A sphere in the same color, on the skeleton | That neuron's soma (cell body), or the skeleton's root point if the skeleton has no soma. |
+| A larger sphere in the same color, away from any skeleton | A neuron with no skeleton file, drawn at its marked point. |
 | Tubes instead of lines | The same skeletons, drawn with `--tubes`. |
 | A floor and a shadow under the brain | `--floor`. The shadow shows depth. It carries no data. |
 
-A cell type's colour is one of the seven non-black Okabe-Ito colours, fixed by
-its name, so it is the same in every render. The colour identifies the type
+A cell type's color is one of the seven non-black Okabe-Ito colors, fixed by
+its name, so it is the same in every render. The color identifies the type
 within one image; it does not encode a category, and it can match a super
-class colour in the cloud. In the images on this page, DNp01 is
+class color in the cloud. In the images on this page, DNp01 is
 <span class="swatch" style="background:#0072B2"></span> `#0072B2` and LPLC2 is <span class="swatch" style="background:#CC79A7"></span> `#CC79A7`.
 
 ### Flow view
 
 | what you see | what it means |
 |---|---|
-| A large sphere with a label | A neuropil, placed at the synapse-weighted centre of its neurons. `_L` and `_R` mark the left and right hemisphere; a name with no suffix spans the midline. |
-| Sphere colour | The neuropil's brain region (table below). |
+| A large sphere with a label | A neuropil, placed at the synapse-weighted center of its neurons. `_L` and `_R` mark the left and right hemisphere; a name with no suffix spans the midline. |
+| Sphere color | The neuropil's brain region (table below). |
 | Sphere size | The neuropil's synapse count. Radius grows with the cube root, so a sphere twice as wide holds about eight times the synapses. |
 | A tube between two spheres | Signal flow from one neuropil to the other, carried by neurons that take input in the first and make output in the second. See [What flow measures](#what-flow-measures). |
 | Tube thickness | The amount of flow, relative to the strongest drawn tube. Radius grows with the square root, so a tube twice as thick carries about four times the flow. |
-| Tube colour | The brain region of the source neuropil: the flow leaves a neuropil of that region. |
+| Tube color | The brain region of the source neuropil: the flow leaves a neuropil of that region. |
 | Which way a tube curves | The direction of flow. Seen from above, every tube bows to the right of its direction of travel. In the front view, a tube running left to right bulges toward you and one running right to left bulges away. |
 | A small, darker sphere with no label | A neuropil with no drawn tube, shown for context. |
 
 Neuropils are grouped into brain regions after the systematic nomenclature
 FlyWire's neuropils follow (Ito et al. 2014). There are 13 regions and 8
-colours, so regions that neighbour each other in the brain share a colour:
+colors, so regions that neighbour each other in the brain share a color:
 
-| colour | regions and their neuropils |
+| color | regions and their neuropils |
 |---|---|
 | <span class="swatch" style="background:#E69F00"></span> `#E69F00` orange | optic lobe: `LA`, `ME`, `AME`, `LO`, `LOP` |
 | <span class="swatch" style="background:#56B4E9"></span> `#56B4E9` sky blue | ventrolateral neuropils: `AOTU`, `AVLP`, `PVLP`, `PLP`, `WED` |
@@ -146,12 +146,12 @@ colours, so regions that neighbour each other in the brain share a colour:
 | <span class="swatch" style="background:#000000"></span> `#000000` black | ocellar ganglion: `OCG`; unassigned: `UNASGD` |
 
 `connkg quilt` and the viewer draw the spheres without labels, so use the
-region colours there. The images on this page add labels, which tell apart
-neuropils that share a colour.
+region colors there. The images on this page add labels, which tell apart
+neuropils that share a color.
 
 ??? note "Neuropil abbreviations in the images on this page"
 
-    | label | neuropil | region | colour |
+    | label | neuropil | region | color |
     |---|---|---|---|
     | `AL` | antennal lobe | antennal lobe | <span class="swatch" style="background:#009E73"></span> `#009E73` |
     | `AMMC` | antennal mechanosensory and motor center | periesophageal neuropils | <span class="swatch" style="background:#009E73"></span> `#009E73` |
@@ -278,7 +278,7 @@ connkg --root . quilt --view flow --top 60 --floor --cast
 ```
 
 To render one flat image instead of a quilt, add `--still`. The still is the
-quilt's centre view at the preset's aspect, 3840 x 2160 for `16-landscape`:
+quilt's center view at the preset's aspect, 3840 x 2160 for `16-landscape`:
 
 ```bash
 connkg --root . quilt LPLC2 DNp01 --tubes --floor --still
@@ -299,7 +299,7 @@ Quilts are never committed.
 | option | views | default | effect |
 |---|---|---|---|
 | `--view` | both | `circuit` | `circuit` or `flow` |
-| `--color-by` | both | `super_class` | context cloud colour: `super_class` or `sign` |
+| `--color-by` | both | `super_class` | context cloud color: `super_class` or `sign` |
 | `--data-dir` | circuit | `fafb_v783` | skeleton download root |
 | `--skeleton-step` | circuit | `4` | keep every Nth skeleton point, 1 to 50 |
 | `--tubes` | circuit | off | draw skeletons as tubes instead of lines |
@@ -311,7 +311,7 @@ Quilts are never committed.
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
 | `--view-cone` | quilt | `35` | degrees the quilt cameras sweep |
 | `--fov`, `--zoom` | quilt | `14.0`, `1.0` | per-view field of view in degrees, and camera dolly |
-| `--still` | quilt | off | render one flat centre view instead of a quilt |
+| `--still` | quilt | off | render one flat center view instead of a quilt |
 | `--cast` | quilt | off | send the finished quilt to Looking Glass Bridge; not with `--still` |
 
 The circuit view needs at least one SPEC. In the flow view, SPECs are
@@ -328,7 +328,7 @@ the same thing.
 
 The function works in five steps:
 
-1. Set the background to a muted grey (`scene.BACKGROUND`, `#5A5D62`).
+1. Set the background to a muted gray (`scene.BACKGROUND`, `#5A5D62`).
 2. Compute the world frame from the neuron positions.
 3. Draw the neuropil meshes, when cached and `neuropils=True`.
 4. Draw the context cloud, unless meshes were drawn (`cloud=None`, the
@@ -344,7 +344,7 @@ NumPy and SQL only. The tests exercise them without the `viz3d` extra.
 | data | source | read by |
 |---|---|---|
 | neuron positions | `soma_x`, `soma_y`, `soma_z` in each neuron node's metadata where `connkg skeletons` back-filled one, else `x`, `y`, `z`, the Codex marked point, in nm | world frame, context cloud, flow centroids |
-| super class and sign | neuron node metadata | context cloud colour |
+| super class and sign | neuron node metadata | context cloud color |
 | skeletons | `.connectomekg/skeletons/` (written by `connkg skeletons`), then `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever it does not hold | circuit |
 | per-neuron neuropil synapse counts | `IN_NEUROPIL` edge evidence, `{"pre": n, "post": m}` | flow |
 | neuropil synapse totals | neuropil node metadata, `n_synapses` | flow sphere size |
@@ -356,7 +356,7 @@ FAFB coordinates are image coordinates in nanometres: `x` runs across the
 brain, `y` increases ventrally, and `z` runs through the section stack. The
 3-D stack expects `+z` up.
 
-`build_brain_scene` centres the scene on the median neuron position and
+`build_brain_scene` centers the scene on the median neuron position and
 scales it to 1 world unit per 100,000 nm. It maps each point as follows:
 
 ```
@@ -412,22 +412,22 @@ Three choices keep it visible without covering the subject:
   the camera like the rest of the scene. Each sphere is a low-poly glyph (6 x
   4 facets), so the full 139,255-neuron cloud is about 3.3 million triangles
   and composes in under a second.
-- **Muted, opaque colours.** Each dot's colour from `connectomekg.colors`
-  is blended 45% toward the grey background (`_CONTEXT_MUTE`). The hue stays,
+- **Muted, opaque colors.** Each dot's color from `connectomekg.colors`
+  is blended 45% toward the gray background (`_CONTEXT_MUTE`). The hue stays,
   but the skeletons and neuropils drawn at full saturation stand out, even
   where a cell type shares a hue with the dots around it. The blend goes
-  toward the background, not toward white, because lightened colours turn
-  pastel and colour-blind readers cannot tell pastels apart. The dots are
+  toward the background, not toward white, because lightened colors turn
+  pastel and color-blind readers cannot tell pastels apart. The dots are
   opaque, because alpha blending ghosts between views in a light-field
   render.
-- **Thinner and grey in the flow view.** The flow view draws every 10th
+- **Thinner and gray in the flow view.** The flow view draws every 10th
   neuron, with larger spheres (radius 0.014 world units, against 0.005 in the
-  circuit view), all in one neutral grey. At full density, the cloud hides
-  the neuropil spheres inside it, and super-class colours would compete with
-  the region colours.
+  circuit view), all in one neutral gray. At full density, the cloud hides
+  the neuropil spheres inside it, and super-class colors would compete with
+  the region colors.
 
 [Background and context cloud](#background-and-context-cloud) lists every
-colour.
+color.
 
 A marked point is not a cell body: FlyWire's anchor can sit tens of microns
 from the soma, so a cloud drawn from marked points shows where neurons are
@@ -455,13 +455,13 @@ meshes.
 The views draw the meshes like this:
 
 - **Circuit view:** pale neutral shells, `#C8CCD2` at 10% opacity, so the
-  circuit's cell-type colours stay the only colour in the scene.
-- **Flow view:** each surface tinted with its brain region's colour at 15%
-  opacity, the colour its sphere already carries, so the spheres and tubes
+  circuit's cell-type colors stay the only color in the scene.
+- **Flow view:** each surface tinted with its brain region's color at 15%
+  opacity, the color its sphere already carries, so the spheres and tubes
   read as sitting inside their neuropils.
 
-Meshes of one colour are merged into one actor (`neuropils` in the circuit
-view, `neuropils:<colour>` in the flow view), so the 78 surfaces cost a
+Meshes of one color are merged into one actor (`neuropils` in the circuit
+view, `neuropils:<color>` in the flow view), so the 78 surfaces cost a
 handful of draw calls. Depth peeling is on so translucent surfaces composite
 in the right order. On FAFB v783 a 48-view quilt of LPLC2 and DNp01 with
 meshes renders in about 5 seconds.
@@ -475,7 +475,7 @@ them off.
 With the meshes drawn, the context cloud is redundant: the surfaces show the
 brain's outline more plainly than 139,255 dots. So drawing the surfaces turns
 the cloud off, leaving the subject inside the anatomy. Pass `--cloud` for
-both at once, which is worth it when the dots' own colouring is the point
+both at once, which is worth it when the dots' own coloring is the point
 (`--color-by sign`, say). Without a mesh cache, nothing changes: the cloud
 draws as it always did.
 
@@ -573,9 +573,9 @@ brightness:
    (`skeleton:<type>`), so a 100-neuron type costs one draw call. A sphere
    marks each soma (`soma:<type>`).
 
-Each cell type's colour comes from the seven non-black Okabe-Ito colours,
-indexed by `seed_from_key(type name)`. The same type has the same colour in
-every render and every session. The colour identifies the type; it does not
+Each cell type's color comes from the seven non-black Okabe-Ito colors,
+indexed by `seed_from_key(type name)`. The same type has the same color in
+every render and every session. The color identifies the type; it does not
 encode a category.
 
 Two fallbacks keep a neuron visible when data is missing, and the command
@@ -585,7 +585,7 @@ output counts both:
   sphere at its marked point (`fallback:<type>`). The larger size marks it
   as a stand-in, not a measured soma.
 - **Soma fallbacks:** in 3.3% of FAFB v783 skeletons (4,580 of 139,255) no
-  row is labelled soma, so the soma sphere sits at the skeleton's root point
+  row is labeled soma, so the soma sphere sits at the skeleton's root point
   instead.
 
 ## The flow view
@@ -651,16 +651,16 @@ Keep three limits in mind when you read a flow picture:
   the neuropil's synapse count, up to 0.22 world units. A centroid is a
   position, not the neuropil's shape: the Codex download has no neuropil
   meshes.
-- **Colour** is the neuropil's brain region, from
+- **Color** is the neuropil's brain region, from
   `connectomekg.neuropils.NEUROPIL_REGION` and
   `connectomekg.colors.REGION_COLOR`, so `LO_L`, `LO_R` and `ME_L` are all
   optic-lobe orange. Spheres and tubes are lit more evenly than the rest of
-  the scene (`_FLOW_AMBIENT`), because shading darkens a colour toward its
+  the scene (`_FLOW_AMBIENT`), because shading darkens a color toward its
   neighbours: a shaded yellow reads as orange. The images in these docs add
   neuropil labels; `connkg quilt` and the viewer do not draw labels.
 - **Tubes** follow the `--top` strongest pairs. A tube's radius scales with
   the square root of its flow relative to the strongest drawn pair, and its
-  colour is the source neuropil's colour.
+  color is the source neuropil's color.
 - **Direction** shows in the curve. Each tube bows to one side of the line
   between its endpoints, along the cross product of that line and world up,
   so A -> B and B -> A curve to opposite sides instead of overlapping.
@@ -713,7 +713,7 @@ See [Reading the images](#reading-the-images).*
 
 `connectomekg.scene.add_floor` adds three things:
 
-- **A floor plane** in the background grey, a little below the scene and
+- **A floor plane** in the background gray, a little below the scene and
   far larger than the frame, so it fills the view behind the brain. The
   floor is only visible from a camera that looks down on it, which is why
   `--floor` defaults `--elevation` to 25 degrees.
@@ -747,8 +747,8 @@ are in world units, where the brain is about 8 units wide.
 | `_CONTEXT_RADIUS` | 0.005 | context sphere radius, circuit view |
 | `_FLOW_CONTEXT_RADIUS` | 0.014 | context sphere radius, flow view |
 | `_FLOW_CONTEXT_STRIDE` | 10 | flow view draws every Nth neuron |
-| `_CONTEXT_MUTE` | 0.45 | how far context dot colours blend toward the background |
-| `_FLOW_CONTEXT_COLOR` | `#8A8F96` | context dot colour in the flow view, before muting |
+| `_CONTEXT_MUTE` | 0.45 | how far context dot colors blend toward the background |
+| `_FLOW_CONTEXT_COLOR` | `#8A8F96` | context dot color in the flow view, before muting |
 | `_SOMA_RADIUS`, `_FALLBACK_RADIUS` | 0.05, 0.09 | soma and missing-skeleton spheres |
 | `_TUBE_RADIUS` | 0.01 | skeleton tube radius with `--tubes` |
 | `_NEUROPIL_MAX_RADIUS` | 0.22 | largest neuropil sphere |

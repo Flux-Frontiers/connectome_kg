@@ -1,4 +1,4 @@
-"""Read a FlyWire Codex release directory into the normalised tables.
+"""Read a FlyWire Codex release directory into the normalized tables.
 
 Column names follow the v783 release as verified 2026-09-16:
 
@@ -95,7 +95,7 @@ def _resolve_connection_columns(path: Path) -> dict[str, str]:
 
     :param path: The connections table.
     :return: ``{our_name: their_name}`` for every column we need.
-    :raises ValueError: When a required column has no recognised spelling.
+    :raises ValueError: When a required column has no recognized spelling.
     """
     header = list(pd.read_csv(path, nrows=0).columns)
     lower = {c.lower(): c for c in header}
@@ -119,7 +119,7 @@ def _read(path: Path, usecols: list[str] | None = None, **kw) -> pd.DataFrame:
     return pd.read_csv(path, usecols=usecols, **kw)
 
 
-#: Codex per-transmitter averages in neurons.csv.gz, to the normalised score columns.
+#: Codex per-transmitter averages in neurons.csv.gz, to the normalized score columns.
 _NT_AVG = {
     "ach_avg": "score_ach",
     "da_avg": "score_da",

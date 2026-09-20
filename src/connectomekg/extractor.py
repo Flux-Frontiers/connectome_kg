@@ -63,7 +63,7 @@ DEFAULT_RELS = ("CONTAINS", "INSTANCE_OF", "INNERVATES", "TYPE_SYNAPSES_TO", "LA
 SELECTIVE_TAGS = ("broadcaster", "highly_reciprocal_neuron", "integrator", "nsrn")
 #: A cell type maps to an ontology term only when the term is on at least this
 #: share as many of its neurons as its best-supported term. On v783, T4b has
-#: 1,426 neurons labelled with its own term and 40, 6 and 6 with T4a's, T4c's
+#: 1,426 neurons labeled with its own term and 40, 6 and 6 with T4a's, T4c's
 #: and T4d's; stray labels like those sit far below the cut.
 TERM_SHARE = 0.5
 #: Pairs between progress reports in the synapse loop, which dominates extraction.
@@ -111,7 +111,7 @@ class ConnectomeExtractor(KGExtractor):
 
     @property
     def tables(self) -> ConnectomeTables:
-        """The normalised tables, loaded on first use."""
+        """The normalized tables, loaded on first use."""
         if self._tables is None:
             source = self._tables_source
             self._tables = source if isinstance(source, ConnectomeTables) else source()
@@ -262,12 +262,12 @@ class ConnectomeExtractor(KGExtractor):
             docstring=(
                 f"{ds.name} version {ds.version}, {ds.organism}. {len(neurons)} neurons, "
                 f"{len(pairs)} connected pairs, {int(con['syn_count'].sum())} synapses. "
-                f"Licence {ds.licence}. {ds.citation}"
+                f"License {ds.license}. {ds.citation}"
             ),
             metadata={
                 "version": ds.version,
                 "organism": ds.organism,
-                "licence": ds.licence,
+                "license": ds.license,
                 "url": ds.url,
                 "citation": ds.citation,
                 "n_neurons": int(len(neurons)),

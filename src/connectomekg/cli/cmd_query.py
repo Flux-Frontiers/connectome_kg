@@ -83,7 +83,7 @@ def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) ->
     """Strongest synaptic path between two specs.
 
     With --render, the answer is also drawn: each hop's neuron as a traced
-    skeleton in its own colour, dark to bright along the path, labelled with
+    skeleton in its own color, dark to bright along the path, labeled with
     the synapses entering it, standing on a floor. Needs the viz3d extra.
     """
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
@@ -132,7 +132,7 @@ def cone(
     """Downstream or upstream cone of a spec.
 
     With --render, the answer is also drawn: the neurons of each hop in their
-    own colour, dark to bright outward from the seed, standing on a floor.
+    own color, dark to bright outward from the seed, standing on a floor.
     Needs the viz3d extra.
     """
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
@@ -206,7 +206,7 @@ def influence(
 )
 @click.pass_context
 def link(ctx: click.Context, specs: tuple[str, ...], limit: int, **source: Any) -> None:
-    """Neuroglancer URL showing each spec's neurons as meshes, one colour per spec."""
+    """Neuroglancer URL showing each spec's neurons as meshes, one color per spec."""
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
         res = kg.neuroglancer_link(list(specs), limit=limit)
     for s in res["specs"]:

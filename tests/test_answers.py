@@ -1,4 +1,4 @@
-"""The answer grammar: path: and cone: queries resolved into coloured groups.
+"""The answer grammar: path: and cone: queries resolved into colored groups.
 
 No PyVista and no Qt in the module under test, so these run with no extra
 installed.
@@ -60,7 +60,7 @@ def test_a_path_becomes_one_group_per_hop_dark_to_bright(kg):
     assert [g.label.split()[1] for g in answer.groups] == [
         str(i) for i in range(len(answer.groups))
     ]
-    # Every hop but the first is labelled with the synapses entering it.
+    # Every hop but the first is labeled with the synapses entering it.
     assert len(answer.labels) == len(answer.groups)
     assert any("syn" in text for _, text in answer.labels)
     assert answer.stem == "path_GRN_sugar_to_MN9"

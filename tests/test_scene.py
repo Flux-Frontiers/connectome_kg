@@ -456,7 +456,7 @@ def test_hop_colors_span_the_ramp_in_order():
     assert hop_color(0, 4) == HOP_RAMP[0] and hop_color(3, 4) == HOP_RAMP[-1]
 
     # Luminance rises monotonically, which is what carries the order to a
-    # colour-blind reader.
+    # color-blind reader.
     def luminance(c):
         r, g, b = (int(c[i : i + 2], 16) for i in (1, 3, 5))
         return 0.2126 * r + 0.7152 * g + 0.0722 * b

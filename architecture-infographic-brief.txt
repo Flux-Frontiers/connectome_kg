@@ -18,7 +18,7 @@ SQLite file."
 ====================================================================
 
 The natural layout is a left-to-right (or top-to-bottom) pipeline of five
-stages, where stage 3 is the widest box and the visual centre of gravity.
+stages, where stage 3 is the widest box and the visual center of gravity.
 Everything to its left is ingest; everything to its right is use.
 
     [1 SOURCE] -> [2 INGEST] -> [3 THE GRAPH] -> [4 ENGINE] -> [5 SURFACES]
@@ -46,11 +46,11 @@ STAGE 2: INGEST (narrow)
 --------------------------------------------------------------------
 Two boxes in series:
 
-  READER  ->  NORMALISED TABLES  ->  EXTRACTOR
+  READER  ->  NORMALIZED TABLES  ->  EXTRACTOR
 
   - READER (readers/codex.py, readers/synthetic.py): reads one release format.
     Adding a new connectome means adding a reader, nothing else.
-  - NORMALISED TABLES (schema.py): the dataset-neutral middle. Every reader
+  - NORMALIZED TABLES (schema.py): the dataset-neutral middle. Every reader
     produces these; the extractor consumes only these.
   - EXTRACTOR (extractor.py): turns the tables into typed nodes and edges.
 
@@ -75,7 +75,7 @@ Layout on disk (show as a small tree):
 Caption: each release owns a complete store, so two datasets never share a
 graph, an index or a snapshot history.
 
-11 NODE KINDS (show as labelled chips, sized by count):
+11 NODE KINDS (show as labeled chips, sized by count):
     neuron            139,255
     cell_type           8,772
     label               7,306
@@ -185,7 +185,7 @@ Four ways in, drawn as four branches from the engine:
 4. THE THREE IDEAS THE GRAPHIC SHOULD CARRY
 ====================================================================
 
-1. ONE SEAM, MANY CONNECTOMES. A reader and a normalised table set sit
+1. ONE SEAM, MANY CONNECTOMES. A reader and a normalized table set sit
    between the source files and the graph, so a new connectome is a new
    reader, not a new system.
 
@@ -201,19 +201,19 @@ Four ways in, drawn as four branches from the engine:
 5. DESIGN NOTES
 ====================================================================
 
-- Colour: use saturated, colour-blind-safe colours (the Okabe-Ito palette:
+- Color: use saturated, color-blind-safe colors (the Okabe-Ito palette:
   orange #E69F00, sky blue #56B4E9, bluish green #009E73, yellow #F0E442,
   blue #0072B2, vermillion #D55E00, reddish purple #CC79A7, black). No
-  pastels: they collapse together for colour-blind readers. This is the same
+  pastels: they collapse together for color-blind readers. This is the same
   palette the software's own renders use.
-- Background: a muted mid grey (#5A5D62) is what the renders use, and it
-  makes saturated colours read. White is fine for print.
+- Background: a muted mid gray (#5A5D62) is what the renders use, and it
+  makes saturated colors read. White is fine for print.
 - Where something is optional, say so. The skeleton download (31 GB), the
   semantic index, and the 2-D and 3-D views are all optional extras.
 - Real renders exist and beat any drawing of a brain: see docs/images/ for
   the whole-brain context cloud, a circuit of traced skeletons, and the
   neuropil flow view.
-- Keep the licence line visible if the FlyWire data or any render appears:
+- Keep the license line visible if the FlyWire data or any render appears:
   data CC BY-NC-SA 4.0, software Elastic License 2.0.
 
 ====================================================================

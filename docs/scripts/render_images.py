@@ -8,9 +8,9 @@ download in fafb_v783/:
 Every image goes through the same steps as ``connkg quilt --still``:
 ``build_brain_scene``, ``aim_camera``, optionally ``add_floor``, then a
 one-view ``render_quilt``. The flow images also carry neuropil name labels,
-which ``connkg quilt`` does not draw: neuropil colours repeat (a 15-colour
+which ``connkg quilt`` does not draw: neuropil colors repeat (a 15-color
 palette over more neuropil types), so the docs key relies on the names.
-Images are written 1600 x 900 and quantized to 256 colours to stay under the
+Images are written 1600 x 900 and quantized to 256 colors to stay under the
 repository's 1 MB file limit.
 """
 

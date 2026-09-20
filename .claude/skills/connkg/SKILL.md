@@ -57,7 +57,7 @@ few thousand neurons means a synthetic fixture was built there instead.
 |---|---|
 | strongest route from A to B | `connkg --root . path --from LC4 --to DNp01` |
 | everything downstream or upstream | `connkg --root . cone LC4 --hops 2 --min-syn 10 --direction down` |
-| a type's partner types, types in a neuropil, column, family or nerve, ontology terms, who labelled a neuron | SQL: read [references/sql-recipes.md](references/sql-recipes.md) |
+| a type's partner types, types in a neuropil, column, family or nerve, ontology terms, who labeled a neuron | SQL: read [references/sql-recipes.md](references/sql-recipes.md) |
 | fuzzy concept ("giant fibre escape") | `connkg query`, only if the vector index exists; see below |
 | overall counts, hubs, coverage | `connkg --root . stats`, `connkg --root . analyze` |
 | a picture of a type's local circuit | `connkg --root . viz LC4 --view network\|partners -o out.html` (needs the `viz` extra; about a second on FAFB) |
@@ -232,18 +232,18 @@ scene title says which (`somas=N` against `context=N`).
   restrict the sum to their neurons, with no neuron cap. The largest v783
   flows are ME -> LO, LA -> ME, LO -> LOP and LO -> PVLP. Each arc bows to one
   side, so A -> B and B -> A do not overlap. The context cloud is thinned to
-  every 10th neuron in this view, in one neutral grey.
-- Colours are colour-blind safe, with no pastels. Neuropils and flow tubes
-  take their brain region's colour (13 regions from
-  `connectomekg.neuropils.NEUROPIL_REGION` over 8 Okabe-Ito colours, so
+  every 10th neuron in this view, in one neutral gray.
+- Colors are color-blind safe, with no pastels. Neuropils and flow tubes
+  take their brain region's color (13 regions from
+  `connectomekg.neuropils.NEUROPIL_REGION` over 8 Okabe-Ito colors, so
   neighbouring regions share one); cell types use the 7 non-black Okabe-Ito
-  colours; the circuit view's cloud is its super-class colours muted toward
+  colors; the circuit view's cloud is its super-class colors muted toward
   the background. The key is "Reading the images" in `docs/rendering.md`;
   regenerate the doc images with `docs/scripts/render_images.py`.
 - `--floor` stands the scene over a floor lit from above, with shadows, and
   defaults `--elevation` to 25 degrees (the floor is invisible from level).
   Pair it with `--tubes` in the circuit view: line skeletons cast almost no
-  shadow. `connkg quilt --still` renders one flat 3840 x 2160 centre view to
+  shadow. `connkg quilt --still` renders one flat 3840 x 2160 center view to
   `renders/stills/` instead of a quilt; it cannot be combined with `--cast`.
 - A quilt sweeps `--view-cone` 35 degrees by default and prints
   `depth_report` before rendering. The flow view with a floor measures about

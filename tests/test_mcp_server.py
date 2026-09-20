@@ -156,8 +156,8 @@ async def test_report_and_snapshot_tools(graph_root):
 
 async def test_semantic_search_without_an_index_says_why(graph_root):
     async with _session(graph_root) as s:
-        assert "no vector index" in await _error(s, "query_connectome", q="giant fibre")
-        assert "no vector index" in await _error(s, "pack_connectome", q="giant fibre")
+        assert "no vector index" in await _error(s, "query_connectome", q="giant fiber")
+        assert "no vector index" in await _error(s, "pack_connectome", q="giant fiber")
 
 
 @pytest.mark.parametrize(
