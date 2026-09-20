@@ -412,3 +412,40 @@ def test_flow_view_thins_the_context_cloud_to_one_neutral_grey(kg):
     assert f_radius == scene._FLOW_CONTEXT_RADIUS
     c_ids, _, c_colors, _ = scene._context_for_view("circuit", ids, points, colors)
     assert c_ids == ids and c_colors == colors
+
+
+def test_circuit_records_one_pick_owner_per_drawn_neuron(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    specs = ["GRN_sugar"]
+    info = scene.build_brain_scene(plotter, kg, specs=specs, cloud=False, neuropils=False)
+    picks = info.picks
+    assert info.n_circuit > 0
+    # Every circuit neuron is clickable: either its skeleton or its fallback sphere.
+    assert set(picks.neuron_ids) == set(scene.circuit_neurons(kg, specs))
+    assert len(picks.points) == len(picks.owner)
+    assert picks.owner.max() < len(picks.neuron_ids)
+    # And each one's own points resolve back to it.
+    for i, node_id in enumerate(picks.neuron_ids):
+        mine = picks.points[picks.owner == i]
+        assert len(mine)
+        assert picks.nearest(mine[0]) == node_id
+
+
+def test_the_flow_view_has_nothing_to_pick(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, view="flow", cloud=False, neuropils=False)
+    assert len(info.picks) == 0
+    assert info.picks.nearest([0.0, 0.0, 0.0]) is None
+
+
+def test_pick_points_are_the_drawn_world_coordinates(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    info = scene.build_brain_scene(plotter, kg, specs=["MN9"], cloud=False, neuropils=False)
+    # info.points is every drawn point; the pick targets are a subset of it,
+    # in the same frame, so they must sit inside its bounding box.
+    lo, hi = info.points.min(axis=0), info.points.max(axis=0)
+    assert (info.picks.points >= lo - 1e-3).all()
+    assert (info.picks.points <= hi + 1e-3).all()

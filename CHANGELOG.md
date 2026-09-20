@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`connkg viz3d` could not open at all.** It died with `ZeroDivisionError:
+  division by zero` before showing a window, on every invocation, and 0.4.0
+  shipped that way. `BrainSceneWindow` aimed the camera during construction,
+  but `quiltwright.frame_and_focus` divides by the render window's height to
+  get the horizontal half-angle, and a `QtInteractor` reports `(0, 0)` until it
+  is shown -- which `launch()` only did afterwards. The window now sizes its
+  render window before composing, and `--width`/`--height` reach it rather than
+  being applied after the fact. The viewer had one test, an import, which is
+  why nothing caught this; it now has six that build the window offscreen, and
+  five of them fail without the fix.
+
+### Added
+
+- **Picking in the 3-D viewer.** Point at a neuron in `connkg viz3d` and press
+  P: a panel names it, gives the description the graph already stores for it,
+  and lists its strongest partner types in each direction. Picking is bound to
+  the key rather than to a left click, because a left click is where VTK begins
+  a rotation and picking there would re-answer the question on every orbit.
+
+  The toolbar's **Show** box takes the same specs the command does and redraws
+  in place, so exploring no longer means restarting. It refuses a spec that
+  matches nothing, or one over `MAX_SCENE_NEURONS`, and leaves the scene as it
+  was -- including when only one spec of several is bad, since drawing the rest
+  would look like a scene that contained them all.
+
+  A whole cell type shares one actor, so VTK can report which type was hit but
+  never which neuron -- and that is the question a click asks. The new
+  `connectomekg.picking` carries identity beside the geometry instead: every
+  drawn point with the neuron that owns it, resolved by nearest-point lookup
+  (1.02 M points and 12.3 MB for a 212-neuron scene, 4.4 microseconds a pick).
+  That makes it indifferent to `--tubes`, to the simplification stride, and to
+  whether VTK propagates point data through `tube()` and `glyph()`. A pick more
+  than 25 microns from any drawn neuron is reported as a miss rather than as
+  whichever neuron happened to be nearest.
+
+
+### Fixed
+
 - **`docs/scripts/render_images.py` runs again.** It opened `ConnectomeKG(".")`,
   which has looked for `./.connectomekg/graph.sqlite` since 0.3.0 moved each
   dataset into `connectomes/<dataset>/`, so it failed on its first line and

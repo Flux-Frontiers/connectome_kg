@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -44,6 +44,7 @@ from kg_utils.viz3d import seed_from_key
 from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
 from connectomekg.neuropil_meshes import Mesh, load_neuropil_meshes, neuropil_mesh_path
 from connectomekg.neuropils import neuropil_region
+from connectomekg.picking import PickTargets, _Collector
 from connectomekg.skeleton_cache import (
     cache_info,
     effective_step,
@@ -451,6 +452,8 @@ class SceneInfo:
     :param n_context_somas: Context-cloud neurons drawn at a real soma rather
         than at FlyWire's marked point; 0 until ``connkg skeletons`` has
         back-filled somas.
+    :param picks: Every circuit point with the neuron that owns it, so a click
+        in the viewer resolves to a neuron. Empty for the flow view.
     """
 
     title: str
@@ -465,6 +468,7 @@ class SceneInfo:
     n_flow_total: int = 0
     n_neuropil_meshes: int = 0
     n_context_somas: int = 0
+    picks: PickTargets = field(default_factory=PickTargets.empty)
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -857,7 +861,7 @@ def build_brain_scene(
     n_circuit = len(circuit_ids)
 
     _say(f"resolving {n_circuit} circuit neurons")
-    neurons_by_type: dict[str, list[dict]] = {}
+    neurons_by_type: dict[str, list[tuple[str, dict]]] = {}
     root_ids: list[int] = []
     for nid in circuit_ids:
         node = kg.store.node(nid)
@@ -865,7 +869,7 @@ def build_brain_scene(
             continue
         meta = node.get("metadata") or {}
         cell_type = str(meta.get("cell_type") or "unknown")
-        neurons_by_type.setdefault(cell_type, []).append(meta)
+        neurons_by_type.setdefault(cell_type, []).append((nid, meta))
         root_id = meta.get("root_id")
         if root_id is not None:
             root_ids.append(int(root_id))
@@ -889,6 +893,7 @@ def build_brain_scene(
 
     n_skeletons = 0
     soma_fallbacks = 0
+    collector = _Collector()
     if circuit_ids:
         _say(f"drawing {n_circuit} circuit neurons")
     for cell_type, metas in neurons_by_type.items():
@@ -896,7 +901,7 @@ def build_brain_scene(
         segment_batches: list[np.ndarray] = []
         soma_world: list[np.ndarray] = []
         fallback_world: list[np.ndarray] = []
-        for meta in metas:
+        for nid, meta in metas:
             root_id = meta.get("root_id")
             skeleton = skeletons_by_root.get(int(root_id)) if root_id is not None else None
             if skeleton is not None:
@@ -904,7 +909,9 @@ def build_brain_scene(
                 step = cached_step if skeleton.root_id in cached_roots else skeleton_step
                 segs_nm = segments(skeleton, step=step)
                 if segs_nm.size:
-                    segment_batches.append(frame.to_world(segs_nm.reshape(-1, 3)).reshape(-1, 2, 3))
+                    drawn = frame.to_world(segs_nm.reshape(-1, 3))
+                    segment_batches.append(drawn.reshape(-1, 2, 3))
+                    collector.add(nid, drawn)
                 soma_nm, is_soma = soma(skeleton)
                 if not is_soma:
                     soma_fallbacks += 1
@@ -913,7 +920,11 @@ def build_brain_scene(
                 x, y, z = meta.get("x"), meta.get("y"), meta.get("z")
                 if x is None or y is None or z is None:
                     continue
-                fallback_world.append(frame.to_world(np.asarray([x, y, z], dtype=np.float64))[0])
+                marked = frame.to_world(np.asarray([x, y, z], dtype=np.float64))[0]
+                fallback_world.append(marked)
+                # A neuron with no skeleton is one sphere, and that sphere is
+                # the only thing there is to click on.
+                collector.add(nid, marked)
 
         if segment_batches:
             segs = np.concatenate(segment_batches, axis=0)
@@ -951,6 +962,7 @@ def build_brain_scene(
         soma_fallbacks=soma_fallbacks,
         n_neuropil_meshes=n_meshes,
         n_context_somas=n_context_somas,
+        picks=collector.build(),
     )
 
 
