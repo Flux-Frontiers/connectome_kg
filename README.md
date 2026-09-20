@@ -179,6 +179,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |
 | **Walk downstream or upstream** | `connkg cone SPEC --hops N --direction down\|up` |
 | **Measure how much one population drives another, signed** | `connkg influence --from A --to B --hops N` |
+| **Draw the answer: a path's hops or a cone's shells, hop-coloured** | `connkg path --from A --to B --render`, `connkg cone SPEC --render` (the `viz3d` extra) |
 | **Open neurons as FlyWire meshes in the browser, no login** | `connkg link SPEC [SPEC...]` (FAFB v783) |
 | **Draw a cell type's partner network or partner chart** | `connkg viz TYPE --view network\|partners` (the `viz` extra) |
 | **Render a circuit inside the whole brain as a Looking Glass quilt** | `connkg quilt SPEC [SPEC...]` (the `viz3d` extra) |

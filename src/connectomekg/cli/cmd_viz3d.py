@@ -20,14 +20,22 @@ from __future__ import annotations
 
 import importlib.util
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import open_kg, usage_errors
 from connectomekg.validation import MAX_FLOW_PAIRS, MAX_SKELETON_STEP
+
+if TYPE_CHECKING:
+    import pyvista as pv
+
+    from connectomekg.module import ConnectomeKG
+    from connectomekg.scene import NeuronGroup, SceneInfo
 
 _VIZ3D_EXTRA = 'pip install "connectome-kg[viz3d]"'
 
@@ -41,6 +49,9 @@ REPORTS_DIR = RENDERS_ROOT / "reports"
 #: Height of a ``--still`` image; the width follows the preset's aspect, so a
 #: 16-landscape still is 3840 x 2160.
 STILL_HEIGHT = 2160
+#: The preset an answer render uses; the same default the quilt command takes.
+DEFAULT_PRESET = "16-landscape"
+
 #: Default quilt view cone, degrees. quiltwright's library sweeps a preset's
 #: full cone (50 for 16-landscape); its CLI and render scripts cap at 35.
 DEFAULT_VIEW_CONE = 35.0
@@ -133,7 +144,7 @@ tubes_option = click.option(
 )
 preset_option = click.option(
     "--preset",
-    default="16-landscape",
+    default=DEFAULT_PRESET,
     show_default=True,
     help="Looking Glass quilt preset.",
 )
@@ -177,6 +188,116 @@ elevation_option = click.option(
     help="Degrees to tilt the camera up from the front view, so it looks down. "
     "Default 25 with --floor, else 0.",
 )
+
+
+def require_viz3d(*names: str) -> None:
+    """Stop with a usage error naming whichever viz3d modules are absent.
+
+    :param names: Module names to require; the viz3d set by default.
+    :raises click.UsageError: Naming the missing modules and how to get them.
+    """
+    missing = _missing_modules(*(names or ("pyvista", "quiltwright")))
+    if missing:
+        raise click.UsageError(
+            f"{', '.join(missing)} not installed. Install the viz3d extra with:\n  {_VIZ3D_EXTRA}"
+        )
+
+
+def render_answer(
+    kg: ConnectomeKG,
+    groups: Sequence[NeuronGroup],
+    *,
+    stem: str,
+    data_dir: str | None,
+    labels: Sequence[tuple[str, str]] = (),
+    skeleton_step: int = 4,
+    out_dir: Path | None = None,
+    say: Callable[[str], None] = lambda _m: None,
+) -> Path:
+    """Draw an answer -- a path's hops, a cone's shells -- as one still.
+
+    The query layer has already decided what belongs together and in what
+    colour; this only draws it. Tubes rather than lines, because a line has no
+    surface to shade and reads flat, and a floor, because an answer suspended
+    in nothing has no depth cue at all.
+
+    :param kg: An open ``ConnectomeKG``.
+    :param groups: What to draw, in order, each carrying its own colour.
+    :param stem: Output file stem, before the still's own suffix.
+    :param data_dir: Skeleton download root, for neurons the cache lacks.
+    :param labels: ``(neuron node id, text)`` drawn at that neuron's geometry.
+    :param skeleton_step: Skeleton simplification stride.
+    :param out_dir: Where to write; the default is ``renders/stills/``.
+    :param say: Progress sink.
+    :return: The file written.
+    :raises click.UsageError: If the viz3d extra is not installed.
+    """
+    require_viz3d()
+
+    import pyvista as pv  # noqa: PLC0415 - arrives with the viz3d extra
+    from quiltwright import QUILT_PRESETS, render_quilt, save_quilt  # noqa: PLC0415
+
+    from connectomekg import scene as render3d  # noqa: PLC0415 - needs the extra
+
+    spec_obj = QUILT_PRESETS[DEFAULT_PRESET].still(height=STILL_HEIGHT)
+    plotter = pv.Plotter(off_screen=True)
+    # No neuropil surfaces and no cloud. Not for speed: the camera frames the
+    # scene's bounds, so leaving the brain in makes it the thing being framed
+    # and the answer ends up a quarter of the frame wide -- while the surfaces
+    # themselves, at 10 % opacity from this distance, are not even visible.
+    # An answer render is a portrait of the answer.
+    info = render3d.build_brain_scene(
+        plotter,
+        kg,
+        groups=groups,
+        data_dir=data_dir,
+        skeleton_step=skeleton_step,
+        tubes=True,
+        neuropils=False,
+        cloud=False,
+        progress=say,
+    )
+    render3d.aim_camera(plotter, info.points, elevation=render3d.FLOOR_ELEVATION, spec=spec_obj)
+    render3d.add_floor(plotter)
+    _label_neurons(plotter, info, labels)
+
+    out_dir = out_dir or STILLS_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    say(f"rendering {spec_obj.tile_width}x{spec_obj.tile_height}")
+    image = render_quilt(plotter, spec_obj, fov=None)
+    plotter.close()
+    return save_quilt(image, out_dir / sanitize_specs((stem,)), spec_obj)
+
+
+def _label_neurons(plotter: pv.Plotter, info: SceneInfo, labels: Sequence[tuple[str, str]]) -> None:
+    """Put each label on its neuron's own geometry, skipping any not drawn.
+
+    The label goes at a point the neuron actually occupies rather than at a
+    computed centre, so it never floats over a neighbour's arbour.
+    """
+    if not labels:
+        return
+    picks = info.picks
+    points, texts = [], []
+    for node_id, text in labels:
+        if node_id not in picks.neuron_ids:
+            continue
+        owned = picks.points[picks.owner == picks.neuron_ids.index(node_id)]
+        if len(owned):
+            points.append(owned[len(owned) // 2])
+            texts.append(text)
+    if points:
+        plotter.add_point_labels(
+            points,
+            texts,
+            font_size=14,
+            text_color="white",
+            shape_color="#2B2D31",
+            shape_opacity=0.65,
+            show_points=False,
+            always_visible=True,
+            name="answer-labels",
+        )
 
 
 @cli.command("quilt")
@@ -265,11 +386,7 @@ def quilt(
     require_specs_for_view(view, specs)
     if still and cast:
         raise click.UsageError("--cast sends a quilt; it cannot be combined with --still")
-    missing = _missing_modules("pyvista", "quiltwright")
-    if missing:
-        raise click.UsageError(
-            f"{', '.join(missing)} not installed. Install the viz3d extra with:\n  {_VIZ3D_EXTRA}"
-        )
+    require_viz3d()
 
     import pyvista as pv  # noqa: PLC0415 - arrives with the viz3d extra
     from quiltwright import (  # noqa: PLC0415
@@ -397,11 +514,7 @@ def viz3d(
     to Looking Glass" button sends the current view to Bridge.
     """
     require_specs_for_view(view, specs)
-    missing = _missing_modules("pyvista", "pyvistaqt", "PyQt5", "quiltwright")
-    if missing:
-        raise click.UsageError(
-            f"{', '.join(missing)} not installed. Install the viz3d extra with:\n  {_VIZ3D_EXTRA}"
-        )
+    require_viz3d("pyvista", "pyvistaqt", "PyQt5", "quiltwright")
 
     from connectomekg import viz3d as viewer  # noqa: PLC0415 - arrives with the viz3d extra
 

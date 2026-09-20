@@ -1,0 +1,231 @@
+CONNECTOMEKG ARCHITECTURE: INFOGRAPHIC BRIEF
+Source: connectome_kg 0.4.0, and the built FAFB v783 graph's own 0.4.0 snapshot.
+Written 2026-09-19. Every number here was read from the code or the graph, not estimated.
+
+====================================================================
+1. THE ONE-SENTENCE IDEA (headline of the graphic)
+====================================================================
+
+An electron-microscope connectome goes in as flat files; a queryable knowledge
+graph comes out, and you can ask it questions, federate it, or look at the
+brain in 3-D.
+
+Subtitle option: "139,255 neurons, 3.7 million synaptic connections, one
+SQLite file."
+
+====================================================================
+2. THE SHAPE: A FIVE-STAGE PIPELINE
+====================================================================
+
+The natural layout is a left-to-right (or top-to-bottom) pipeline of five
+stages, where stage 3 is the widest box and the visual centre of gravity.
+Everything to its left is ingest; everything to its right is use.
+
+    [1 SOURCE] -> [2 INGEST] -> [3 THE GRAPH] -> [4 ENGINE] -> [5 SURFACES]
+
+--------------------------------------------------------------------
+STAGE 1: SOURCE DATA (leftmost, narrow)
+--------------------------------------------------------------------
+Box label: "FlyWire FAFB v783"
+Sub-items (stack as small file icons):
+  - neurons.csv.gz            transmitter predictions
+  - classification.csv.gz     super class, class, hemilineage
+  - connections.csv.gz        every synaptic pair, ~68 MB
+  - 7 optional files          cell types, coordinates, community labels,
+                              cell stats, visual types, columns, tags
+  - sk_lod1_783_healed/       one traced skeleton per neuron, 31 GB (optional)
+
+Two notes worth a caption:
+  - The files are free for non-commercial use (CC BY-NC-SA 4.0) and need a
+    Google sign-in, so downloading is a manual step.
+  - A second, synthetic source exists for tests and demos: `connkg fixture`
+    writes a fake release in the same format, with planted circuits.
+
+--------------------------------------------------------------------
+STAGE 2: INGEST (narrow)
+--------------------------------------------------------------------
+Two boxes in series:
+
+  READER  ->  NORMALISED TABLES  ->  EXTRACTOR
+
+  - READER (readers/codex.py, readers/synthetic.py): reads one release format.
+    Adding a new connectome means adding a reader, nothing else.
+  - NORMALISED TABLES (schema.py): the dataset-neutral middle. Every reader
+    produces these; the extractor consumes only these.
+  - EXTRACTOR (extractor.py): turns the tables into typed nodes and edges.
+
+Caption: the seam that makes the rest reusable. The graph does not know what
+a Codex file looks like.
+
+--------------------------------------------------------------------
+STAGE 3: THE GRAPH (the big central box)
+--------------------------------------------------------------------
+Label: "One graph per connectome release"
+
+Layout on disk (show as a small tree):
+
+    <root>/connectomes/fafb783/.connectomekg/
+        graph.sqlite          2.1 GB   nodes, edges, metadata
+        vectors.sqlite         28 MB   sqlite-vec semantic index
+        snapshots/                     one JSON per release, tracked in git
+        skeletons/            2.6 GB   simplified skeleton cache (optional)
+        synapse_graph.npz      13 MB   NumPy synapse graph for fast paths
+        neuropil_meshes.npz   960 KB   brain region surfaces for the 3-D views
+
+Caption: each release owns a complete store, so two datasets never share a
+graph, an index or a snapshot history.
+
+11 NODE KINDS (show as labelled chips, sized by count):
+    neuron            139,255
+    cell_type           8,772
+    label               7,306
+    column              1,581
+    taxon                 243
+    ontology_term         235
+    hemilineage           214
+    neuropil               79
+    nerve                   8
+    connectivity_tag        4
+    dataset                 1
+    ----------------------------
+    157,698 nodes total
+
+14 EDGE KINDS (same treatment):
+    SYNAPSES_TO       3,732,460   neuron to neuron, with count and sign
+    TYPE_SYNAPSES_TO    507,287   the same, aggregated to cell types
+    IN_NEUROPIL         421,132   which brain regions a neuron works in
+    LABELED             139,436
+    INSTANCE_OF         138,327   neuron to its cell type
+    IN_COLUMN            45,528
+    INNERVATES           40,211
+    IN_DATASET           10,976
+    CONTAINS              9,727
+    VIA_NERVE             9,647
+    MEMBER_OF             7,540
+    TAGGED                5,268
+    MIRROR_OF             4,441
+    MAPS_TO                 305
+    ----------------------------
+    5,072,285 edges total
+
+Good callout: the top three edge kinds are 92% of all edges. The graphic
+should show that imbalance rather than hide it.
+
+Coverage, if a "how complete is it" panel is wanted (fraction of neurons
+carrying each annotation):
+    length 99.99% | cell type 99.33% | soma 96.71% | transmitter sign 85.88%
+    visual family 68.25% | ontology term 33.93% | column 32.69%
+
+--------------------------------------------------------------------
+STAGE 4: THE ENGINE (narrow, between graph and surfaces)
+--------------------------------------------------------------------
+Four capabilities, each one box:
+
+  - STRUCTURE: typed lookups over nodes and edges.
+  - PATHS AND CONES (paths.py): strongest synaptic path between two
+    populations, and everything up or downstream within N hops. Backed by the
+    NumPy synapse graph, not SQL.
+  - INFLUENCE (paths.py): effective connectivity, how much of each neuron's
+    input a source population drives, hop by hop.
+  - SEMANTIC SEARCH (the `semantic` extra): a vector index over the human
+    vocabulary only, that is, cell type names, neuropils, labels and taxa.
+
+Caption, worth stating plainly on the graphic: structure is ground truth;
+embeddings are an acceleration layer. Neurons are not embedded. Search finds
+the right place to start, then the graph does the rest.
+
+Underneath all of it: kgmodule-utils, the shared fleet SDK (store, vector
+backends, snapshots, layout). ConnectomeKG is a KGModule, which is what lets
+kg-rag federate it with the code, document and other graphs.
+
+--------------------------------------------------------------------
+STAGE 5: SURFACES (rightmost, the widest fan)
+--------------------------------------------------------------------
+Four ways in, drawn as four branches from the engine:
+
+  A. CLI: `connkg`, 18 commands
+     build, verify, files, fixture, datasets, stats, analyze, snapshot,
+     query, path, cone, influence, link, skeletons, meshes, viz, viz3d, quilt
+
+  B. MCP SERVER: `connkg-mcp`, 16 tools over stdio or SSE
+     graph_stats, find_nodes, get_node, node_edges, neurons_of, type_partners,
+     influence, strongest_path, cone, neuroglancer_link, query_connectome,
+     pack_connectome, analyze_connectome, snapshot_list/show/diff
+     Caption: this is how an AI agent uses the brain.
+
+  C. PYTHON API: `ConnectomeKG`, a KGModule. Also the federation path into
+     kg-rag, which serves it beside the fleet's other knowledge graphs.
+
+  D. VIEWS:
+     - 2-D (`viz` extra): a cell type's partner network, a partner chart,
+       each one self-contained HTML.
+     - 3-D (`viz3d` extra): real geometry, not a metaphor. Every neuron sits
+       at its measured position. Circuit view draws traced skeletons; flow
+       view draws neuropils linked by the signal their neurons carry.
+     - Looking Glass: the same scene as a light-field quilt through
+       quiltwright, or a flat 4K still.
+     - Neuroglancer: `connkg link` builds a URL that shows a spec's neurons
+       as meshes in a browser, no login.
+
+====================================================================
+3. NUMBERS WORTH PUTTING IN LARGE TYPE
+====================================================================
+
+    139,255     neurons
+    3,732,460   synaptic connections between neurons
+    8,772       cell types
+    79          neuropils (brain regions)
+    5,072,285   edges in total
+    ~3 minutes  to build the whole graph on a laptop
+    2.1 GB      the finished SQLite file
+    16          MCP tools
+    18          CLI commands
+
+====================================================================
+4. THE THREE IDEAS THE GRAPHIC SHOULD CARRY
+====================================================================
+
+1. ONE SEAM, MANY CONNECTOMES. A reader and a normalised table set sit
+   between the source files and the graph, so a new connectome is a new
+   reader, not a new system.
+
+2. STRUCTURE FIRST, EMBEDDINGS SECOND. The synapse counts come from a
+   microscope. The semantic layer is a thin set of labels on top, and it
+   only helps you find where to start.
+
+3. THE PICTURE IS THE DATA. Other knowledge graphs invent a layout to draw
+   themselves. A connectome already has one: every neuron has real
+   coordinates and a traced shape, so the 3-D view is the measurement.
+
+====================================================================
+5. DESIGN NOTES
+====================================================================
+
+- Colour: use saturated, colour-blind-safe colours (the Okabe-Ito palette:
+  orange #E69F00, sky blue #56B4E9, bluish green #009E73, yellow #F0E442,
+  blue #0072B2, vermillion #D55E00, reddish purple #CC79A7, black). No
+  pastels: they collapse together for colour-blind readers. This is the same
+  palette the software's own renders use.
+- Background: a muted mid grey (#5A5D62) is what the renders use, and it
+  makes saturated colours read. White is fine for print.
+- Where something is optional, say so. The skeleton download (31 GB), the
+  semantic index, and the 2-D and 3-D views are all optional extras.
+- Real renders exist and beat any drawing of a brain: see docs/images/ for
+  the whole-brain context cloud, a circuit of traced skeletons, and the
+  neuropil flow view.
+- Keep the licence line visible if the FlyWire data or any render appears:
+  data CC BY-NC-SA 4.0, software Elastic License 2.0.
+
+====================================================================
+6. WHAT TO LEAVE OUT
+====================================================================
+
+- The fleet's other knowledge graphs. Mention kg-rag federation as one
+  outgoing arrow, but this graphic is about one system.
+- Internal module names, except where they are the clearest label
+  (extractor, reader). Nobody needs to see `validation.py`.
+- Build timings per stage, snapshot internals and the provenance report.
+  They matter to a maintainer, not to a reader of a poster.
+- Anything claiming the graph simulates the brain. It does not. It is wiring
+  and annotation: who connects to whom, how strongly, with which
+  transmitter, and where.

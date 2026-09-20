@@ -48,6 +48,12 @@ DATASET = "fafb783"
 #: marked points where `connkg skeletons` has back-filled them. Drawing the
 #: surfaces turns the cloud off by default, so an entry that wants both says
 #: so with `cloud=True`.
+#:
+#: Circuits are drawn as tubes here even though `--tubes` is opt-in on the
+#: CLI. A line has no surface, so no lighting can shade it and the result
+#: reads flat however the scene is lit; a tube is a surface and takes the
+#: three-point rig. These are the pictures the project is judged by, so they
+#: pay the extra geometry.
 IMAGES = [
     (
         "anatomy_lplc2_dnp01",
@@ -57,10 +63,21 @@ IMAGES = [
             "tubes": True,
             "cloud": True,
         },
+        True,
+        False,
+    ),
+    (
+        "circuit_dnp01",
+        {"specs": ["DNp01"], "data_dir": "fafb_v783", "tubes": True},
         False,
         False,
     ),
-    ("circuit_dnp01", {"specs": ["DNp01"], "data_dir": "fafb_v783"}, False, False),
+    # The flow views are the only ones without a floor: they are seen nearly
+    # front-on, where a floor is edge-on and puts a band across the frame.
+    # Everything else stands on the ground now that `add_floor` adds its
+    # shadow-casting light on top of the three-point rig instead of replacing
+    # it -- replacing it was what used to leave the shells and the cloud unlit
+    # and turn a circuit render into a lone neuron in the dark.
     ("flow_all", {"view": "flow", "top": 100}, False, True),
     ("flow_lc4", {"view": "flow", "specs": ["LC4"]}, False, True),
     (
