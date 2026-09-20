@@ -11,6 +11,12 @@ interactor style, and Cast to Looking Glass is wired straight to
 ``kg_utils.viz3d.qt.cast_scene_to_looking_glass``, which does the entire cast
 on the GUI thread.
 
+The toolbar's Show box re-resolves specs and redraws in place, so exploring
+does not mean restarting. It refuses a spec that matches nothing, or one over
+``MAX_SCENE_NEURONS``, and leaves the scene as it was -- including when only
+one spec of several is bad, since drawing the rest would look like a scene
+that contained them all.
+
 Picking is bound to **P**, not to a left click. A left click is where VTK
 begins a rotation, so picking on it would re-answer the question on every
 orbit; ``pyvista``'s own default is the key, and the status bar says so. The
@@ -32,6 +38,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
     QDockWidget,
+    QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QTextEdit,
@@ -43,7 +51,7 @@ from connectomekg import scene as render3d
 from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
-from connectomekg.picking import pick_summary
+from connectomekg.picking import PickTargets, pick_summary
 
 #: How far from a neuron's own geometry a pick may land and still count, in
 #: world units (1 unit is 100,000 nm, so this is 25 microns). A pick that hits
@@ -125,59 +133,121 @@ class BrainSceneWindow(QMainWindow):
         self.resize(width, height)
         self.plotter.window_size = [width, height]
 
-        info = render3d.build_brain_scene(
-            self.plotter,
-            kg,
-            specs=specs,
-            view=view,
-            data_dir=data_dir,
-            color_by=color_by,
-            skeleton_step=skeleton_step,
-            tubes=tubes,
-            top=top,
-            neuropils=neuropils,
-            cloud=cloud,
-        )
-        self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
+        self._elevation = elevation
+        self._picks = PickTargets.empty()
 
-        render3d.aim_camera(self.plotter, info.points, elevation=elevation)
-        if floor:
-            render3d.add_floor(self.plotter)
+        self._info_panel = QTextEdit(self)
+        self._info_panel.setReadOnly(True)
+        self._info_panel.setLineWrapMode(QTextEdit.WidgetWidth)
+        self._dock = QDockWidget("Neuron", self)
+        self._dock.setWidget(self._info_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._dock)
 
         toolbar = QToolBar("Actions", self)
         self.addToolBar(toolbar)
         cast_action = QAction("Cast to Looking Glass", self)
         cast_action.triggered.connect(self._cast)
         toolbar.addAction(cast_action)
+        toolbar.addSeparator()
+        toolbar.addWidget(QLabel(" Show: ", self))
+        self._filter_box = QLineEdit(self)
+        self._filter_box.setPlaceholderText(
+            "spec, space-separated -- LC4 DNp01, a root id, or label:giant fib"
+        )
+        self._filter_box.setText(" ".join(specs))
+        self._filter_box.setClearButtonEnabled(True)
+        self._filter_box.returnPressed.connect(self._apply_filter)
+        self._filter_box.setMinimumWidth(360)
+        toolbar.addWidget(self._filter_box)
 
+        # Enabled once, not per scene: the callback reads self._picks when it
+        # fires, so re-filtering swaps the targets without re-registering.
+        # show_message=False keeps the hint out of the scene and out of a cast.
+        self.plotter.enable_point_picking(
+            callback=self._on_pick, show_message=False, show_point=False
+        )
+        self._compose(specs)
+
+    def _compose(self, specs: Sequence[str]) -> None:
+        """Draw a scene for *specs*, replacing whatever is there.
+
+        :param specs: The specs to draw; empty draws the brain alone.
+        """
+        self.plotter.clear()
+        info = render3d.build_brain_scene(
+            self.plotter,
+            self._kg,
+            specs=specs,
+            view=self._view,
+            data_dir=self._data_dir,
+            color_by=self._color_by,
+            skeleton_step=self._skeleton_step,
+            tubes=self._tubes,
+            top=self._top,
+            neuropils=self._neuropils,
+            cloud=self._cloud,
+        )
+        self._specs = list(specs)
         self._picks = info.picks
-        self._info_panel = QTextEdit(self)
-        self._info_panel.setReadOnly(True)
-        self._info_panel.setLineWrapMode(QTextEdit.WidgetWidth)
-        dock = QDockWidget("Neuron", self)
-        dock.setWidget(self._info_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
-        self._dock = dock
+        self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
+        render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
+        if self._floor:
+            render3d.add_floor(self.plotter)
 
         if len(self._picks):
             self._info_panel.setPlainText(
                 f"{len(self._picks.neuron_ids)} neurons drawn.\n\n"
                 "Point at one and press P to identify it."
             )
-            # show_message=False: the hint belongs in the status bar, which
-            # does not sit on top of the scene or end up in a cast quilt.
-            self.plotter.enable_point_picking(
-                callback=self._on_pick, show_message=False, show_point=False
-            )
-            status = self.statusBar()
-            if status is not None:
-                status.showMessage("Point at a neuron and press P to identify it.")
+            self._dock.show()
+            self._say("Point at a neuron and press P to identify it.")
         else:
             self._info_panel.setPlainText(
-                "No circuit in this view, so there is nothing to pick.\n\n"
-                "The flow view draws neuropils rather than neurons."
+                "Nothing here to pick.\n\n"
+                "The flow view draws neuropils rather than neurons, and a "
+                "circuit view needs a spec that resolves to some."
             )
-            dock.hide()
+            self._dock.setVisible(self._view != "flow")
+            self._say("No neurons drawn.")
+
+    def _say(self, message: str) -> None:
+        """Put a line in the status bar, which QMainWindow types as optional."""
+        status = self.statusBar()
+        if status is not None:
+            status.showMessage(message)
+
+    def _apply_filter(self) -> None:
+        """Redraw for whatever the filter box holds, or explain why it cannot.
+
+        The specs are resolved *before* the old scene is torn down, so a typo
+        or a spec over ``MAX_SCENE_NEURONS`` leaves the view as it was rather
+        than emptying it.
+        """
+        specs = self._filter_box.text().split()
+        try:
+            # An unknown name is not an error to `neurons_of`, it is an empty
+            # result, so emptiness has to be checked for rather than caught --
+            # and per spec, not over the union. "LC4 NoSuchType" resolves to
+            # LC4's neurons, and drawing those silently would look like a
+            # scene that contains both.
+            empty = [spec for spec in specs if not self._kg.neurons_of(spec)]
+            if specs and not empty:
+                render3d.circuit_neurons(self._kg, specs)  # raises over the cap
+        except ValueError as exc:
+            self._reject(str(exc))
+            return
+        if empty:
+            self._reject(f"No neuron matches {', '.join(empty)}. Specs are case-sensitive.")
+            return
+        self._compose(specs)
+
+    def _reject(self, message: str) -> None:
+        """Explain why a filter was not applied, leaving the scene as it was.
+
+        :param message: What was wrong with the spec.
+        """
+        self._info_panel.setPlainText(f"Cannot show that.\n\n{message}")
+        self._say(message)
 
     def _on_pick(self, point, *_: object) -> None:
         """Resolve a picked position to a neuron and describe it in the panel.

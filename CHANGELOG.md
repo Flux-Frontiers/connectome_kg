@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the key rather than to a left click, because a left click is where VTK begins
   a rotation and picking there would re-answer the question on every orbit.
 
+  The toolbar's **Show** box takes the same specs the command does and redraws
+  in place, so exploring no longer means restarting. It refuses a spec that
+  matches nothing, or one over `MAX_SCENE_NEURONS`, and leaves the scene as it
+  was -- including when only one spec of several is bad, since drawing the rest
+  would look like a scene that contained them all.
+
   A whole cell type shares one actor, so VTK can report which type was hit but
   never which neuron -- and that is the question a click asks. The new
   `connectomekg.picking` carries identity beside the geometry instead: every
