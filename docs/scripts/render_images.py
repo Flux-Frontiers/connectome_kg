@@ -55,6 +55,14 @@ DATASET = "fafb783"
 #: three-point rig. These are the pictures the project is judged by, so they
 #: pay the extra geometry.
 IMAGES = [
+    # The hero, on the README and the documentation site. Flow rather than a
+    # circuit because it shows the whole brain at once, and over a floor
+    # because the shadow is what gives it depth: the same scene without one
+    # reads flat, which is the note that prompted it.
+    # cloud=True explicitly: drawing the neuropil surfaces turns the cloud off
+    # by default, and here the brain's outline in dots is what the flow map
+    # hangs in. Without it the arcs float in an empty frame.
+    ("flow_all_floor", {"view": "flow", "top": 100, "cloud": True}, True, False),
     (
         "anatomy_lplc2_dnp01",
         {
@@ -72,12 +80,10 @@ IMAGES = [
         False,
         False,
     ),
-    # The flow views are the only ones without a floor: they are seen nearly
-    # front-on, where a floor is edge-on and puts a band across the frame.
-    # Everything else stands on the ground now that `add_floor` adds its
-    # shadow-casting light on top of the three-point rig instead of replacing
-    # it -- replacing it was what used to leave the shells and the cloud unlit
-    # and turn a circuit render into a lone neuron in the dark.
+    # A floor needs the camera tilted down onto it, which `add_floor` pairs
+    # with FLOOR_ELEVATION. Given that tilt it suits the flow view as well as
+    # any other -- an earlier note here claimed flow was seen too nearly
+    # front-on for a floor to read, which the hero below disproves.
     ("flow_all", {"view": "flow", "top": 100}, False, True),
     ("flow_lc4", {"view": "flow", "specs": ["LC4"]}, False, True),
     (

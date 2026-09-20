@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A new hero image**, on the README and the documentation site: the
+  whole-brain flow map over a floor, `docs/images/flow_all_floor.png`. The
+  previous hero was a circuit drawn flat, and the shadow is what it was
+  missing. Passing `cloud=True` explicitly is load-bearing here -- drawing
+  the neuropil surfaces turns the cloud off by default, and it is the brain's
+  outline in cell bodies that the flow map hangs in.
+
+  A note in `render_images.py` had claimed the flow view was seen too nearly
+  front-on for a floor to read. With the camera tilted by `FLOOR_ELEVATION`,
+  which `add_floor` is designed to pair with, that is not so.
+
 ### Added
 
 - **`connkg specs`** prints every form a SPEC takes, with examples, and the

@@ -12,13 +12,12 @@
 
 <!-- An absolute raw URL, not a repo-relative path: PyPI re-hosts this README
      and repo-relative images do not resolve there. Pinned to main rather than
-     to a tag on purpose. A tag-pinned hero has to be bumped every release and
-     fails silently when it is not, serving the previous release's image at
-     200 OK; and this one could not be pinned to v0.4.0 in any case, because
-     the tag was cut before the image existed. -->
-![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/anatomy_lplc2_dnp01.png)
+     to a tag on purpose -- a tag-pinned hero has to be bumped every release
+     and fails silently when it is not, serving the previous release's image
+     at 200 OK. -->
+![Signal flow across the FAFB v783 brain, over a floor](https://raw.githubusercontent.com/Flux-Frontiers/connectome_kg/main/docs/images/flow_all_floor.png)
 
-*The escape circuit in its anatomy. Pink is LPLC2, the looming detectors whose dendrites fill the lobula of each optic lobe; blue is DNp01, the giant fibre, which collects from them in the central brain and sends the two axons leaving the bottom of the frame down to the nerve cord. Behind them the brain's 78 neuropil surfaces, and one dot for each of the 139,255 neurons placed at its cell body. One command draws it, over the same spec grammar the path and cone queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
+*Signal flow across the whole brain: the strongest 100 of 5,786 directed neuropil pairs, each neuropil a sphere at the synapse-weighted centroid of its neurons and tinted by brain region, inside the outline of all 139,255 cell bodies. Flow from A to B is carried by neurons, not counted from synapses: each neuron's output synapses in B, apportioned by the share of its input that lies in A.*
 
 *Render of the [FlyWire](https://flywire.ai) FAFB v783 connectome ([Dorkenwald et al. 2024](https://doi.org/10.1038/s41586-024-07558-y); [Schlegel et al. 2024](https://doi.org/10.1038/s41586-024-07686-5)), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The image is an adaptation shared under the same licence, not under the software's Elastic License 2.0.*
 

@@ -11,21 +11,17 @@ taxonomy, hemilineages and community labels sit on top. The first corpus is
 the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460
 connected neuron pairs.
 
+![Signal flow across the FAFB v783 brain, over a floor](images/flow_all_floor.png)
+
+*Signal flow across the whole brain: the strongest 100 of 5,786 directed neuropil pairs, each neuropil a sphere at the synapse-weighted centroid of its neurons and tinted by brain region, inside the outline of all 139,255 cell bodies. Flow from A to B is carried by neurons, not counted from synapses: each neuron's output synapses in B, apportioned by the share of its input that lies in A.*
+
 ![The escape circuit, LPLC2 to DNp01, inside the brain's neuropil surfaces](images/anatomy_lplc2_dnp01.png)
 
-*The escape circuit in its anatomy. Pink is LPLC2, the looming detectors
-filling the lobula of each optic lobe; blue is DNp01, the giant fibre, which
-collects from them and sends the two axons leaving the bottom of the frame
-down to the nerve cord. Behind them the brain's 78 neuropil surfaces, and one
-dot per neuron at its cell body. The whole picture comes from one command,
-`connkg quilt LPLC2 DNp01 --tubes --cloud`, over the same spec grammar the
-path and cone queries take.*
-
-![Neuropil flow across the FAFB v783 brain](images/flow_all.png)
-
-*Signal flow between neuropils, summed over the neurons that carry it: the
-strongest 100 of 5,786 directed pairs, each neuropil a sphere at the
-synapse-weighted centroid of its neurons and tinted by brain region.*
+*And one circuit inside it. Pink is LPLC2, the looming detectors filling the
+lobula of each optic lobe; blue is DNp01, the giant fibre, which collects from
+them and sends the two axons leaving the bottom of the frame down to the nerve
+cord. One command draws it, over the same spec grammar the path and cone
+queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
 
 !!! note "Data credit and licence"
     The images above are renders of the
