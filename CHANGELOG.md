@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg specs`** prints every form a SPEC takes, with examples, and the
+  answer forms beside them. One list in `connectomekg.answers` feeds the
+  command, the README and the 3-D viewer's own panel, and a test asserts every
+  example parses -- three were wrong when first written (two synthetic
+  fixture names that do not exist on v783, and two cones that blow the scene
+  cap) and were caught by running them against the real graph.
+- **A control panel in the 3-D viewer.** Toggles for the whole-brain cloud,
+  the neuropil surfaces, the floor and tubes; a stride spinner where 0 means
+  automatic; a minimum-synapse spinner that brings an over-cap cone back under
+  it; and the spec examples listed beside them. The fleet's other viewers
+  (`gutenberg_kg`, `pycode_kg`, `Metabo_kg`) all have a panel like this;
+  only `genealogy_kg`, which this viewer was modelled on, does not.
+
+### Changed
+
+- **`MAX_SCENE_NEURONS` is 5,000, up from 500**, and the skeleton stride now
+  defaults to one chosen by neuron count rather than a fixed 4. The old cap
+  was set when drawing 500 neurons meant 500 SWC parses out of a 31 GB
+  download; the skeleton cache made that a filtered read of one Parquet
+  directory. Measured on FAFB v783: 4,000 neurons compose in 4.5 s and render
+  in 0.4 s, and the automatic stride holds the point count near
+  `SCENE_POINT_BUDGET` so the cost stops tracking the neuron count. `cone:LC4`
+  is 489 neurons and `cone:DNp01<1` is 663 -- both refused before, both drawn
+  now.
+
+
+### Added
+
 - **Answers in the 3-D viewer.** `connkg viz3d "path:LPLC2>DNp01"` opens on the
   answer rather than on a cell type, drawn hop-coloured; so does typing the
   same thing into the viewer's Show box, which means a question can be

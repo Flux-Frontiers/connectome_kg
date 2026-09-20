@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from connectomekg.colors import hop_color
 from connectomekg.validation import MAX_HOP, MAX_SCENE_NEURONS, bounded_int
@@ -36,10 +36,59 @@ if TYPE_CHECKING:
     from connectomekg.module import ConnectomeKG
     from connectomekg.scene import NeuronGroup
 
-__all__ = ["Answer", "ANSWER_SYNTAX", "answer_groups", "is_answer", "parse_answer"]
+__all__ = [
+    "ANSWER_EXAMPLES",
+    "ANSWER_SYNTAX",
+    "SPEC_EXAMPLES",
+    "Answer",
+    "answer_groups",
+    "is_answer",
+    "parse_answer",
+    "spec_help",
+]
 
 #: Shown wherever an answer query can be typed or passed.
 ANSWER_SYNTAX = "path:FROM>TO, cone:SPEC, cone:SPEC>HOPS (downstream), cone:SPEC<HOPS (upstream)"
+
+#: Every form the spec grammar takes, as ``(example, what it means)``. One
+#: list, so the CLI's ``connkg specs``, the README, the rendering guide and
+#: the 3-D viewer's own help all say the same thing. The examples are real on
+#: FAFB v783 -- each one resolves against a built v783 graph.
+SPEC_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
+    ("LC4", "every neuron of a cell type, by exact name (case-sensitive)"),
+    ("DNp01", "the two giant fibre descending neurons"),
+    ("720575940622838154", "one neuron, by FlyWire root id"),
+    ("connectome:fafb783:n:720575940622838154", "the same neuron, by node id"),
+    ("label:giant fib", "every neuron a community label matches, as a regex"),
+    ("label:^LPLC2_", "anchored, so it matches the label's start"),
+)
+
+#: The answer forms, which any command taking a spec also takes. Every one of
+#: these resolves on FAFB v783 and fits in one scene -- a multi-hop cone at
+#: the default threshold does not, which is what ``min_syn`` is for, so none
+#: is offered here as though it would.
+ANSWER_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
+    ("path:LPLC2>DNp01", "the strongest signed path, hop by hop"),
+    ("path:LC4>DNp01", "looming detectors to the giant fibre: the escape circuit"),
+    ("path:label:giant fib>DNp04", "a path may start from a label"),
+    ("cone:LC4", "everything one hop downstream: 489 neurons"),
+    ("cone:DNp01<1", "one hop upstream -- the arrow follows the signal: 663"),
+    ("cone:label:giant fib<1", "a spec may itself carry a prefix"),
+)
+
+
+def spec_help() -> str:
+    """The spec and answer grammar with examples, as plain text.
+
+    :return: Two labelled blocks, one line per form.
+    """
+    width = max(len(example) for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES))
+    lines = ["A SPEC names neurons:", ""]
+    lines += [f"  {example:<{width}}  {meaning}" for example, meaning in SPEC_EXAMPLES]
+    lines += ["", "An answer draws a query instead, and goes anywhere a SPEC does:", ""]
+    lines += [f"  {example:<{width}}  {meaning}" for example, meaning in ANSWER_EXAMPLES]
+    return "\n".join(lines)
+
 
 # Either side may be empty here so that `path:A>` reaches the error below,
 # which names the forms, rather than falling through to the generic one.

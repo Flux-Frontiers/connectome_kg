@@ -173,6 +173,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Make a test connectome** | `connkg fixture --out DIR` |
 | **Build the graph** | `connkg build` |
 | **List the connectomes built under a root** | `connkg datasets` |
+| **List every SPEC and answer form, with examples** | `connkg specs` |
 | **Count nodes and edges** | `connkg stats` |
 | **Get a Markdown report: hubs, top type-to-type links, neuropils, coverage** | `connkg analyze` |
 | **Search types, neuropils and labels** | `connkg query "..."` |
@@ -190,6 +191,32 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Render a view as one 4K image, over a floor with shadows** | `connkg quilt SPEC --still --floor` (the `viz3d` extra) |
 | **Record the graph's metrics** | `connkg snapshot save [VERSION]` |
 | **Give an AI agent the graph** | `connkg-mcp --root DIR [--dataset ID]` |
+
+### What a SPEC can be
+
+Every command that takes neurons takes the same grammar, and `connkg specs` prints it.
+
+| spec | means |
+|---|---|
+| `LC4` | every neuron of a cell type, by exact name (case-sensitive) |
+| `DNp01` | the two giant fibre descending neurons |
+| `720575940622838154` | one neuron, by FlyWire root id |
+| `connectome:fafb783:n:720575940622838154` | the same neuron, by node id |
+| `label:giant fib` | every neuron a community label matches, as a regex |
+| `label:^LPLC2_` | anchored, so it matches the label's start |
+
+An **answer** goes anywhere a spec does, and draws the query rather than naming it:
+
+| answer | means |
+|---|---|
+| `path:LPLC2>DNp01` | the strongest signed path, hop by hop |
+| `path:LC4>DNp01` | looming detectors to the giant fibre: the escape circuit |
+| `path:label:giant fib>DNp04` | a path may start from a label |
+| `cone:LC4` | everything one hop downstream: 489 neurons |
+| `cone:DNp01<1` | one hop upstream -- the arrow follows the signal: 663 |
+| `cone:label:giant fib<1` | a spec may itself carry a prefix |
+
+The arrow follows the signal, which is why upstream is `<`. Specs are case-sensitive, and a `label:` pattern is a regular expression. An answer that will not fit in one scene is refused; narrow it with `--min-syn`.
 
 `--root` and `--dataset` come before the command. Run `connkg <command> --help` for every option.
 

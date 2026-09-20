@@ -7,7 +7,7 @@ from typing import Any
 
 import click
 
-from connectomekg.answers import answer_groups
+from connectomekg.answers import answer_groups, spec_help
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, usage_errors
 from connectomekg.validation import MAX_LIMIT
@@ -58,6 +58,19 @@ def _draw(kg: Any, query: str, min_syn: int, data_dir: str | None) -> None:
         say=lambda m: click.echo(f"  {m}", err=True),
     )
     click.echo(f"Wrote {written}")
+
+
+@cli.command("specs")
+def specs() -> None:
+    """Every form a SPEC takes, with examples.
+
+    A SPEC is what `path`, `cone`, `influence`, `link`, `quilt` and `viz3d`
+    all take to mean "these neurons". The answer forms go in the same places
+    and draw the query instead of naming it.
+    """
+    click.echo(spec_help())
+    click.echo("\n  Specs are case-sensitive. A label: pattern is a regular expression.")
+    click.echo("  An answer over the scene cap is refused; narrow it with --min-syn.")
 
 
 @cli.command("path")

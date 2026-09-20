@@ -134,10 +134,12 @@ color_by_option = click.option(
 )
 skeleton_step_option = click.option(
     "--skeleton-step",
-    default=4,
-    show_default=True,
+    default=None,
     type=click.IntRange(1, MAX_SKELETON_STEP),
-    help="Skeleton simplification stride; 1 draws every traced point.",
+    help=(
+        "Skeleton simplification stride; 1 draws every traced point. "
+        "The default scales with the neuron count to keep a big scene drawable."
+    ),
 )
 tubes_option = click.option(
     "--tubes", is_flag=True, help="Draw circuit skeletons as tubes instead of lines."

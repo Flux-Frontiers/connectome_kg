@@ -37,22 +37,28 @@ from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
+    QCheckBox,
     QDockWidget,
+    QFrame,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QSpinBox,
     QTextEdit,
     QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
 from pyvistaqt import QtInteractor
 
 from connectomekg import scene as render3d
-from connectomekg.answers import ANSWER_SYNTAX, Answer, answer_groups, is_answer
+from connectomekg.answers import ANSWER_SYNTAX, Answer, answer_groups, is_answer, spec_help
 from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
 from connectomekg.picking import PickTargets, pick_summary
+from connectomekg.validation import MAX_MIN_SYN, MAX_SKELETON_STEP
 
 #: How far from a neuron's own geometry a pick may land and still count, in
 #: world units (1 unit is 100,000 nm, so this is 25 microns). A pick that hits
@@ -100,7 +106,7 @@ class BrainSceneWindow(QMainWindow):
         view: str = "circuit",
         data_dir: str | Path | None = None,
         color_by: str = "super_class",
-        skeleton_step: int = 4,
+        skeleton_step: int | None = None,
         tubes: bool = False,
         top: int = 100,
         neuropils: bool = True,
@@ -147,6 +153,7 @@ class BrainSceneWindow(QMainWindow):
         self._dock = QDockWidget("Neuron", self)
         self._dock.setWidget(self._info_panel)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._dock)
+        self._build_controls()
 
         toolbar = QToolBar("Actions", self)
         self.addToolBar(toolbar)
@@ -172,6 +179,92 @@ class BrainSceneWindow(QMainWindow):
             callback=self._on_pick, show_message=False, show_point=False
         )
         self._compose(specs, answer)
+
+    def _build_controls(self) -> None:
+        """A dock of toggles for everything the scene can draw or leave out.
+
+        The fleet's other viewers (``gutenberg_kg``, ``pycode_kg``,
+        ``Metabo_kg``) put their controls in a panel like this; only
+        ``genealogy_kg``, which this file was modelled on, has none. A
+        connectome scene has more to turn on and off than a family tree does,
+        so it follows the majority.
+
+        Each toggle redraws, because the overlays are composed rather than
+        merely hidden: the cloud is one glyph per neuron and the surfaces are
+        78 merged meshes, and keeping both around to toggle visibility would
+        cost more than rebuilding the scene without them.
+        """
+        panel = QWidget(self)
+        layout = QVBoxLayout(panel)
+        layout.setSpacing(6)
+
+        layout.addWidget(self._heading("Overlays"))
+        self._toggles: dict[str, QCheckBox] = {}
+        for key, text, checked in (
+            ("cloud", "Whole-brain cloud", bool(self._cloud)),
+            ("neuropils", "Neuropil surfaces", self._neuropils),
+            ("floor", "Floor and shadow", self._floor),
+            ("tubes", "Skeletons as tubes", self._tubes),
+        ):
+            box = QCheckBox(text, panel)
+            box.setChecked(checked)
+            box.stateChanged.connect(self._on_toggle)
+            layout.addWidget(box)
+            self._toggles[key] = box
+
+        layout.addWidget(self._separator())
+        layout.addWidget(self._heading("Detail"))
+        layout.addWidget(QLabel("Skeleton stride (0 = automatic)", panel))
+        self._stride = QSpinBox(panel)
+        self._stride.setRange(0, MAX_SKELETON_STEP)
+        self._stride.setValue(self._skeleton_step or 0)
+        self._stride.setToolTip(
+            "0 lets the stride follow the neuron count, so a large answer stays drawable."
+        )
+        layout.addWidget(self._stride)
+
+        layout.addWidget(QLabel("Minimum synapses (cone)", panel))
+        self._min_syn = QSpinBox(panel)
+        self._min_syn.setRange(1, MAX_MIN_SYN)
+        self._min_syn.setValue(1)
+        self._min_syn.setToolTip(
+            "Raise this to bring a multi-hop cone under the scene cap; it only affects "
+            "cone: answers."
+        )
+        layout.addWidget(self._min_syn)
+
+        layout.addWidget(self._separator())
+        layout.addWidget(self._heading("Examples"))
+        examples = QTextEdit(panel)
+        examples.setReadOnly(True)
+        examples.setPlainText(spec_help())
+        examples.setLineWrapMode(QTextEdit.NoWrap)
+        layout.addWidget(examples, stretch=1)
+
+        dock = QDockWidget("Controls", self)
+        dock.setWidget(panel)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+        self._controls_dock = dock
+
+    def _heading(self, text: str) -> QLabel:
+        label = QLabel(text, self)
+        label.setStyleSheet("font-weight: bold;")
+        return label
+
+    def _separator(self) -> QFrame:
+        line = QFrame(self)
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        return line
+
+    def _on_toggle(self) -> None:
+        """Apply the toggles by redrawing whatever the view currently shows."""
+        self._cloud = self._toggles["cloud"].isChecked()
+        self._neuropils = self._toggles["neuropils"].isChecked()
+        self._floor = self._toggles["floor"].isChecked()
+        self._tubes = self._toggles["tubes"].isChecked()
+        self._skeleton_step = self._stride.value() or None
+        self._compose(self._specs, self._answer)
 
     def _compose(self, specs: Sequence[str], answer: Answer | None = None) -> None:
         """Draw a scene for *specs*, or for an answer, replacing whatever is there.
@@ -237,7 +330,7 @@ class BrainSceneWindow(QMainWindow):
         text = self._filter_box.text().strip()
         if is_answer(text):
             try:
-                answer = answer_groups(self._kg, text)
+                answer = answer_groups(self._kg, text, min_syn=self._min_syn.value())
             except ValueError as exc:
                 self._reject(str(exc))
                 return
@@ -331,7 +424,7 @@ def launch(
     view: str = "circuit",
     data_dir: str | Path | None = None,
     color_by: str = "super_class",
-    skeleton_step: int = 4,
+    skeleton_step: int | None = None,
     tubes: bool = False,
     top: int = 100,
     neuropils: bool = True,

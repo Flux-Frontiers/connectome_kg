@@ -96,3 +96,34 @@ def test_min_syn_narrows_a_cone(kg):
     wide = answers.answer_groups(kg, "cone:GRN_sugar>1", min_syn=1)
     narrow = answers.answer_groups(kg, "cone:GRN_sugar>1", min_syn=10_000)
     assert len(narrow) < len(wide)
+
+
+def test_every_documented_spec_example_resolves(kg):
+    """The examples are shown to users, so they have to be real.
+
+    The fixture is synthetic and has none of v783's cell types, so this checks
+    the *shape* of each example rather than its yield: that it parses, and
+    that an answer form resolves through the same code a user's would. Three
+    of these were wrong when first written -- two synthetic names that do not
+    exist on v783, and two cones that blow the scene cap -- and were caught by
+    running them against the real graph.
+    """
+    for example, meaning in answers.SPEC_EXAMPLES:
+        assert meaning and not meaning.endswith("."), example
+        assert not answers.is_answer(example), example
+        # A spec must be something neurons_of will accept, not just any string.
+        kg.neurons_of(example)
+
+    for example, meaning in answers.ANSWER_EXAMPLES:
+        assert meaning and not meaning.endswith("."), example
+        assert answers.is_answer(example), example
+        kind, _ = answers.parse_answer(example)
+        assert kind in {"path", "cone"}
+
+
+def test_spec_help_lists_every_example():
+    text = answers.spec_help()
+    for example, meaning in (*answers.SPEC_EXAMPLES, *answers.ANSWER_EXAMPLES):
+        assert example in text and meaning in text
+    assert "A SPEC names neurons" in text
+    assert "goes anywhere a SPEC does" in text
