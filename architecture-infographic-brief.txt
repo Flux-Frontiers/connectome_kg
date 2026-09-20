@@ -1,6 +1,7 @@
 CONNECTOMEKG ARCHITECTURE: INFOGRAPHIC BRIEF
-Source: connectome_kg 0.4.0, and the built FAFB v783 graph's own 0.4.0 snapshot.
-Written 2026-09-19. Every number here was read from the code or the graph, not estimated.
+Source: connectome_kg 0.5.0, and the built FAFB v783 graph's own 0.5.0 snapshot.
+Written 2026-09-19, checked against 0.5.0 on 2026-09-20. Every number here was
+read from the code or the graph, not estimated.
 
 ====================================================================
 1. THE ONE-SENTENCE IDEA (headline of the graphic)
@@ -143,8 +144,8 @@ STAGE 5: SURFACES (rightmost, the widest fan)
 --------------------------------------------------------------------
 Four ways in, drawn as four branches from the engine:
 
-  A. CLI: `connkg`, 18 commands
-     build, verify, files, fixture, datasets, stats, analyze, snapshot,
+  A. CLI: `connkg`, 19 commands
+     build, verify, files, fixture, datasets, specs, stats, analyze, snapshot,
      query, path, cone, influence, link, skeletons, meshes, viz, viz3d, quilt
 
   B. MCP SERVER: `connkg-mcp`, 16 tools over stdio or SSE
@@ -179,7 +180,7 @@ Four ways in, drawn as four branches from the engine:
     ~3 minutes  to build the whole graph on a laptop
     2.1 GB      the finished SQLite file
     16          MCP tools
-    18          CLI commands
+    19          CLI commands
 
 ====================================================================
 4. THE THREE IDEAS THE GRAPHIC SHOULD CARRY
