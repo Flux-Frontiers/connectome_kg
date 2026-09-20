@@ -28,13 +28,94 @@ def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
         result.print_summary()
 
 
+#: Offered by the queries that can draw their own answer.
+render_option = click.option(
+    "--render",
+    is_flag=True,
+    help="Also draw the answer as a still under renders/stills/ (needs the viz3d extra).",
+)
+
+
+def _draw_path(kg: Any, result: Any, src: str, dst: str, data_dir: str | None) -> None:
+    """Render a strongest path: one group per hop, dark to bright along it.
+
+    One neuron per hop, so each hop is its own group and the ramp reads as the
+    direction of travel. The label on a hop is the synapses entering it, which
+    is the number the text output puts on the same line.
+    """
+    from connectomekg.cli.cmd_viz3d import render_answer  # noqa: PLC0415 - needs the extra
+    from connectomekg.colors import hop_color  # noqa: PLC0415
+    from connectomekg.scene import NeuronGroup  # noqa: PLC0415
+
+    n = len(result.hops)
+    groups, labels = [], []
+    for i, hop in enumerate(result.hops):
+        node = kg.store.node(hop.node_id) or {}
+        name = node.get("name") or hop.node_id
+        groups.append(NeuronGroup(f"hop {i} {name}", [hop.node_id], hop_color(i, n)))
+        labels.append(
+            (hop.node_id, f"{name}" if not hop.syn_count else f"{name}  {hop.syn_count} syn")
+        )
+    written = render_answer(
+        kg,
+        groups,
+        stem=f"path_{src}_to_{dst}",
+        data_dir=data_dir,
+        labels=labels,
+        say=lambda m: click.echo(f"  {m}", err=True),
+    )
+    click.echo(f"Wrote {written}")
+
+
+def _draw_cone(
+    kg: Any, reached: dict[str, int], spec: str, direction: str, data_dir: str | None
+) -> None:
+    """Render a cone: one group per hop, dark at the seed and bright outward.
+
+    :raises click.UsageError: If the cone holds more neurons than one scene
+        may draw, with the count and the cap.
+    """
+    from connectomekg.cli.cmd_viz3d import render_answer  # noqa: PLC0415 - needs the extra
+    from connectomekg.colors import hop_color  # noqa: PLC0415
+    from connectomekg.scene import NeuronGroup  # noqa: PLC0415
+    from connectomekg.validation import MAX_SCENE_NEURONS  # noqa: PLC0415
+
+    if len(reached) > MAX_SCENE_NEURONS:
+        raise click.UsageError(
+            f"{len(reached)} neurons in this cone, over the cap of {MAX_SCENE_NEURONS} for "
+            "one scene; narrow it with fewer --hops or a higher --min-syn"
+        )
+    by_hop: dict[int, list[str]] = {}
+    for node_id, hop in reached.items():
+        by_hop.setdefault(hop, []).append(node_id)
+    n = len(by_hop)
+    groups = [
+        NeuronGroup(f"hop {hop}", sorted(by_hop[hop]), hop_color(i, n))
+        for i, hop in enumerate(sorted(by_hop))
+    ]
+    written = render_answer(
+        kg,
+        groups,
+        stem=f"cone_{spec}_{direction}",
+        data_dir=data_dir,
+        say=lambda m: click.echo(f"  {m}", err=True),
+    )
+    click.echo(f"Wrote {written}")
+
+
 @cli.command("path")
 @source_options
 @click.option("--from", "src", required=True, help="Source spec: cell type, neuron or label.")
 @click.option("--to", "dst", required=True, help="Target spec.")
+@render_option
 @click.pass_context
-def path(ctx: click.Context, src: str, dst: str, **source: Any) -> None:
-    """Strongest synaptic path between two specs."""
+def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) -> None:
+    """Strongest synaptic path between two specs.
+
+    With --render, the answer is also drawn: each hop's neuron as a traced
+    skeleton in its own colour, dark to bright along the path, labelled with
+    the synapses entering it, standing on a floor. Needs the viz3d extra.
+    """
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
         with usage_errors():
             res = kg.strongest_path(src, dst)
@@ -51,6 +132,8 @@ def path(ctx: click.Context, src: str, dst: str, **source: Any) -> None:
                 )
             else:
                 click.echo(f"  {tag}")
+        if render:
+            _draw_path(kg, res, src, dst, source.get("data_dir"))
 
 
 @cli.command("cone")
@@ -65,11 +148,23 @@ def path(ctx: click.Context, src: str, dst: str, **source: Any) -> None:
     type=click.IntRange(min=1),
     help="Neurons listed per hop.",
 )
+@render_option
 @click.pass_context
 def cone(
-    ctx: click.Context, spec: str, hops: int, direction: str, limit: int, **source: Any
+    ctx: click.Context,
+    spec: str,
+    hops: int,
+    direction: str,
+    limit: int,
+    render: bool,
+    **source: Any,
 ) -> None:
-    """Downstream or upstream cone of a spec."""
+    """Downstream or upstream cone of a spec.
+
+    With --render, the answer is also drawn: the neurons of each hop in their
+    own colour, dark to bright outward from the seed, standing on a floor.
+    Needs the viz3d extra.
+    """
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
         with usage_errors():
             reached = kg.cone(spec, hops=hops, min_syn=source["min_syn"], direction=direction)
@@ -81,6 +176,8 @@ def cone(
             click.echo(f"hop {h}: {len(by_hop[h])} neurons")
             for q in sorted(by_hop[h])[:limit]:
                 click.echo(f"  {q}")
+        if render:
+            _draw_cone(kg, reached, spec, direction, source.get("data_dir"))
 
 
 @cli.command("influence")

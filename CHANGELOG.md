@@ -36,14 +36,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`connkg path --render` and `connkg cone --render` draw the answer.** The
+  query already knows which neurons answer the question and in what order; the
+  flag draws them. A path becomes its hops as traced skeletons, one colour per
+  hop running dark to bright along the route and labelled with the synapses
+  entering it; a cone becomes its shells, dark at the seed and bright outward.
+  Tubes on a floor, written as a 4K still under `renders/stills/`. Needs the
+  viz3d extra, and says so if it is missing.
+
+  An answer render draws no neuropil surfaces and no whole-brain cloud, which
+  is not about speed: the camera frames the scene's bounds, so leaving the
+  brain in makes the brain the thing framed and the answer ends up a quarter
+  of the frame wide. A cone over `MAX_SCENE_NEURONS` is refused with the count
+  and the remedy, after its text answer has printed -- the query succeeded,
+  only the drawing of it did not.
+
 - **`connectomekg.scene.NeuronGroup`**, so a caller can say which neurons
   belong together and in what colour, rather than having cell type decide. The
   circuit view groups by type and colours by name, which is right for "show me
   LC4" and wrong for "show me the answer": a path's hops are an order, and the
   neurons in one hop rarely share a type. With `connectomekg.colors.hop_color`,
   a viridis-style ramp that rises monotonically in luminance so the order
-  survives colour blindness, this is the groundwork for rendering a path or a
-  cone.
+  survives colour blindness, this is what `--render` draws with.
 
 
 ### Fixed
