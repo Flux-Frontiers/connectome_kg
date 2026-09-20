@@ -390,8 +390,10 @@ def viz3d(
 ) -> None:
     """Launch an interactive 3-D viewer of SPEC(s)' circuit or the neuropil flow.
 
-    Orbit/zoom/pan with the mouse. The toolbar's "Cast to Looking Glass"
-    button sends the current view to Bridge.
+    Orbit/zoom/pan with the mouse. Point at a neuron and press P to identify
+    it: the panel on the right names it, describes it, and lists its strongest
+    partner types each way. The toolbar's "Cast to Looking Glass" button sends
+    the current view to Bridge.
     """
     require_specs_for_view(view, specs)
     missing = _missing_modules("pyvista", "pyvistaqt", "PyQt5", "quiltwright")
