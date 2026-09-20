@@ -175,9 +175,18 @@ class BrainSceneWindow(QMainWindow):
         # Enabled once, not per scene: the callback reads self._picks when it
         # fires, so re-filtering swaps the targets without re-registering.
         # show_message=False keeps the hint out of the scene and out of a cast.
-        self.plotter.enable_point_picking(
-            callback=self._on_pick, show_message=False, show_point=False
-        )
+        #
+        # Picking is an interactor event, and a QtInteractor built while
+        # pyvista.OFF_SCREEN is set has no interactor at all -- iren is None,
+        # and enable_point_picking raises on it. That is the state CI runs in,
+        # since pyvista's headless-display action exports PYVISTA_OFF_SCREEN.
+        # Nothing is lost by skipping it there: an off-screen window is one
+        # nobody can point at. _on_pick stays callable either way, which is
+        # how the picking tests drive it.
+        if self.plotter.iren is not None:
+            self.plotter.enable_point_picking(
+                callback=self._on_pick, show_message=False, show_point=False
+            )
         self._compose(specs, answer)
 
     def _build_controls(self) -> None:
