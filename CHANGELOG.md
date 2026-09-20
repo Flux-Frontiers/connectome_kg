@@ -7,17 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **The 3-D viewer no longer refuses to build when there is no interactor.**
-  Picking is an interactor event, and a `QtInteractor` created while
-  `pyvista.OFF_SCREEN` is set has no interactor at all, so
-  `enable_point_picking` raised `AttributeError` in `BrainSceneWindow`'s
-  constructor and the window could not be built. It is skipped in that state
-  now -- an off-screen window is one nobody can point at. This is what CI runs
-  in, since pyvista's headless-display action exports `PYVISTA_OFF_SCREEN` and
-  a developer's machine does not: 21 viewer tests passed locally and failed
-  there. A test sets the flag itself, so the developer run catches it too.
+## [0.5.0] - 2026-09-20
 
 ### Added
 
@@ -54,36 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first two papers that query returned nothing useful, since `DNp01`,
   `LC4` and `LPLC2` appeared zero times in either.
 
-### Fixed
-
-- **A toggle in the 3-D viewer no longer throws away the rotation.** Every
-  overlay toggle recomposed the scene and re-aimed the camera, so turning the
-  floor on after orbiting put the view back where it started. A toggle changes
-  what is drawn, not what is being looked at, so the camera is kept; a new
-  spec or answer still re-frames, since the old camera may not contain it.
-- **The floor no longer blocks the scene from below.** It was an opaque
-  120-unit plane visible from both sides, so orbiting under the subject put it
-  between the camera and the brain -- nothing was visible at all. It is culled
-  from behind now: a floor is a surface to stand on, not a wall. (Viewed from
-  underneath the subject is still dark, which is the shadow rather than the
-  floor: the only shadow-casting light is above it.)
-
-
-### Changed
-
-- **A new hero image**, on the README and the documentation site: the
-  whole-brain flow map over a floor, `docs/images/flow_all_floor.png`. The
-  previous hero was a circuit drawn flat, and the shadow is what it was
-  missing. Passing `cloud=True` explicitly is load-bearing here -- drawing
-  the neuropil surfaces turns the cloud off by default, and it is the brain's
-  outline in cell bodies that the flow map hangs in.
-
-  A note in `render_images.py` had claimed the flow view was seen too nearly
-  front-on for a floor to read. With the camera tilted by `FLOOR_ELEVATION`,
-  which `add_floor` is designed to pair with, that is not so.
-
-### Added
-
 - **`connkg specs`** prints every form a SPEC takes, with examples, and the
   answer forms beside them. One list in `connectomekg.answers` feeds the
   command, the README and the 3-D viewer's own panel, and a test asserts every
@@ -96,21 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it; and the spec examples listed beside them. The fleet's other viewers
   (`gutenberg_kg`, `pycode_kg`, `Metabo_kg`) all have a panel like this;
   only `genealogy_kg`, which this viewer was modelled on, does not.
-
-### Changed
-
-- **`MAX_SCENE_NEURONS` is 5,000, up from 500**, and the skeleton stride now
-  defaults to one chosen by neuron count rather than a fixed 4. The old cap
-  was set when drawing 500 neurons meant 500 SWC parses out of a 31 GB
-  download; the skeleton cache made that a filtered read of one Parquet
-  directory. Measured on FAFB v783: 4,000 neurons compose in 4.5 s and render
-  in 0.4 s, and the automatic stride holds the point count near
-  `SCENE_POINT_BUDGET` so the cost stops tracking the neuron count. `cone:LC4`
-  is 489 neurons and `cone:DNp01<1` is 663 -- both refused before, both drawn
-  now.
-
-
-### Added
 
 - **Answers in the 3-D viewer.** `connkg viz3d "path:LPLC2>DNp01"` opens on the
   answer rather than on a cell type, drawn hop-coloured; so does typing the
@@ -127,36 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or that holds more neurons than one scene may draw, is refused with the
   reason and leaves the view as it was -- `cone:DNp01<1` is 663 neurons on
   FAFB v783 and says so.
-
-
-### Changed
-
-- **Every 3-D scene is lit by a three-point rig**, replacing PyVista's five
-  default lights. The default's flaw is not that its lights follow the camera
-  but that all five sit on the view axis, so every surface is lit head-on and
-  a tube reads as a flat ribbon. Offsetting the key up and to the left models
-  the form while still facing the subject. Measured on the LPLC2-DNp01 scene,
-  the new rig is brighter and more saturated than the default it replaces
-  (luminance 93.8 against 92.0, saturation 17.5 against 16.3). Fixing the
-  lights in the brain's frame instead was tried and measured *worse* -- 86.0
-  and 11.7, because a brain seen front-on turns its lit side away from a key
-  placed in world coordinates -- and the numbers are recorded in the code so
-  nobody repeats it.
-- **`--floor` no longer unlights the scene.** It replaced the lighting with a
-  single narrow spotlight, which threw a shadow and left everything the cone
-  missed dark: the neuropil surfaces at 10 % opacity and the whole-brain cloud
-  both disappeared, turning a circuit render into a lone neuron in the void.
-  The shadow-casting light now sits on top of the three-point rig rather than
-  replacing it, so a floored scene keeps its anatomy. The shadow itself is
-  sharper and darker (cone 75 to 42 degrees, since a penumbra widens with the
-  light's angular size), and the floor is no longer the exact colour of the
-  background, which had left it with no horizon and no lit pool for a shadow
-  to fall on.
-- **The documentation images are drawn as tubes and stand on the ground.** A
-  line has no surface, so no lighting can shade it and a line-drawn circuit
-  reads flat however the scene is lit. `--tubes` stays opt-in on the CLI.
-
-### Added
 
 - **`connkg path --render` and `connkg cone --render` draw the answer.** The
   query already knows which neurons answer the question and in what order; the
@@ -180,22 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   neurons in one hop rarely share a type. With `connectomekg.colors.hop_color`,
   a viridis-style ramp that rises monotonically in luminance so the order
   survives colour blindness, this is what `--render` draws with.
-
-
-### Fixed
-
-- **`connkg viz3d` could not open at all.** It died with `ZeroDivisionError:
-  division by zero` before showing a window, on every invocation, and 0.4.0
-  shipped that way. `BrainSceneWindow` aimed the camera during construction,
-  but `quiltwright.frame_and_focus` divides by the render window's height to
-  get the horizontal half-angle, and a `QtInteractor` reports `(0, 0)` until it
-  is shown -- which `launch()` only did afterwards. The window now sizes its
-  render window before composing, and `--width`/`--height` reach it rather than
-  being applied after the fact. The viewer had one test, an import, which is
-  why nothing caught this; it now has six that build the window offscreen, and
-  five of them fail without the fix.
-
-### Added
 
 - **Effective connectivity: `connkg influence`, and an `influence` MCP tool.**
   How much one population drives another, hop by hop and signed, as a share of
@@ -239,8 +138,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than 25 microns from any drawn neuron is reported as a miss rather than as
   whichever neuron happened to be nearest.
 
+- **A hero render, `docs/images/anatomy_lplc2_dnp01.png`**, on the README and
+  the documentation site: the escape circuit, LPLC2 to DNp01, drawn inside the
+  brain's neuropil surfaces with one dot per neuron at its cell body. The four
+  existing images were regenerated and now show the surfaces and the somas too.
+
+### Changed
+
+- **A new hero image**, on the README and the documentation site: the
+  whole-brain flow map over a floor, `docs/images/flow_all_floor.png`. The
+  previous hero was a circuit drawn flat, and the shadow is what it was
+  missing. Passing `cloud=True` explicitly is load-bearing here -- drawing
+  the neuropil surfaces turns the cloud off by default, and it is the brain's
+  outline in cell bodies that the flow map hangs in.
+
+  A note in `render_images.py` had claimed the flow view was seen too nearly
+  front-on for a floor to read. With the camera tilted by `FLOOR_ELEVATION`,
+  which `add_floor` is designed to pair with, that is not so.
+
+- **`MAX_SCENE_NEURONS` is 5,000, up from 500**, and the skeleton stride now
+  defaults to one chosen by neuron count rather than a fixed 4. The old cap
+  was set when drawing 500 neurons meant 500 SWC parses out of a 31 GB
+  download; the skeleton cache made that a filtered read of one Parquet
+  directory. Measured on FAFB v783: 4,000 neurons compose in 4.5 s and render
+  in 0.4 s, and the automatic stride holds the point count near
+  `SCENE_POINT_BUDGET` so the cost stops tracking the neuron count. `cone:LC4`
+  is 489 neurons and `cone:DNp01<1` is 663 -- both refused before, both drawn
+  now.
+
+- **Every 3-D scene is lit by a three-point rig**, replacing PyVista's five
+  default lights. The default's flaw is not that its lights follow the camera
+  but that all five sit on the view axis, so every surface is lit head-on and
+  a tube reads as a flat ribbon. Offsetting the key up and to the left models
+  the form while still facing the subject. Measured on the LPLC2-DNp01 scene,
+  the new rig is brighter and more saturated than the default it replaces
+  (luminance 93.8 against 92.0, saturation 17.5 against 16.3). Fixing the
+  lights in the brain's frame instead was tried and measured *worse* -- 86.0
+  and 11.7, because a brain seen front-on turns its lit side away from a key
+  placed in world coordinates -- and the numbers are recorded in the code so
+  nobody repeats it.
+- **`--floor` no longer unlights the scene.** It replaced the lighting with a
+  single narrow spotlight, which threw a shadow and left everything the cone
+  missed dark: the neuropil surfaces at 10 % opacity and the whole-brain cloud
+  both disappeared, turning a circuit render into a lone neuron in the void.
+  The shadow-casting light now sits on top of the three-point rig rather than
+  replacing it, so a floored scene keeps its anatomy. The shadow itself is
+  sharper and darker (cone 75 to 42 degrees, since a penumbra widens with the
+  light's angular size), and the floor is no longer the exact colour of the
+  background, which had left it with no horizon and no lit pool for a shadow
+  to fall on.
+- **The documentation images are drawn as tubes and stand on the ground.** A
+  line has no surface, so no lighting can shade it and a line-drawn circuit
+  reads flat however the scene is lit. `--tubes` stays opt-in on the CLI.
 
 ### Fixed
+
+- **The 3-D viewer no longer refuses to build when there is no interactor.**
+  Picking is an interactor event, and a `QtInteractor` created while
+  `pyvista.OFF_SCREEN` is set has no interactor at all, so
+  `enable_point_picking` raised `AttributeError` in `BrainSceneWindow`'s
+  constructor and the window could not be built. It is skipped in that state
+  now -- an off-screen window is one nobody can point at. This is what CI runs
+  in, since pyvista's headless-display action exports `PYVISTA_OFF_SCREEN` and
+  a developer's machine does not: 21 viewer tests passed locally and failed
+  there. A test sets the flag itself, so the developer run catches it too.
+
+- **A toggle in the 3-D viewer no longer throws away the rotation.** Every
+  overlay toggle recomposed the scene and re-aimed the camera, so turning the
+  floor on after orbiting put the view back where it started. A toggle changes
+  what is drawn, not what is being looked at, so the camera is kept; a new
+  spec or answer still re-frames, since the old camera may not contain it.
+- **The floor no longer blocks the scene from below.** It was an opaque
+  120-unit plane visible from both sides, so orbiting under the subject put it
+  between the camera and the brain -- nothing was visible at all. It is culled
+  from behind now: a floor is a surface to stand on, not a wall. (Viewed from
+  underneath the subject is still dark, which is the shadow rather than the
+  floor: the only shadow-casting light is above it.)
+
+- **`connkg viz3d` could not open at all.** It died with `ZeroDivisionError:
+  division by zero` before showing a window, on every invocation, and 0.4.0
+  shipped that way. `BrainSceneWindow` aimed the camera during construction,
+  but `quiltwright.frame_and_focus` divides by the render window's height to
+  get the horizontal half-angle, and a `QtInteractor` reports `(0, 0)` until it
+  is shown -- which `launch()` only did afterwards. The window now sizes its
+  render window before composing, and `--width`/`--height` reach it rather than
+  being applied after the fact. The viewer had one test, an import, which is
+  why nothing caught this; it now has six that build the window offscreen, and
+  five of them fail without the fix.
 
 - **`docs/scripts/render_images.py` runs again.** It opened `ConnectomeKG(".")`,
   which has looked for `./.connectomekg/graph.sqlite` since 0.3.0 moved each
@@ -248,14 +232,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing had regenerated the documentation images since 2026-09-17. They
   therefore still showed the whole-brain cloud of marked points with no
   neuropil surfaces, two days after 0.4.0 added both.
-
-### Added
-
-- **A hero render, `docs/images/anatomy_lplc2_dnp01.png`**, on the README and
-  the documentation site: the escape circuit, LPLC2 to DNp01, drawn inside the
-  brain's neuropil surfaces with one dot per neuron at its cell body. The four
-  existing images were regenerated and now show the surfaces and the somas too.
-
 
 ## [0.4.0] - 2026-09-19
 

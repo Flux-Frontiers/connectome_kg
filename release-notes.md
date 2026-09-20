@@ -1,42 +1,43 @@
-# Release Notes -- v0.4.0
+# Release Notes -- v0.5.0
 
-> Released: 2026-09-19
+> Released: 2026-09-20
 
-The brain gets its anatomy. This release gives every neuron its cell body, draws the neuropil surfaces around a circuit, links any query to Neuroglancer, and caches the two things a query used to pay for on every run.
+The 3-D viewer becomes usable, a query becomes something you can draw, and the papers behind the graph become searchable beside it.
 
 ## What changed
 
-**Every neuron knows where its cell body is.** A neuron's `x`/`y`/`z` has always been FlyWire's marked point, an anchor that can sit tens of microns from the soma. `connkg skeletons --data-dir fafb_v783 -j 12` reads the skeleton download once and writes each neuron's real soma into the graph as `soma_x`, `soma_y`, `soma_z` and `has_soma`, alongside the marked point rather than over it. On FAFB v783 that is 134,675 of 139,255 neurons, 96.7%; the remaining 3.3% have no soma row in their skeleton file and fall back to its root point. The whole-brain context cloud in the 3-D views draws somas from then on, and so can any query.
+**`connkg viz3d` could not open at all in 0.4.0.** It died with `ZeroDivisionError: division by zero` before showing a window, on every invocation. `BrainSceneWindow` aimed the camera during construction, but framing divides by the render window's height, and a `QtInteractor` reports `(0, 0)` until it is shown -- which `launch()` only did afterwards. The window sizes its render window before composing now, and `--width`/`--height` reach it. A second way it could not be built was found by CI on the release branch and fixed here too: with `PYVISTA_OFF_SCREEN` set, a `QtInteractor` has no interactor at all, and enabling picking on it raised in the constructor. The viewer had one test, an import, which is why nothing caught this; it now has six that build the window offscreen, and five fail without the fix.
 
-**The same pass caches the skeletons.** It writes `.connectomekg/skeletons/`, holding every neuron's skeleton simplified at `--step` (4 by default): 212,351,918 points in 2.5 GB, against the download's 31 GB. The 3-D circuit view reads it in place of the download, so rendering a circuit no longer needs the 31 GB at all, and a cached render is faster than parsing SWC.
+**Point at a neuron and press P.** A panel names it, gives the description the graph stores for it, and lists its strongest partner types each way. A whole cell type shares one actor, so VTK can report which type was hit but never which neuron -- and that is the question a click asks. `connectomekg.picking` carries identity beside the geometry instead: every drawn point with the neuron that owns it, resolved by nearest-point lookup, 4.4 microseconds a pick and indifferent to tubes, stride, or whether VTK propagates point data through `tube()`. Picking is bound to the key rather than a left click, because a left click is where VTK begins a rotation.
 
-**That pass reads in parallel.** Parsing SWC is pure Python and holds the GIL, so it pegged one core and left the rest idle. `-j N` splits the neurons into contiguous ranges, one worker process and one cache shard each. On an 18-core laptop the FAFB v783 pass goes from 19 minutes 30 seconds to 2 minutes 39 seconds, a 7.4x speed-up, for a cache verified identical to the single-core one.
+**The viewer explores without restarting.** A **Show** box takes the same specs the command does and redraws in place; a control panel toggles the whole-brain cloud, the neuropil surfaces, the floor and tubes, sets the skeleton stride, and sets a minimum synapse count -- which is what makes a multi-hop cone usable interactively, since `cone:LC4>2` is 19,866 neurons at the default threshold and 104 at 200. A toggle keeps the camera, since it changes what is drawn rather than what is being looked at.
 
-**Neuropil surfaces in the 3-D views.** `connkg meshes` fetches the 78 FAFB v783 neuropil surfaces from FlyWire's public bucket, about 1 MB with no sign-in. `connkg quilt` and `connkg viz3d` then draw them: pale shells in the circuit view, region-tinted in the flow view. These are the surfaces of the volumes FlyWire assigned v783 synapses to neuropils with, so a mesh encloses what the graph's `IN_NEUROPIL` edges count. With the surfaces drawn the context cloud is redundant and turns off; `--cloud` draws both.
+**A query is now a thing you can draw.** `path:LPLC2>DNp01`, `cone:LC4`, `cone:DNp01>3` and `cone:DNp01<2` are strings that go anywhere a spec goes: the CLI, `--render`, the viewer's Show box. `connkg path --render` draws a path as its hops in traced skeletons, one colour per hop running dark to bright along the route; `connkg cone --render` draws a cone as shells, dark at the seed and bright outward. `connkg specs` prints every form with examples, from the same list that feeds the README and the viewer's panel.
 
-**Neuroglancer links for any spec.** `connkg link LC4 DNp01` prints a URL that opens those neurons as meshes in the public Neuroglancer, with no login and one colour per spec. The same link comes from the `neuroglancer_link` MCP tool and from `ConnectomeKG.neuroglancer_link()`. The URL is the only thing on stdout, so `connkg link LC4 | pbcopy` works.
+**Effective connectivity: `connkg influence`, and an `influence` MCP tool.** How much one population drives another, hop by hop and signed, as a share of the receiving neuron's input synapses averaged over those neurons -- so 0.15 reads as "the average target gets 15% of its input from the source". A negative value is net inhibition, and two routes of opposite sign cancel, which is what this answers that counting paths does not. It is anchored to an identity that holds by construction: unsigned, at hop 1, the value is the source's share of the target's input synapses, and LC4 onto DNp01 measures +0.1482 both ways on FAFB v783. Computed by propagating a sparse vector rather than raising the matrix to a power -- the matrix is 139,255 square, so one dense power would be 1.5e10 entries, while three hops over 3.7M edges take 0.02 seconds.
 
-**Path and cone queries stop reloading the brain.** `connkg path` and `connkg cone` used to read all 3.7 million synapse edges out of SQLite on every invocation, with a JSON parse each. They now cache the loaded matrix beside the graph, 14 MB, and `connkg path --from LPLC2 --to DNp01` goes from 8.8 seconds to 1.8. The cache is keyed on the edge table's shape and the graph file, so an edited or rebuilt graph is never answered from a stale one.
+**The scene cap is 5,000, up from 500.** It was 500 because drawing 500 neurons meant 500 SWC parses out of a 31 GB download; 0.4.0's skeleton cache made that a filtered read of one Parquet directory. The stride is chosen by neuron count now rather than fixed at 4, so a scene holds near `SCENE_POINT_BUDGET` points whether it draws a hundred neurons or five thousand. Measured on v783: 4,000 neurons compose in 4.5 seconds and render in 0.4. `cone:LC4` is 489 neurons and `cone:DNp01<1` is 663 -- both refused before, both drawn now.
 
-**The vector index is built by default.** The documented build no longer passes `--no-index`, so a fresh install has `connkg query` and the `query_connectome` and `pack_connectome` MCP tools without a second step. On v783 the index is 16,861 vectors, 25 seconds and 29 MB. `connkg build` now checks for the `semantic` extra before it starts rather than failing after the graph is written, and `--no-index` warns when it leaves an older index in place.
+**The renders stopped being flat.** A line has no surface, so no lighting can shade it; the documentation images are drawn as tubes now, standing on a lit floor. Every scene is lit by a three-point rig replacing PyVista's five default lights, whose flaw is not that they follow the camera but that all five sit on the view axis, so every surface is lit head-on. Measured on the LPLC2-DNp01 scene: luminance 93.8 and saturation 17.5 against the default's 92.0 and 16.3. Fixing the lights in the brain's frame instead was tried and measured worse, and those numbers are recorded in the code so nobody repeats it. `--floor` used to replace the lighting with a single narrow spotlight, which left everything the cone missed dark -- the surfaces and the cloud both vanished; the shadow-casting light sits on top of the rig now.
 
-**Provenance for the long passes.** `connkg skeletons` writes `reports/skeletons_<timestamp>.md` the way `connkg build` has always written its own: versions and git commit, options, host, what was read, what was written, timings and peak memory, with a failed pass recorded as FAILED. Graph snapshots gained a `coverage.soma` metric, since the back-fill writes metadata and never a node or an edge, and without it a snapshot could not tell a graph that knows where its cell bodies are from one that does not.
+**The source papers, as a searchable corpus.** The graph says LC4 makes 1,401 synapses onto DNp01. It does not say how the synapses were detected, how the cell types were assigned, or what a neurotransmitter prediction is worth. Eight papers, about a million characters of body text, indexed by DocKG in `papers/`: the two FlyWire papers, Eckstein on neurotransmitter classification, Matsliah on the optic lobe, Namiki on descending neurons, Morimoto on looming, Scheffer on hemibrain, Shiu on the brain model. `papers/extract.py` and `papers/README.md` are tracked; the PDFs and the text derived from them are not, since the publishers' files are theirs to distribute.
 
 ## Upgrading
 
-`pip install -U connectome-kg`. An existing graph keeps working and every existing command behaves as before.
+`pip install -U "connectome-kg[viz3d]"`. An existing graph keeps working and every existing command behaves as before.
 
-To get what this release adds, on a graph you have already built:
+The 3-D viewer works for the first time:
 
 ```bash
-connkg --root . --dataset fafb783 meshes
-connkg --root . --dataset fafb783 skeletons --data-dir fafb_v783 -j 12
-connkg --root . --dataset fafb783 snapshot save
+connkg --root . --dataset fafb783 viz3d LC4 DNp01
+connkg --root . --dataset fafb783 viz3d "path:LPLC2>DNp01"
+connkg --root . --dataset fafb783 specs
+connkg --root . --dataset fafb783 influence --from LC4 --to DNp01
 ```
 
-`meshes` takes about 11 seconds. `skeletons` needs the 31 GB skeleton download and is the only thing that does; pass your core count to `-j`, which defaults to 1. Re-snapshot afterwards, because the soma back-fill changes the graph a snapshot measures.
+`viz3d` and `--render` need the skeleton cache that `connkg skeletons` writes; 0.4.0's upgrade note covers it.
 
-One API change: `connectomekg.scene.context_points` returns a fourth value, the count of cloud points that are a real soma rather than a marked point.
+To search the papers, put their PDFs in `papers/` -- `papers/README.md` lists the eight and their DOIs -- then `poetry run python papers/extract.py && dockg build --repo papers`.
 
 ---
 
