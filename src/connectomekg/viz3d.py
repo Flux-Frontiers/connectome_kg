@@ -48,6 +48,7 @@ from PyQt5.QtWidgets import (
 from pyvistaqt import QtInteractor
 
 from connectomekg import scene as render3d
+from connectomekg.answers import ANSWER_SYNTAX, Answer, answer_groups, is_answer
 from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
@@ -84,6 +85,8 @@ class BrainSceneWindow(QMainWindow):
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
     :param preset: Quilt preset name for the Cast action.
+    :param answer: A resolved path or cone to open on, drawn hop-coloured
+        instead of by cell type.
     :param width: Window width in pixels; also the render window's width,
         which the camera framing divides by and so cannot be left at zero.
     :param height: Window height in pixels, likewise.
@@ -107,6 +110,7 @@ class BrainSceneWindow(QMainWindow):
         preset: str = DEFAULT_QUILT_PRESET,
         width: int = DEFAULT_WINDOW_SIZE[0],
         height: int = DEFAULT_WINDOW_SIZE[1],
+        answer: Answer | None = None,
     ) -> None:
         super().__init__()
         self._kg = kg
@@ -134,6 +138,7 @@ class BrainSceneWindow(QMainWindow):
         self.plotter.window_size = [width, height]
 
         self._elevation = elevation
+        self._answer: Answer | None = None
         self._picks = PickTargets.empty()
 
         self._info_panel = QTextEdit(self)
@@ -166,18 +171,21 @@ class BrainSceneWindow(QMainWindow):
         self.plotter.enable_point_picking(
             callback=self._on_pick, show_message=False, show_point=False
         )
-        self._compose(specs)
+        self._compose(specs, answer)
 
-    def _compose(self, specs: Sequence[str]) -> None:
-        """Draw a scene for *specs*, replacing whatever is there.
+    def _compose(self, specs: Sequence[str], answer: Answer | None = None) -> None:
+        """Draw a scene for *specs*, or for an answer, replacing whatever is there.
 
         :param specs: The specs to draw; empty draws the brain alone.
+        :param answer: A resolved path or cone, drawn hop-coloured instead of
+            by cell type.
         """
         self.plotter.clear()
         info = render3d.build_brain_scene(
             self.plotter,
             self._kg,
-            specs=specs,
+            specs=() if answer else specs,
+            groups=answer.groups if answer else None,
             view=self._view,
             data_dir=self._data_dir,
             color_by=self._color_by,
@@ -188,16 +196,19 @@ class BrainSceneWindow(QMainWindow):
             cloud=self._cloud,
         )
         self._specs = list(specs)
+        self._answer = answer
         self._picks = info.picks
-        self.setWindowTitle(f"ConnectomeKG viz3d -- {info.title}")
+        title = f"{answer.title} | {info.title}" if answer else info.title
+        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
         render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
         if self._floor:
             render3d.add_floor(self.plotter)
 
         if len(self._picks):
+            drawn = f"{len(self._picks.neuron_ids)} neurons drawn."
             self._info_panel.setPlainText(
-                f"{len(self._picks.neuron_ids)} neurons drawn.\n\n"
-                "Point at one and press P to identify it."
+                f"{drawn}\n\nPoint at one and press P to identify it."
+                f"\n\nShow also takes an answer:\n{ANSWER_SYNTAX}"
             )
             self._dock.show()
             self._say("Point at a neuron and press P to identify it.")
@@ -223,7 +234,17 @@ class BrainSceneWindow(QMainWindow):
         or a spec over ``MAX_SCENE_NEURONS`` leaves the view as it was rather
         than emptying it.
         """
-        specs = self._filter_box.text().split()
+        text = self._filter_box.text().strip()
+        if is_answer(text):
+            try:
+                answer = answer_groups(self._kg, text)
+            except ValueError as exc:
+                self._reject(str(exc))
+                return
+            self._compose([text], answer)
+            return
+
+        specs = text.split()
         try:
             # An unknown name is not an error to `neurons_of`, it is an empty
             # result, so emptiness has to be checked for rather than caught --
@@ -277,11 +298,14 @@ class BrainSceneWindow(QMainWindow):
         skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
         floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
 
+        answer = self._answer
+
         def build(plotter) -> None:
             render3d.build_brain_scene(
                 plotter,
                 kg,
-                specs=specs,
+                specs=() if answer else specs,
+                groups=answer.groups if answer else None,
                 view=view,
                 data_dir=data_dir,
                 color_by=color_by,
@@ -345,6 +369,9 @@ def launch(
     from PyQt5.QtWidgets import QApplication  # noqa: PLC0415 - viz3d-only import
 
     with open_kg(str(root), dataset=dataset) as kg:
+        answer = None
+        if len(specs) == 1 and is_answer(specs[0]):
+            answer = answer_groups(kg, specs[0])
         app = QApplication.instance() or QApplication([])
         window = BrainSceneWindow(
             kg,
@@ -362,6 +389,7 @@ def launch(
             preset=preset,
             width=width,
             height=height,
+            answer=answer,
         )
         window.show()
         app.exec_()

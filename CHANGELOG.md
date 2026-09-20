@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Answers in the 3-D viewer.** `connkg viz3d "path:LPLC2>DNp01"` opens on the
+  answer rather than on a cell type, drawn hop-coloured; so does typing the
+  same thing into the viewer's Show box, which means a question can be
+  re-asked and re-seen without restarting. The forms are `path:FROM>TO`,
+  `cone:SPEC`, `cone:SPEC>HOPS` downstream and `cone:SPEC<HOPS` upstream, the
+  arrow pointing the way the signal travels. They follow the `label:` prefix
+  the spec grammar already had, so anywhere a spec is taken an answer can be
+  too.
+
+  The new `connectomekg.answers` holds the grammar and the group-building, and
+  `connkg path --render` and `connkg cone --render` now go through it as well
+  rather than each building their own groups. An answer that reaches nothing,
+  or that holds more neurons than one scene may draw, is refused with the
+  reason and leaves the view as it was -- `cone:DNp01<1` is 663 neurons on
+  FAFB v783 and says so.
+
+
 ### Changed
 
 - **Every 3-D scene is lit by a three-point rig**, replacing PyVista's five
