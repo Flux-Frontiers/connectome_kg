@@ -108,6 +108,52 @@ class PathResult:
     net_sign: int
 
 
+@dataclass
+class InfluenceResult:
+    """How strongly one population drives another, hop by hop.
+
+    A value is a *share of the receiving neuron's input synapses*, averaged
+    over the receiving neurons, so it reads directly: 0.15 means the average
+    target gets 15 % of its input from the source. Signed, a negative value is
+    net inhibition. Shares are averaged rather than summed because a sum over
+    several targets is not a share of anything and can exceed 1.
+
+    :param source: The source spec, as given.
+    :param target: The target spec, or ``None`` when none was asked for.
+    :param hops: Hops computed.
+    :param signed: Whether transmitter signs were applied.
+    :param n_sources: Source neurons the spec resolved to.
+    :param n_targets: Target neurons, 0 when there is no target.
+    :param onto: Per-hop mean share onto the target, empty without a target.
+    :param ranked: Per-hop ``(cell type, mean share)``, strongest absolute
+        influence first.
+    """
+
+    source: str
+    target: str | None
+    hops: int
+    signed: bool
+    n_sources: int
+    n_targets: int
+    onto: list[float]
+    ranked: list[list[tuple[str, float]]]
+
+    def __str__(self) -> str:
+        sign_word = "signed" if self.signed else "unsigned"
+        lines = [
+            f"influence of {self.source} ({self.n_sources} neurons), {sign_word}, "
+            f"as a share of the receiving neuron's input"
+        ]
+        if self.target is not None:
+            lines.append(f"\nonto {self.target} ({self.n_targets} neurons), averaged:")
+            lines += [f"  hop {k + 1}: {value:+.4f}" for k, value in enumerate(self.onto)]
+            lines.append(f"  total: {sum(self.onto):+.4f}")
+        for k, hop in enumerate(self.ranked):
+            lines.append(f"\nstrongest cell types at hop {k + 1}:")
+            lines += [f"  {value:+.4f}  {name}" for name, value in hop] or ["  (none)"]
+        return "\n".join(lines)
+
+
 class SynapseGraph:
     """The neuron-level wiring of a built store as sparse matrices."""
 
@@ -225,6 +271,58 @@ class SynapseGraph:
             partial.replace(path)
         except OSError:
             return
+
+    def influence(self, sources: list[str], *, hops: int = 3, signed: bool = True) -> np.ndarray:
+        """How much of each neuron's input the source population drives, hop by hop.
+
+        The convention is the one :class:`SynapseGraph` already uses for path
+        strength, from connectome-interpreter: an edge's weight is the share of
+        the postsynaptic neuron's input synapses it carries. Starting a unit of
+        drive on every source neuron and propagating it forward therefore gives,
+        at hop 1, the share of each neuron's input that comes from the sources;
+        at hop 2, the share arriving through one intermediary; and so on. The
+        values need no normalisation to be read, because a share of a neuron's
+        input is already what they are.
+
+        Signed, that share can be negative: a source reaching a target through
+        an inhibitory neuron subtracts from it, and two routes of opposite sign
+        cancel, which is the point of computing it rather than counting paths.
+
+        Computed by propagating a vector, not by raising the matrix to a power.
+        The matrix is 139,255 square on FAFB v783, so a single dense power is
+        1.5e10 entries; a sparse matrix-vector product is one pass over the
+        3.7 M edges and runs in milliseconds.
+
+        Recurrence is not removed. A source that is also downstream of itself
+        appears again at a later hop, which is a property of the brain rather
+        than of the arithmetic.
+
+        :param sources: Neuron node ids to start the drive on. Ids not in this
+            graph are ignored.
+        :param hops: Hops to propagate, at least 1.
+        :param signed: Weight each step by the presynaptic transmitter sign, so
+            the result is net excitation (positive) or inhibition (negative).
+            Unsigned treats every synapse as excitatory.
+        :return: ``(hops, n)`` float64; row ``k`` is the share arriving in
+            exactly ``k + 1`` hops, indexed like :attr:`ids`.
+        :raises ValueError: If ``hops`` is below 1.
+        """
+        if int(hops) < 1:
+            raise ValueError(f"hops must be at least 1, got {hops}")
+        weights = self.fraction
+        if signed:
+            # Row i carries neuron i's outgoing edges, so its sign scales the
+            # whole row; signs of 0 (unresolved transmitter) zero that route,
+            # which is honest -- an unknown sign cannot be added up.
+            weights = sp.diags(self.signs.astype(float)) @ self.fraction
+        drive = np.zeros(len(self.ids), dtype=float)
+        seeded = [self.index[s] for s in sources if s in self.index]
+        drive[seeded] = 1.0
+        out = np.empty((int(hops), len(self.ids)), dtype=float)
+        for k in range(int(hops)):
+            drive = drive @ weights
+            out[k] = drive
+        return out
 
     def strongest_path(self, sources: list[str], targets: list[str]) -> PathResult | None:
         """Strongest path from any source neuron to any target neuron.

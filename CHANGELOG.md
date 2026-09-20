@@ -22,6 +22,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Effective connectivity: `connkg influence`, and an `influence` MCP tool.**
+  How much one population drives another, hop by hop and signed, as a share of
+  the receiving neuron's input synapses averaged over those neurons -- so 0.15
+  reads as "the average target gets 15 % of its input from the source". A
+  negative value is net inhibition, and two routes of opposite sign cancel,
+  which is what this answers that counting paths does not. Without `--to` it
+  ranks the cell types a population drives most.
+
+  It follows the convention `connkg path` already uses, from
+  connectome-interpreter, and is anchored to an identity that holds by
+  construction: unsigned, at hop 1, the value *is* the source's share of the
+  target's input synapses. On FAFB v783, LC4 onto DNp01 measures +0.1482 both
+  ways. Signed, the same pair reads +0.1469, the difference being one LC4
+  neuron of 104 whose transmitter is unresolved and which therefore carries
+  nothing.
+
+  Computed by propagating a sparse vector rather than raising the matrix to a
+  power: the matrix is 139,255 square, so one dense power would be 1.5e10
+  entries, while three hops over the 3.7 M edges take 0.02 s.
+
 - **Picking in the 3-D viewer.** Point at a neuron in `connkg viz3d` and press
   P: a panel names it, gives the description the graph already stores for it,
   and lists its strongest partner types in each direction. Picking is bound to
