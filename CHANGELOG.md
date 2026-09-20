@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   license rather than `?` until it is rebuilt. FlyWire's own label text is
   left as it is -- the v783 community label reads `giant fiber/giant
   fibre/GF/GFN` and carries both spellings itself.
+- **`quiltwright` floor raised to `>=0.15.0`** (was `>=0.14.1`) and the `ruff`
+  floor from `>=0.6` to `>=0.15`, inside the existing `<0.16` cap
+  (`kgrag_priv` sweep item 49, tier 1). Nothing here depends on 0.15.0's
+  toe-in geometry specifically; this is a currency bump.
 
 ## [0.5.0] - 2026-09-20
 
