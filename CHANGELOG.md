@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Every 3-D scene is lit by a three-point rig**, replacing PyVista's five
+  default lights. The default's flaw is not that its lights follow the camera
+  but that all five sit on the view axis, so every surface is lit head-on and
+  a tube reads as a flat ribbon. Offsetting the key up and to the left models
+  the form while still facing the subject. Measured on the LPLC2-DNp01 scene,
+  the new rig is brighter and more saturated than the default it replaces
+  (luminance 93.8 against 92.0, saturation 17.5 against 16.3). Fixing the
+  lights in the brain's frame instead was tried and measured *worse* -- 86.0
+  and 11.7, because a brain seen front-on turns its lit side away from a key
+  placed in world coordinates -- and the numbers are recorded in the code so
+  nobody repeats it.
+- **`--floor` no longer unlights the scene.** It replaced the lighting with a
+  single narrow spotlight, which threw a shadow and left everything the cone
+  missed dark: the neuropil surfaces at 10 % opacity and the whole-brain cloud
+  both disappeared, turning a circuit render into a lone neuron in the void.
+  The shadow-casting light now sits on top of the three-point rig rather than
+  replacing it, so a floored scene keeps its anatomy. The shadow itself is
+  sharper and darker (cone 75 to 42 degrees, since a penumbra widens with the
+  light's angular size), and the floor is no longer the exact colour of the
+  background, which had left it with no horizon and no lit pool for a shadow
+  to fall on.
+- **The documentation images are drawn as tubes and stand on the ground.** A
+  line has no surface, so no lighting can shade it and a line-drawn circuit
+  reads flat however the scene is lit. `--tubes` stays opt-in on the CLI.
+
+### Added
+
+- **`connectomekg.scene.NeuronGroup`**, so a caller can say which neurons
+  belong together and in what colour, rather than having cell type decide. The
+  circuit view groups by type and colours by name, which is right for "show me
+  LC4" and wrong for "show me the answer": a path's hops are an order, and the
+  neurons in one hop rarely share a type. With `connectomekg.colors.hop_color`,
+  a viridis-style ramp that rises monotonically in luminance so the order
+  survives colour blindness, this is the groundwork for rendering a path or a
+  cone.
+
+
 ### Fixed
 
 - **`connkg viz3d` could not open at all.** It died with `ZeroDivisionError:
