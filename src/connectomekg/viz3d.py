@@ -264,15 +264,22 @@ class BrainSceneWindow(QMainWindow):
         self._floor = self._toggles["floor"].isChecked()
         self._tubes = self._toggles["tubes"].isChecked()
         self._skeleton_step = self._stride.value() or None
-        self._compose(self._specs, self._answer)
+        self._compose(self._specs, self._answer, keep_camera=True)
 
-    def _compose(self, specs: Sequence[str], answer: Answer | None = None) -> None:
+    def _compose(
+        self, specs: Sequence[str], answer: Answer | None = None, *, keep_camera: bool = False
+    ) -> None:
         """Draw a scene for *specs*, or for an answer, replacing whatever is there.
 
         :param specs: The specs to draw; empty draws the brain alone.
         :param answer: A resolved path or cone, drawn hop-coloured instead of
             by cell type.
+        :param keep_camera: Leave the camera where the viewer put it. A toggle
+            changes what is drawn, not what is being looked at, so re-aiming
+            would throw away the rotation the viewer had chosen; a new subject
+            is re-framed because the old camera may not contain it.
         """
+        camera = self.plotter.camera_position if keep_camera else None
         self.plotter.clear()
         info = render3d.build_brain_scene(
             self.plotter,
@@ -293,7 +300,10 @@ class BrainSceneWindow(QMainWindow):
         self._picks = info.picks
         title = f"{answer.title} | {info.title}" if answer else info.title
         self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
-        render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
+        if camera is None:
+            render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
+        else:
+            self.plotter.camera_position = camera
         if self._floor:
             render3d.add_floor(self.plotter)
 
