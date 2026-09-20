@@ -96,6 +96,28 @@ def test_the_flow_view_hides_the_pick_panel(qapp, kg):
         window.close()
 
 
+def test_the_window_builds_with_pyvista_off_screen_set(qapp, kg, monkeypatch):
+    """A window with no interactor still builds, and can still be asked a pick.
+
+    ``pyvista.OFF_SCREEN`` leaves ``QtInteractor.iren`` as ``None``, and
+    ``enable_point_picking`` raises on it. CI runs in exactly that state --
+    pyvista's headless-display action exports ``PYVISTA_OFF_SCREEN`` -- and a
+    developer's machine does not, so 21 tests passed locally and failed there.
+    """
+    pyvista = pytest.importorskip("pyvista")
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    monkeypatch.setattr(pyvista, "OFF_SCREEN", True)
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert window.plotter.iren is None
+        point = window._picks.points[window._picks.owner == 0][0]
+        window._on_pick(point)
+        assert "Inputs:" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
 def test_the_filter_box_redraws_for_a_new_spec(qapp, kg):
     from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
 

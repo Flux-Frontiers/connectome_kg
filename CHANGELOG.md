@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The 3-D viewer no longer refuses to build when there is no interactor.**
+  Picking is an interactor event, and a `QtInteractor` created while
+  `pyvista.OFF_SCREEN` is set has no interactor at all, so
+  `enable_point_picking` raised `AttributeError` in `BrainSceneWindow`'s
+  constructor and the window could not be built. It is skipped in that state
+  now -- an off-screen window is one nobody can point at. This is what CI runs
+  in, since pyvista's headless-display action exports `PYVISTA_OFF_SCREEN` and
+  a developer's machine does not: 21 viewer tests passed locally and failed
+  there. A test sets the flag itself, so the developer run catches it too.
+
 ### Added
 
 - **The source papers as a searchable corpus**, in `papers/`. The graph says
