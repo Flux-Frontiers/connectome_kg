@@ -90,7 +90,7 @@ def test_the_flow_view_hides_the_pick_panel(qapp, kg):
     window = BrainSceneWindow(kg, [], view="flow", cloud=False, neuropils=False)
     try:
         assert len(window._picks) == 0
-        assert window._dock.isHidden()
+        assert window._inspector.isHidden()
         assert "Nothing here to pick" in window._info_panel.toPlainText()
     finally:
         window.close()
@@ -342,7 +342,7 @@ def test_the_controls_offer_every_example_as_a_button(qapp, kg):
 
     window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
     try:
-        panel = window._controls_dock.widget()
+        panel = window._examples.widget()
         texts = [b.text() for b in panel.findChildren(QPushButton)]
         buttons = {b.text(): b for b in panel.findChildren(QPushButton)}
         documented = (*circuit_examples(), *SPEC_EXAMPLES, *ANSWER_EXAMPLES)
@@ -374,7 +374,7 @@ def test_clicking_an_example_fills_the_box_and_applies_it(qapp, kg):
     window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
     try:
         before_title = window.windowTitle()
-        panel = window._controls_dock.widget()
+        panel = window._examples.widget()
         button = next(b for b in panel.findChildren(QPushButton) if b.text() == "circuit:compass")
         button.click()
         assert window._filter_box.text() == "circuit:compass"
@@ -608,5 +608,271 @@ def test_reset_view_frames_the_subject_not_the_floor(qapp, kg):
         )
         assert np.allclose(back, framed, rtol=1e-6, atol=1e-6)
         assert "floor" in window.plotter.renderer.actors, "the floor must come back"
+    finally:
+        window.close()
+
+
+def test_show_button_updates_scene_summary(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._filter_box.setText("MN9")
+        window._show_button.click()
+        assert window._specs == ["MN9"]
+        assert window._scene_title.text() == "MN9"
+        assert f"{len(kg.neurons_of('MN9'))} circuit neurons" in window._scene_stats.text()
+        before = window._scene_stats.text()
+        window._filter_box.setText("NoSuchType")
+        window._show_button.click()
+        assert window._scene_title.text() == "MN9"
+        assert window._scene_stats.text() == before
+    finally:
+        window.close()
+
+
+def test_collapsed_inspector_stays_closed_until_a_pick_or_error(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._inspect_button.click()
+        assert window._inspector.isHidden()
+        window._draw_example("MN9")
+        assert window._inspector.isHidden()
+        window._on_pick(window._picks.points[0])
+        assert not window._inspector.isHidden()
+        assert window._inspect_button.isChecked()
+        window._inspect_button.click()
+        window._draw_example("NoSuchType")
+        assert not window._inspector.isHidden()
+        assert window._inspect_button.isChecked()
+        assert "Cannot show that" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
+def test_flow_errors_can_be_read_and_dismissed(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, [], view="flow", cloud=False, neuropils=False)
+    try:
+        assert "flow arcs" in window._scene_stats.text()
+        window._draw_example("NoSuchType")
+        assert not window._inspector.isHidden()
+        assert not window._inspect_button.isHidden()
+        window._inspect_button.click()
+        assert window._inspector.isHidden()
+    finally:
+        window.close()
+
+
+def test_automatic_cloud_survives_other_display_edits(qapp, kg):
+    from PyQt5.QtCore import Qt  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=None, neuropils=False)
+    try:
+        assert window._toggles["cloud"].checkState() == Qt.CheckState.PartiallyChecked
+        assert any(name.startswith("context") for name in window.plotter.renderer.actors)
+        window._toggles["tubes"].setChecked(True)
+        assert window._cloud is None
+        assert any(name.startswith("context") for name in window.plotter.renderer.actors)
+        window._toggles["cloud"].setCheckState(Qt.CheckState.Unchecked)
+        assert window._cloud is False
+        assert not any(name.startswith("context") for name in window.plotter.renderer.actors)
+    finally:
+        window.close()
+
+
+def test_stride_edit_applies_once_and_keeps_camera(qapp, kg, monkeypatch):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        calls = []
+        monkeypatch.setattr(window, "_compose", lambda *a, **kw: calls.append(kw))
+        window._stride.setValue(9)
+        window._stride.editingFinished.emit()
+        assert window._skeleton_step == 9
+        assert calls == [{"keep_camera": True}]
+        window._stride.editingFinished.emit()
+        assert len(calls) == 1
+    finally:
+        window.close()
+
+
+def test_busy_disables_scene_actions_and_restores_them_on_error(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        with pytest.raises(RuntimeError), window._busy("working"):
+            assert not window._show_button.isEnabled()
+            assert not window._cast_button.isEnabled()
+            assert not window._reset_button.isEnabled()
+            assert not window.plotter.isEnabled()
+            raise RuntimeError("test failure")
+        assert window._show_button.isEnabled()
+        assert window._cast_button.isEnabled()
+        assert window._reset_button.isEnabled()
+        assert window.plotter.isEnabled()
+    finally:
+        window.close()
+
+
+def test_laptop_layout_keeps_actions_visible_and_examples_scrollable(qapp, kg):
+    from PyQt5.QtCore import QPoint  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(
+        kg, ["GRN_sugar"], cloud=False, neuropils=False, width=1024, height=640
+    )
+    try:
+        window.show()
+        qapp.processEvents()
+        assert window.width() == 1024
+        assert window.height() == 640
+        assert window.plotter.width() > window._controls_panel.width() * 2
+        assert window.plotter.height() > 250
+        for widget in (
+            window._filter_box,
+            window._show_button,
+            window._cast_button,
+            window._reset_button,
+            window._inspect_button,
+        ):
+            top_left = widget.mapTo(window, QPoint(0, 0))
+            bottom_right = widget.mapTo(window, widget.rect().bottomRight())
+            assert window.rect().contains(top_left)
+            assert window.rect().contains(bottom_right)
+            assert widget.isVisible()
+        scrollbar = window._examples.verticalScrollBar()
+        assert scrollbar.maximum() > 0
+        scrollbar.setValue(scrollbar.maximum())
+        assert window._cast_button.isVisible()
+    finally:
+        window.close()
+
+
+def test_geometry_counts_mesh_instances_but_not_hidden_meshes_or_text(qapp, kg, monkeypatch):
+    import pyvista as pv  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, [], cloud=False, neuropils=False)
+    try:
+        window.plotter.clear()
+        triangle = pv.PolyData([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)], [3, 0, 1, 2])
+        window.plotter.add_mesh(triangle, name="skeleton:first")
+        window.plotter.add_mesh(triangle, name="skeleton:second")
+        window.plotter.add_mesh(pv.Line(), name="flow:line")
+        hidden = window.plotter.add_mesh(pv.Sphere(), name="hidden")
+        hidden.visibility = False
+        window.plotter.add_text("Not geometry", name="annotation")
+        monkeypatch.setattr("connectomekg.viz3d.perf_counter", lambda: 102.5)
+        window._update_geometry_stats(100.0)
+        assert window._geometry_stats.text() == (
+            "Geometry: 3 meshes  |  8 points  |  3 cells  |  Scene build: 2.50 s"
+        )
+        detail = window._geometry_stats.toolTip()
+        assert "skeleton: 2 meshes, 6 points, 2 cells" in detail
+        assert "flow: 1 meshes, 2 points, 1 cells" in detail
+        assert "hidden:" not in detail
+        assert "annotation:" not in detail
+    finally:
+        window.close()
+
+
+def test_geometry_summary_follows_overlays_and_survives_rejected_specs(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        initial = window._geometry_stats.text().split("Scene build:")[0]
+        window._toggles["cloud"].setChecked(True)
+        assert window._geometry_stats.text().split("Scene build:")[0] != initial
+        assert "context:" in window._geometry_stats.toolTip()
+        window._toggles["floor"].setChecked(True)
+        assert "floor:" in window._geometry_stats.toolTip()
+        before = window._geometry_stats.text()
+        window._draw_example("NoSuchType")
+        assert window._geometry_stats.text() == before
+        window._toggles["cloud"].setChecked(False)
+        window._toggles["floor"].setChecked(False)
+        assert window._geometry_stats.text().split("Scene build:")[0] == initial
+        assert "context:" not in window._geometry_stats.toolTip()
+        assert "floor:" not in window._geometry_stats.toolTip()
+    finally:
+        window.close()
+
+
+@pytest.mark.parametrize("typed", ["label:giant fib", '"label:giant fib"', r"label:giant\s+fib"])
+def test_label_specs_reach_the_resolver_intact(qapp, kg, monkeypatch, typed):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        expected = typed.strip('"')
+        real_resolver = kg.neurons_of
+        calls = []
+
+        def resolve(spec):
+            calls.append(spec)
+            return real_resolver("GRN_sugar") if spec == expected else []
+
+        monkeypatch.setattr(kg, "neurons_of", resolve)
+        window._draw_example(typed)
+        assert window._specs == [expected]
+        assert set(calls) == {expected}
+    finally:
+        window.close()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("", []),
+        ("LC4 DNp01", ["LC4", "DNp01"]),
+        ("label:giant fib", ["label:giant fib"]),
+        ("label:Kenyon's cell", ["label:Kenyon's cell"]),
+        ('"label:giant fib" DNp01', ["label:giant fib", "DNp01"]),
+        (r'LC4 "label:\bgiant\s+fib"', ["LC4", r"label:\bgiant\s+fib"]),
+        ('"label:neuron #1" LC4', ["label:neuron #1", "LC4"]),
+    ],
+)
+def test_show_input_preserves_regexes_and_supports_quoted_unions(qapp, text, expected):
+    from connectomekg.viz3d import _split_specs  # noqa: PLC0415
+
+    assert _split_specs(text) == expected
+
+
+def test_unfinished_quote_keeps_scene_and_explains_the_error(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._draw_example('"label:giant fib')
+        assert window._specs == ["GRN_sugar"]
+        assert "quotation" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
+def test_initial_specs_with_label_spaces_round_trip_through_show(qapp, kg, monkeypatch):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    real_resolver = kg.neurons_of
+    monkeypatch.setattr(
+        kg, "neurons_of", lambda s: real_resolver("GRN_sugar" if s == "label:giant fib" else s)
+    )
+    window = BrainSceneWindow(kg, ["label:giant fib", "MN9"], cloud=False, neuropils=False)
+    try:
+        before = set(window._picks.neuron_ids)
+        window._show_button.click()
+        assert window._specs == ["label:giant fib", "MN9"]
+        assert set(window._picks.neuron_ids) == before
     finally:
         window.close()

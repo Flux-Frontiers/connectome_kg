@@ -836,6 +836,31 @@ def _draw_translucency_after_shadows(plotter: pv.Plotter, shadow_pass: vtkShadow
     passes.AddItem(vtkOverlayPass())
 
 
+def _reset_floor_passes(plotter: pv.Plotter) -> None:
+    """Undo the floor's custom pass sequence before replacing its actors.
+
+    ``clear_actors`` preserves render passes. Leaving shadows active while
+    adding fresh skeleton lines compiles their shaders before tube shading
+    has been enabled. PyVista's shadow disable also leaves our custom
+    translucency sequence without an opaque pass, and some versions retain
+    the shadow-pass reference, preventing subsequent re-enabling.
+
+    :param plotter: Plotter about to receive a new brain scene.
+    """
+    from vtkmodules.vtkRenderingOpenGL2 import vtkRenderStepsPass  # noqa: PLC0415
+
+    passes = plotter.renderer._render_passes
+    if passes._shadow_map_pass is None:
+        return
+    # Release the old shadow maps while their render window still exists.
+    passes._camera_pass.ReleaseGraphicsResources(plotter.render_window)
+    plotter.renderer.disable_shadows()
+    passes._shadow_map_pass = None
+    passes._pass_collection.RemoveAllItems()
+    passes._pass_collection.AddItem(vtkRenderStepsPass())
+    passes._update_passes()
+
+
 def add_floor(plotter: pv.Plotter) -> None:
     """Put a shadow-receiving floor under the composed scene, lit from above.
 
@@ -895,13 +920,13 @@ def add_floor(plotter: pv.Plotter) -> None:
     key.positional = True
     key.cone_angle = _KEY_LIGHT_CONE
     plotter.add_light(key)
+    _shade_skeleton_lines(plotter)
     plotter.enable_shadows()  # ty: ignore[missing-argument]
     # PyVista exposes no setter for the shadow map size.
     shadow_pass = plotter.renderer._render_passes._shadow_map_pass
     if shadow_pass is not None:
         shadow_pass.GetShadowMapBakerPass().SetResolution(_SHADOW_MAP_RESOLUTION)
         _draw_translucency_after_shadows(plotter, shadow_pass)
-    _shade_skeleton_lines(plotter)
 
 
 def build_brain_scene(
@@ -966,6 +991,7 @@ def build_brain_scene(
         if progress is not None:
             progress(message)
 
+    _reset_floor_passes(plotter)
     plotter.clear_actors()
     plotter.set_background(BACKGROUND)  # ty: ignore[invalid-argument-type]
     frame = world_frame(kg.store)

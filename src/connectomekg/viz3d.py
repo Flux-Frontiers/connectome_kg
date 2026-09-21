@@ -5,17 +5,17 @@ Interactive 3-D viewer for a connectome scene: a ``QMainWindow`` wrapping a
 :func:`connectomekg.scene.build_brain_scene` composes -- the whole-brain
 context cloud plus a spec's circuit skeletons, or the neuropil flow.
 
-Small by design, mirroring ``genealogy_kg``'s own ``viz3d.py``.
+The workspace follows ``gutenberg_kg``'s control-rail and viewport layout.
 ``QtInteractor`` supplies orbit/zoom/pan for free via VTK's default
 interactor style, and Cast to Looking Glass is wired straight to
 ``kg_utils.viz3d.qt.cast_scene_to_looking_glass``, which does the entire cast
 on the GUI thread.
 
-The toolbar's Show box re-resolves specs and redraws in place, so exploring
+The control rail's Show box re-resolves specs and redraws in place, so exploring
 does not mean restarting. It refuses a spec that matches nothing, or one over
 ``MAX_SCENE_NEURONS``, and leaves the scene as it was -- including when only
 one spec of several is bad, since drawing the rest would look like a scene
-that contained them all. The controls dock lists every documented spec,
+that contained them all. The Explore tab lists every documented spec,
 answer and named circuit as a button that fills the Show box and applies it,
 so the grammar can be explored without being retyped.
 
@@ -32,33 +32,38 @@ License: Elastic 2.0
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
+from time import perf_counter
 
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QAction,
     QApplication,
     QCheckBox,
-    QDockWidget,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
+    QSplitter,
+    QTabWidget,
     QTextEdit,
-    QToolBar,
     QVBoxLayout,
     QWidget,
 )
+from pyvista import Actor
 from pyvistaqt import QtInteractor
 
+from connectomekg import __version__
 from connectomekg import scene as render3d
 from connectomekg.answers import (
     ANSWER_EXAMPLES,
@@ -85,6 +90,58 @@ PICK_RADIUS = 0.25
 #: Default window size, in pixels. Also the render window's size, which has to
 #: be set before the camera is aimed -- see :class:`BrainSceneWindow`.
 DEFAULT_WINDOW_SIZE = (1400, 900)
+
+# Gutenberg's three surface levels, green headings and blue cast action.
+DARK_STYLESHEET = """
+    QMainWindow { background: #11151e; }
+    QWidget { background: #1a2030; color: #e6e9ef; font-size: 13px; }
+    QLabel { background: transparent; }
+    QLabel[role="heading"] { color: #90ee90; font-weight: bold;
+        border-bottom: 1px solid #3a4358; padding: 6px 0; }
+    QLabel[role="muted"] { color: #9aa4b8; }
+    QLabel#brand { font-size: 20px; font-weight: bold; }
+    QLabel#scene-title { font-size: 17px; font-weight: bold; }
+    QLineEdit, QSpinBox, QTextEdit { background: #232b3d;
+        border: 1px solid #3a4358; border-radius: 4px; padding: 6px;
+        selection-background-color: #2e8b57; }
+    QLineEdit:focus, QSpinBox:focus, QTextEdit:focus { border-color: #5fa8d3; }
+    QPushButton { background: #232b3d; border: 1px solid #3a4358;
+        border-radius: 4px; padding: 7px 10px; }
+    QPushButton:hover { background: #2b3448; border-color: #5fa8d3; }
+    QPushButton:focus { border-color: #90ee90; }
+    QPushButton:pressed, QPushButton:checked { background: #35465e; }
+    QPushButton#show-scene { background: #2e8b57; font-weight: bold; }
+    QPushButton#cast-scene { background: #3e5f8a; font-weight: bold; }
+    QPushButton:disabled { color: #788297; background: #1a2030; }
+    QTabWidget::pane { border: 0; }
+    QTabBar::tab { padding: 9px 16px; color: #9aa4b8; border: none;
+        border-bottom: 2px solid transparent; }
+    QTabBar::tab:selected { color: #90ee90; border-bottom: 2px solid #90ee90; }
+    QCheckBox { spacing: 8px; padding: 5px 0; }
+    QSplitter::handle { background: #11151e; }
+    QScrollBar:vertical { background: #1a2030; width: 12px; }
+    QScrollBar::handle:vertical { background: #3a4358; min-height: 24px; }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+    QStatusBar { background: #11151e; color: #9aa4b8; }
+"""
+
+
+def _split_specs(text: str) -> list[str]:
+    """Split Show input while preserving label spaces and regex backslashes.
+
+    A leading unquoted ``label:`` consumes the whole field. Quote the full
+    label spec to combine it with other specs, e.g. ``"label:giant fib" LC4``.
+
+    :param text: Trimmed Show input (answers are handled before this).
+    :raises ValueError: On an unterminated quote.
+    """
+    if text.startswith("label:"):
+        return [text]
+    lexer = shlex.shlex(text, posix=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    lexer.escape = ""  # Backslashes belong to label regexes, not shell escapes.
+    return list(lexer)
 
 
 class BrainSceneWindow(QMainWindow):
@@ -148,7 +205,6 @@ class BrainSceneWindow(QMainWindow):
         self._preset = preset
 
         self.plotter = QtInteractor(self)
-        self.setCentralWidget(self.plotter)
         # Size the render window before composing, because aiming the camera
         # reads it: quiltwright's frame_and_focus divides by the window height
         # to get the horizontal half-angle. A QtInteractor reports (0, 0) until
@@ -165,66 +221,134 @@ class BrainSceneWindow(QMainWindow):
         # the same framing the scene was first given.
         self._points: object = None
 
-        self._info_panel = QTextEdit(self)
-        self._info_panel.setReadOnly(True)
-        self._info_panel.setLineWrapMode(QTextEdit.WidgetWidth)
-        self._dock = QDockWidget("Neuron", self)
-        self._dock.setWidget(self._info_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._dock)
-        self._build_controls()
+        self.setStyleSheet(DARK_STYLESHEET)
+        self._build_workspace(specs)
 
-        toolbar = QToolBar("Actions", self)
-        self.addToolBar(toolbar)
-        cast_action = QAction("Cast to Looking Glass", self)
-        cast_action.triggered.connect(self._cast)
-        toolbar.addAction(cast_action)
-        reset_action = QAction("Reset view", self)
-        reset_action.setToolTip("Frame the current scene again, undoing any orbit or zoom.")
-        reset_action.triggered.connect(self._reset_view)
-        toolbar.addAction(reset_action)
-        toolbar.addSeparator()
-        toolbar.addWidget(QLabel(" Show: ", self))
-        self._filter_box = QLineEdit(self)
-        self._filter_box.setPlaceholderText(
-            "spec, space-separated -- LC4 DNp01, a root id, or label:giant fib"
-        )
-        self._filter_box.setText(" ".join(specs))
-        self._filter_box.setClearButtonEnabled(True)
-        self._filter_box.returnPressed.connect(self._apply_filter)
-        self._filter_box.setMinimumWidth(360)
-        toolbar.addWidget(self._filter_box)
-
-        # Enabled once, not per scene: the callback reads self._picks when it
-        # fires, so re-filtering swaps the targets without re-registering.
-        # show_message=False keeps the hint out of the scene and out of a cast.
-        #
-        # Picking is an interactor event, and a QtInteractor built while
-        # pyvista.OFF_SCREEN is set has no interactor at all -- iren is None,
-        # and enable_point_picking raises on it. That is the state CI runs in,
-        # since pyvista's headless-display action exports PYVISTA_OFF_SCREEN.
-        # Nothing is lost by skipping it there: an off-screen window is one
-        # nobody can point at. _on_pick stays callable either way, which is
-        # how the picking tests drive it.
+        # Enabled once, not per scene: the callback reads the current targets.
+        # Off-screen QtInteractors have no interactor, so CI skips registration.
         if self.plotter.iren is not None:
             self.plotter.enable_point_picking(
                 callback=self._on_pick, show_message=False, show_point=False
             )
         self._compose(specs, answer)
 
-    def _build_controls(self) -> None:
-        """A dock of toggles for everything the scene can draw or leave out.
+    def _build_workspace(self, specs: Sequence[str]) -> None:
+        """Build a bounded control rail and a viewport with a lower inspector."""
+        self._controls_panel = QWidget(self)
+        self._controls_panel.setMinimumWidth(280)
+        self._controls_panel.setMaximumWidth(380)
+        rail = QVBoxLayout(self._controls_panel)
+        rail.setContentsMargins(14, 12, 14, 12)
+        rail.setSpacing(10)
+        brand = QLabel("ConnectomeKG", self)
+        brand.setObjectName("brand")
+        brand_row = QHBoxLayout()
+        brand_row.addWidget(brand)
+        self._version_label = QLabel(f"v{__version__}", self)
+        self._version_label.setProperty("role", "muted")
+        brand_row.addWidget(self._version_label)
+        brand_row.addStretch(1)
+        rail.addLayout(brand_row)
+        subtitle = QLabel("3D CONNECTOME EXPLORER", self)
+        subtitle.setProperty("role", "muted")
+        rail.addWidget(subtitle)
+        rail.addWidget(self._heading("Show"))
+        self._filter_box = QLineEdit(self)
+        self._filter_box.setPlaceholderText("LC4 DNp01, circuit:compass, path:...")
+        self._filter_box.setToolTip(
+            "Enter space-separated specs, a root id, or an answer.\n"
+            "A label may contain spaces: label:giant fib.\n"
+            'To combine it with another spec: "label:giant fib" LC4.\n'
+            "Clear the box to show the brain alone.\n" + ANSWER_SYNTAX
+        )
+        self._filter_box.setText(specs[0] if len(specs) == 1 else shlex.join(specs))
+        self._filter_box.setClearButtonEnabled(True)
+        self._filter_box.returnPressed.connect(self._apply_filter)
+        self._filter_box.setAccessibleName("Scene specification")
+        rail.addWidget(self._filter_box)
+        self._show_button = QPushButton("Show scene", self)
+        self._show_button.setObjectName("show-scene")
+        self._show_button.setMinimumHeight(38)
+        self._show_button.clicked.connect(self._apply_filter)
+        rail.addWidget(self._show_button)
 
-        The fleet's other viewers (``gutenberg_kg``, ``pycode_kg``,
-        ``Metabo_kg``) put their controls in a panel like this; only
-        ``genealogy_kg``, which this file was modeled on, has none. A
-        connectome scene has more to turn on and off than a family tree does,
-        so it follows the majority.
+        self._tabs = QTabWidget(self)
+        self._examples = self._example_buttons(self._tabs)
+        self._tabs.addTab(self._examples, "Explore")
+        self._tabs.addTab(self._build_controls(), "Display")
+        rail.addWidget(self._tabs, stretch=1)
+        self._cast_button = QPushButton("Cast to Looking Glass", self)
+        self._cast_button.setObjectName("cast-scene")
+        self._cast_button.setMinimumHeight(36)
+        self._cast_button.setToolTip("Cast the current scene and camera using " + self._preset)
+        self._cast_button.clicked.connect(self._cast)
+        rail.addWidget(self._cast_button)
 
-        Each toggle redraws, because the overlays are composed rather than
-        merely hidden: the cloud is one glyph per neuron and the surfaces are
-        78 merged meshes, and keeping both around to toggle visibility would
-        cost more than rebuilding the scene without them.
-        """
+        viewport = QWidget(self)
+        vis = QVBoxLayout(viewport)
+        vis.setContentsMargins(12, 12, 12, 8)
+        vis.setSpacing(8)
+        self._scene_title = QLabel(self)
+        self._scene_title.setObjectName("scene-title")
+        self._scene_title.setTextFormat(Qt.TextFormat.PlainText)
+        self._scene_title.setWordWrap(True)
+        self._scene_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        vis.addWidget(self._scene_title)
+        self._scene_stats = QLabel(self)
+        self._scene_stats.setProperty("role", "muted")
+        self._scene_stats.setWordWrap(True)
+        vis.addWidget(self._scene_stats)
+        self._geometry_stats = QLabel(self)
+        self._geometry_stats.setProperty("role", "muted")
+        self._geometry_stats.setWordWrap(True)
+        self._geometry_stats.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        vis.addWidget(self._geometry_stats)
+
+        self._inspector = QWidget(self)
+        details = QVBoxLayout(self._inspector)
+        details.setContentsMargins(0, 0, 0, 0)
+        details.addWidget(self._heading("Neuron inspector"))
+        self._info_panel = QTextEdit(self)
+        self._info_panel.setReadOnly(True)
+        self._info_panel.setLineWrapMode(QTextEdit.WidgetWidth)
+        self._info_panel.setAccessibleName("Neuron details")
+        details.addWidget(self._info_panel)
+        self._viewport_splitter = QSplitter(Qt.Orientation.Vertical, self)
+        self._viewport_splitter.setChildrenCollapsible(False)
+        self._viewport_splitter.addWidget(self.plotter)
+        self._viewport_splitter.addWidget(self._inspector)
+        self._viewport_splitter.setStretchFactor(0, 1)
+        self._viewport_splitter.setStretchFactor(1, 0)
+        self._viewport_splitter.setSizes([650, 160])
+        vis.addWidget(self._viewport_splitter, stretch=1)
+
+        actions = QHBoxLayout()
+        self._reset_button = QPushButton("Reset view", self)
+        self._reset_button.setToolTip("Frame the current scene again, undoing any orbit or zoom.")
+        self._reset_button.clicked.connect(self._reset_view)
+        actions.addWidget(self._reset_button)
+        self._inspect_button = QPushButton("Neuron details", self)
+        self._inspect_button.setCheckable(True)
+        self._inspect_button.setChecked(True)
+        self._inspect_button.toggled.connect(self._inspector.setVisible)
+        actions.addWidget(self._inspect_button)
+        hint = QLabel("Drag to orbit  |  Scroll to zoom  |  P to pick", self)
+        hint.setProperty("role", "muted")
+        hint.setWordWrap(True)
+        actions.addWidget(hint, stretch=1)
+        vis.addLayout(actions)
+
+        self._workspace = QSplitter(Qt.Orientation.Horizontal, self)
+        self._workspace.setChildrenCollapsible(False)
+        self._workspace.addWidget(self._controls_panel)
+        self._workspace.addWidget(viewport)
+        self._workspace.setStretchFactor(0, 0)
+        self._workspace.setStretchFactor(1, 1)
+        self._workspace.setSizes([310, 1090])
+        self.setCentralWidget(self._workspace)
+
+    def _build_controls(self) -> QScrollArea:
+        """Scrollable display settings; overlay toggles rebuild the scene."""
         panel = QWidget(self)
         layout = QVBoxLayout(panel)
         layout.setSpacing(6)
@@ -239,6 +363,14 @@ class BrainSceneWindow(QMainWindow):
         ):
             box = QCheckBox(text, panel)
             box.setChecked(checked)
+            if key == "cloud":
+                box.setTristate(True)
+                if self._cloud is None:
+                    box.setCheckState(Qt.CheckState.PartiallyChecked)
+                box.setToolTip(
+                    "Partially checked = automatic (cloud when no surfaces are available).\n"
+                    "Checked = always show. Unchecked = hide."
+                )
             box.stateChanged.connect(self._on_toggle)
             layout.addWidget(box)
             self._toggles[key] = box
@@ -253,6 +385,7 @@ class BrainSceneWindow(QMainWindow):
             "0 lets the stride follow the neuron count, so a large answer stays drawable."
         )
         layout.addWidget(self._stride)
+        self._stride.editingFinished.connect(self._apply_stride)
 
         layout.addWidget(QLabel("Minimum synapses (cone)", panel))
         self._min_syn = QSpinBox(panel)
@@ -263,15 +396,17 @@ class BrainSceneWindow(QMainWindow):
             "cone: answers."
         )
         layout.addWidget(self._min_syn)
-
-        layout.addWidget(self._separator())
-        layout.addWidget(self._heading("Examples"))
-        layout.addWidget(self._example_buttons(panel), stretch=1)
-
-        dock = QDockWidget("Controls", self)
-        dock.setWidget(panel)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
-        self._controls_dock = dock
+        note = QLabel("Minimum synapses applies when you next choose Show scene.", panel)
+        note.setWordWrap(True)
+        note.setProperty("role", "muted")
+        layout.addWidget(note)
+        layout.addStretch(1)
+        area = QScrollArea(self)
+        area.setWidget(panel)
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        return area
 
     def _example_buttons(self, parent: QWidget) -> QScrollArea:
         """Every documented spec, answer and circuit as a button that draws it.
@@ -304,13 +439,14 @@ class BrainSceneWindow(QMainWindow):
             if not fresh:
                 continue
             label = QLabel(title, inner)
-            label.setStyleSheet("color: gray;")
+            label.setProperty("role", "heading")
             column.addWidget(label)
             for example, meaning in fresh:
                 seen.add(example)
                 button = QPushButton(example, inner)
                 button.setToolTip(meaning)
-                button.setStyleSheet("text-align: left; padding: 2px 6px;")
+                button.setStyleSheet("text-align: left; padding: 7px 6px;")
+                button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
                 # default=False keeps Return in the Show box out of these.
                 button.setAutoDefault(False)
                 button.clicked.connect(partial(self._draw_example, example))
@@ -319,6 +455,8 @@ class BrainSceneWindow(QMainWindow):
         area = QScrollArea(parent)
         area.setWidget(inner)
         area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         return area
 
     def _draw_example(self, example: str) -> None:
@@ -331,7 +469,7 @@ class BrainSceneWindow(QMainWindow):
 
     def _heading(self, text: str) -> QLabel:
         label = QLabel(text, self)
-        label.setStyleSheet("font-weight: bold;")
+        label.setProperty("role", "heading")
         return label
 
     def _separator(self) -> QFrame:
@@ -342,12 +480,22 @@ class BrainSceneWindow(QMainWindow):
 
     def _on_toggle(self) -> None:
         """Apply the toggles by redrawing whatever the view currently shows."""
-        self._cloud = self._toggles["cloud"].isChecked()
+        cloud_state = self._toggles["cloud"].checkState()
+        self._cloud = (
+            None
+            if cloud_state == Qt.CheckState.PartiallyChecked
+            else cloud_state == Qt.CheckState.Checked
+        )
         self._neuropils = self._toggles["neuropils"].isChecked()
         self._floor = self._toggles["floor"].isChecked()
         self._tubes = self._toggles["tubes"].isChecked()
         self._skeleton_step = self._stride.value() or None
         self._compose(self._specs, self._answer, keep_camera=True)
+
+    def _apply_stride(self) -> None:
+        """Apply an edited stride once, without rebuilding on an unchanged focus loss."""
+        if (self._stride.value() or None) != self._skeleton_step:
+            self._on_toggle()
 
     def _compose(
         self, specs: Sequence[str], answer: Answer | None = None, *, keep_camera: bool = False
@@ -362,8 +510,8 @@ class BrainSceneWindow(QMainWindow):
             would throw away the rotation the viewer had chosen; a new subject
             is re-framed because the old camera may not contain it.
         """
+        started = perf_counter()
         camera = self.plotter.camera_position if keep_camera else None
-        self.plotter.clear()
         with self._busy("Composing the scene..."):
             info = self._build(specs, answer)
         self._specs = list(specs)
@@ -371,14 +519,75 @@ class BrainSceneWindow(QMainWindow):
         self._picks = info.picks
         self._points = info.points
         title = f"{answer.title} | {info.title}" if answer else info.title
-        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
+        self.setWindowTitle(f"ConnectomeKG v{__version__} viz3d -- {title}")
+        self._scene_title.setText(
+            answer.title
+            if answer
+            else " + ".join(specs) or ("Neuropil flow" if self._view == "flow" else "Whole brain")
+        )
+        self._scene_stats.setText(
+            f"{info.view.capitalize()} view  |  {info.n_circuit:,} circuit neurons  |  "
+            f"{info.n_context:,} context neurons  |  {info.n_neuropil_meshes:,} neuropil surfaces"
+            + (
+                f"  |  {info.n_flow_pairs:,} flow arcs"
+                if info.view == "flow"
+                else f"  |  {info.n_skeletons:,} skeletons"
+            )
+        )
+        self._scene_stats.setToolTip(info.title)
         if camera is None:
             render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
         else:
             self.plotter.camera_position = camera
         if self._floor:
             render3d.add_floor(self.plotter)
+        self._update_geometry_stats(started)
         self._describe_scene()
+
+    def _update_geometry_stats(self, started: float) -> None:
+        """Count expanded mesh geometry without copying or traversing its arrays.
+
+        Counts are per visible actor, including off-camera geometry. Cells
+        include polygons, polylines and strips; they are not GPU triangles.
+        Glyphs and tubes have already expanded into their rendered meshes.
+
+        :param started: ``perf_counter`` timestamp at the start of composition;
+            the displayed duration includes framing and pending mesh updates,
+            not a frame-rate benchmark or a cast duration.
+        """
+        groups: dict[str, list[int]] = {}
+        for name, actor in self.plotter.renderer.actors.items():
+            if not isinstance(actor, Actor) or not actor.visibility:
+                continue
+            # Some mapper inputs are lazy filters and remain empty until
+            # updated, especially before the window's first render.
+            if actor.mapper is None:
+                continue
+            actor.mapper.Update()
+            mesh = getattr(actor.mapper, "dataset", None)
+            if mesh is None:
+                continue
+            counts = groups.setdefault(name.split(":", 1)[0], [0, 0, 0])
+            counts[0] += 1
+            counts[1] += mesh.n_points
+            counts[2] += mesh.n_cells
+        meshes, points, cells = (sum(row[i] for row in groups.values()) for i in range(3))
+        self._geometry_stats.setText(
+            f"Geometry: {meshes:,} meshes  |  {points:,} points  |  {cells:,} cells"
+            f"  |  Scene build: {perf_counter() - started:.2f} s"
+        )
+        rows = [
+            f"{name}: {n:,} meshes, {p:,} points, {c:,} cells"
+            for name, (n, p, c) in sorted(groups.items(), key=lambda item: item[1][2], reverse=True)
+        ]
+        self._geometry_stats.setToolTip(
+            "Scene geometry after glyph and tube expansion, including the floor.\n"
+            "Cells are mesh faces, lines, vertices or strips; not neurons or GPU triangles.\n"
+            "Counted per visible mesh, including geometry outside the camera view.\n\n"
+            + "\n".join(rows)
+            + "\n\nFor lighter scenes: hide the cloud or surfaces, turn off tubes, "
+            "or increase skeleton stride.\nScene build measures setup on this machine, not FPS."
+        )
 
     def _build(self, specs: Sequence[str], answer: Answer | None):
         """Compose the scene into the live plotter.
@@ -410,7 +619,6 @@ class BrainSceneWindow(QMainWindow):
                 f"{drawn}\n\nPoint at one and press P to identify it."
                 f"\n\nShow also takes an answer:\n{ANSWER_SYNTAX}"
             )
-            self._dock.show()
             self._say("Point at a neuron and press P to identify it.")
         else:
             self._info_panel.setPlainText(
@@ -418,8 +626,13 @@ class BrainSceneWindow(QMainWindow):
                 "The flow view draws neuropils rather than neurons, and a "
                 "circuit view needs a spec that resolves to some."
             )
-            self._dock.setVisible(self._view != "flow")
-            self._say("No neurons drawn.")
+            self._say(
+                "Neuropil flow; neuron picking is unavailable."
+                if self._view == "flow"
+                else "Choose a spec or example to explore neurons."
+            )
+        self._inspect_button.setVisible(self._view != "flow")
+        self._inspector.setVisible(self._view != "flow" and self._inspect_button.isChecked())
 
     @contextmanager
     def _busy(self, message: str) -> Iterator[None]:
@@ -436,11 +649,19 @@ class BrainSceneWindow(QMainWindow):
         :param message: What is happening, for the status bar.
         """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        # processEvents also delivers clicks: prevent another composition or
+        # cast from starting while this one owns the scene.
+        controls = (self._controls_panel, self._reset_button, self.plotter)
+        enabled = [widget.isEnabled() for widget in controls]
+        for widget in controls:
+            widget.setEnabled(False)
         self._say(message)
         QApplication.processEvents()
         try:
             yield
         finally:
+            for widget, was_enabled in zip(controls, enabled, strict=True):
+                widget.setEnabled(was_enabled)
             QApplication.restoreOverrideCursor()
             QApplication.processEvents()
 
@@ -490,8 +711,8 @@ class BrainSceneWindow(QMainWindow):
             self._compose([text], answer)
             return
 
-        specs = text.split()
         try:
+            specs = _split_specs(text)
             # An unknown name is not an error to `neurons_of`, it is an empty
             # result, so emptiness has to be checked for rather than caught --
             # and per spec, not over the union. "LC4 NoSuchType" resolves to
@@ -514,6 +735,9 @@ class BrainSceneWindow(QMainWindow):
         :param message: What was wrong with the spec.
         """
         self._info_panel.setPlainText(f"Cannot show that.\n\n{message}")
+        self._inspect_button.show()
+        self._inspector.show()
+        self._inspect_button.setChecked(True)
         self._say(message)
 
     def _on_pick(self, point, *_: object) -> None:
@@ -521,6 +745,8 @@ class BrainSceneWindow(QMainWindow):
 
         :param point: The picked position, in world coordinates.
         """
+        self._inspect_button.setChecked(True)
+        self._inspector.show()
         node_id = self._picks.nearest(point, within=PICK_RADIUS)
         if node_id is None:
             self._info_panel.setPlainText(
