@@ -95,10 +95,6 @@ class ConnectomeKG(KGModule):
         self.progress = progress
         self._graph: SynapseGraph | None = None
 
-    def __enter__(self) -> ConnectomeKG:
-        # KGModule.__enter__ is typed as the base class; narrow it for callers.
-        return self
-
     # ------------------------------------------------------------ contract
     def kind(self) -> str:
         return "connectome"
