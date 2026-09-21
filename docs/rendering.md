@@ -304,7 +304,7 @@ Quilts are never committed.
 | `--tubes` | circuit | off | draw skeletons as tubes instead of lines |
 | `--top` | flow | `100` | strongest neuropil pairs drawn, 1 to 500 |
 | `--neuropils` / `--no-neuropils` | both | on | draw the neuropil surfaces, when `connkg meshes` has fetched them |
-| `--cloud` / `--no-cloud` | both | on, unless the surfaces are drawn | draw the context cloud |
+| `--cloud` / `--no-cloud` | both | on with `--floor`; else on unless the surfaces are drawn | draw the context cloud |
 | `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
 | `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
@@ -803,7 +803,11 @@ because it reaches past the camera and would otherwise decide both. In the
 viewer, **Cast to Looking Glass** rebuilds the floor with the scene.
 
 Skeletons drawn as lines cast almost no shadow. Add `--tubes` to a floored
-circuit view.
+circuit view. Under the floor, line skeletons are rendered as GPU tubes
+either way: VTK's shadow pass can only shade lit geometry, and an unlit
+line's shader fails to compile, silently. The floor also re-orders the
+render passes so that translucent surfaces, the neuropil shells among them,
+are drawn after the shadowed floor rather than under it.
 
 Shadow mapping adds a render pass for each frame, so the interactive viewer
 can respond more slowly with `--floor`. The stills and quilts are not

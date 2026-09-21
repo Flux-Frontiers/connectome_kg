@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--floor` no longer corrupts skeletons drawn as lines.** VTK's shadow-map
+  pass splices `calcShadow(vertexVC, ...)` into every actor's fragment shader
+  but declares `vertexVC` only for lit geometry; a line has no normals, so
+  its shader failed to compile and the render carried on regardless, drawing
+  the skeletons as stray red strokes or not at all. Every documented floor
+  render happened to pair `--floor` with `--tubes` or the flow view, which is
+  why it went unseen. `add_floor` now renders line skeletons as GPU tubes.
+- **Neuropil surfaces show under the floor.** PyVista appends the shadow pass
+  after the stock render-steps pass, so each frame drew the opaque geometry a
+  second time, shadowed, over any translucent surface in front of the floor.
+  `add_floor` re-sequences the passes the way VTK intends: shadowed opaque
+  geometry first, translucency after.
+
+### Changed
+
+- **`--floor` defaults the context cloud on.** The brain's shadow on the
+  floor is thrown by the cloud's opaque somas and by nothing else, since the
+  translucent surfaces cast none; a floor without a cloud showed the circuit's
+  shadow alone. `--no-cloud` still turns it off.
+
 ### Removed
 
 - **The `__enter__` override is gone** (`kgrag_priv` sweep item 5).

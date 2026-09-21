@@ -6,6 +6,7 @@ the scene composition tests do (``pytest.importorskip("pyvista")``).
 
 from __future__ import annotations
 
+import logging
 import re
 
 import numpy as np
@@ -533,3 +534,40 @@ def test_the_floor_is_culled_from_below(kg):
     scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
     scene.add_floor(plotter)
     assert plotter.renderer.actors["floor"].prop.culling == "back"
+
+
+def test_the_floor_shades_skeleton_lines_so_the_shadow_pass_compiles(kg, tmp_path, caplog):
+    """Unlit lines under VTK's shadow pass fail to compile, silently, and draw as red strays."""
+    pv = pytest.importorskip("pyvista")
+    swc_dir = tmp_path / "sk_lod1_783_healed"
+    swc_dir.mkdir()
+    for rid in _lc4_root_ids(kg):
+        _write_stub_skeleton(swc_dir, rid)
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    info = scene.build_brain_scene(
+        plotter, kg, specs=["LC4"], data_dir=tmp_path, cloud=False, neuropils=False
+    )
+    scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    scene.add_floor(plotter)
+
+    assert plotter.renderer.actors["skeleton:LC4"].prop.render_lines_as_tubes
+    with caplog.at_level(logging.ERROR):
+        plotter.screenshot(return_img=True)
+    assert "Could not set shader program" not in caplog.text
+
+
+def test_the_floor_draws_translucent_surfaces_after_the_shadowed_opaque_pass(kg):
+    """PyVista's default order draws the shadowed floor over any translucent surface."""
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    info = scene.build_brain_scene(plotter, kg, specs=["GRN_sugar"], cloud=False, neuropils=False)
+    scene.aim_camera(plotter, info.points, elevation=scene.FLOOR_ELEVATION)
+    scene.add_floor(plotter)
+    scene.add_floor(plotter)  # a second call must not stack a second sequence
+
+    passes = plotter.renderer._render_passes._pass_collection
+    names = [passes.GetItemAsObject(i).GetClassName() for i in range(passes.GetNumberOfItems())]
+    assert "vtkRenderStepsPass" not in names
+    assert names[:2] == ["vtkShadowMapBakerPass", "vtkShadowMapPass"]
+    assert names[2] in ("vtkTranslucentPass", "vtkDepthPeelingPass")
+    assert names[3:] == ["vtkVolumetricPass", "vtkOverlayPass"]

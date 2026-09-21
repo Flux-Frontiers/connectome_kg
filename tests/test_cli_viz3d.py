@@ -116,6 +116,13 @@ def test_quilt_rejects_oversized_skeleton_step(kg, kg_root):
     assert result.exit_code == 2
 
 
+def test_resolve_cloud_defaults_on_only_with_a_floor():
+    assert mod.resolve_cloud(False, None) is None  # the scene decides
+    assert mod.resolve_cloud(True, None) is True  # the cloud throws the brain's shadow
+    assert mod.resolve_cloud(True, False) is False
+    assert mod.resolve_cloud(False, True) is True
+
+
 def test_resolve_elevation_defaults_to_a_look_down_only_with_a_floor():
     assert mod.resolve_elevation(False, None) == 0.0
     assert mod.resolve_elevation(True, None) == FLOOR_ELEVATION
