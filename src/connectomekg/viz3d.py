@@ -449,11 +449,21 @@ class BrainSceneWindow(QMainWindow):
 
         Re-aims rather than restoring a saved camera, so it lands where the
         scene was first framed however far the view has been dragged since.
+
+        The floor comes off first and goes back after. ``aim_camera`` frames
+        ``plotter.bounds``, and the floor is a 120-unit plane around a brain
+        about 8 across, so framing with it in place fits the floor and the
+        subject shrinks to nothing -- which is why ``_compose`` aims before
+        it adds the floor, and why this has to put it back the same way.
         """
         if self._points is None:
             self._say("Nothing to frame.")
             return
+        if self._floor:
+            self.plotter.remove_actor("floor")
         render3d.aim_camera(self.plotter, self._points, elevation=self._elevation)
+        if self._floor:
+            render3d.add_floor(self.plotter)
         self.plotter.render()
         self._say("View reset.")
 

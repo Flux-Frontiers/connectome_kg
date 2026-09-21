@@ -580,3 +580,33 @@ def test_a_cast_reports_its_stages_in_the_status_bar(qapp, kg, monkeypatch):
         assert window.statusBar().currentMessage() == "done"
     finally:
         window.close()
+
+
+def test_reset_view_frames_the_subject_not_the_floor(qapp, kg):
+    """aim_camera measures plotter.bounds, and the floor is a 120-unit plane.
+
+    Framing with it in place fits the floor, and the subject shrinks to a
+    speck -- so the floor comes off for the reframe and goes back after.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False, floor=True)
+    try:
+        framed = np.asarray(window.plotter.camera_position[0], dtype=float)
+        focus = np.asarray(window.plotter.camera_position[1], dtype=float)
+        subject_distance = float(np.linalg.norm(framed - focus))
+
+        window.plotter.camera.azimuth = 40
+        window._reset_view()
+
+        back = np.asarray(window.plotter.camera_position[0], dtype=float)
+        after = float(np.linalg.norm(back - np.asarray(window.plotter.camera_position[1])))
+        assert after == pytest.approx(subject_distance, rel=1e-6), (
+            "reset pulled the camera back to fit the floor"
+        )
+        assert np.allclose(back, framed, rtol=1e-6, atol=1e-6)
+        assert "floor" in window.plotter.renderer.actors, "the floor must come back"
+    finally:
+        window.close()

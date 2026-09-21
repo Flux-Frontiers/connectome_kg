@@ -21,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Reset view, and a wait cursor on the slow steps.** The viewer gained a
+- **Reset view, and a wait cursor on the slow steps.** Reset view takes the
+  floor off before reframing and puts it back after: `aim_camera` measures
+  `plotter.bounds`, and framing a 120-unit floor plane around an 8-unit brain
+  fits the floor and shrinks the subject to a speck. The viewer gained a
   toolbar action that frames the current scene again, undoing an orbit or a
   zoom, matching what `gutenberg_kg` and `pycode_kg` already offer. Composing
   a scene and casting both run seconds long on the GUI thread; both now show
