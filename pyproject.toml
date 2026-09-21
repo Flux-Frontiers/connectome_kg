@@ -139,31 +139,6 @@ pytest-cov = ">=5.0.0"
 ruff = ">=0.15,<0.16"
 ty = ">=0.0.44"
 
-# ---------------------------------------------------------------------------
-# Maintainer tooling (Poetry group, not a PEP 621 extra)
-# ---------------------------------------------------------------------------
-# doc-kg and pycode-kg are tools this repo *runs*, not libraries it imports.
-# Nothing under src/ imports either one. They live here rather than in `dev`
-# so CI's lint and test jobs never install them.
-#
-#   poetry install --with kg      # get the dockg / pycodekg CLIs into .venv/bin
-[tool.poetry.group.kg]
-optional = true
-
-[tool.poetry.group.kg.dependencies]
-# Fleet floors: the releases that moved both packages onto the shared
-# kgmodule-utils snapshot extension points.
-doc-kg = ">=0.26.0"
-pycode-kg = ">=0.27.0"
-
-# ---------------------------------------------------------------------------
-# Docs site (Poetry group, not a PEP 621 extra)
-# ---------------------------------------------------------------------------
-# mkdocs-material renders docs/*.md as-is, and mkdocstrings adds an API
-# reference generated from the package's own docstrings so it cannot drift
-# from the code. Same setup as quiltwright.
-#
-#   poetry install --with docs && poetry run mkdocs serve
 [tool.poetry.group.docs]
 optional = true
 
