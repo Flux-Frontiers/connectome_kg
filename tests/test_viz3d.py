@@ -330,16 +330,70 @@ def test_min_syn_narrows_a_cone_answer(qapp, kg, monkeypatch):
         window.close()
 
 
-def test_the_controls_list_the_spec_examples(qapp, kg):
-    from connectomekg.answers import ANSWER_EXAMPLES, SPEC_EXAMPLES  # noqa: PLC0415
+def test_the_controls_offer_every_example_as_a_button(qapp, kg):
+    from PyQt5.QtWidgets import QPushButton  # noqa: PLC0415
+
+    from connectomekg.answers import (  # noqa: PLC0415
+        ANSWER_EXAMPLES,
+        SPEC_EXAMPLES,
+        circuit_examples,
+    )
     from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
 
     window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
     try:
         panel = window._controls_dock.widget()
-        shown = "\n".join(w.toPlainText() for w in panel.findChildren(type(window._info_panel)))
-        for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES):
-            assert example in shown, example
+        texts = [b.text() for b in panel.findChildren(QPushButton)]
+        buttons = {b.text(): b for b in panel.findChildren(QPushButton)}
+        documented = (*circuit_examples(), *SPEC_EXAMPLES, *ANSWER_EXAMPLES)
+        for example, _ in documented:
+            assert example in buttons, example
+        # circuit:compass documents the form in the spec grammar and is also
+        # one of the circuits; that is two lines of help but one button.
+        assert len(texts) == len(set(texts)), "an example was offered twice"
+        for example, button in buttons.items():
+            meanings = {m for e, m in documented if e == example}
+            # The meaning is not lost by dropping the help text: it is the tooltip.
+            assert button.toolTip() in meanings, example
+    finally:
+        window.close()
+
+
+def test_clicking_an_example_fills_the_box_and_applies_it(qapp, kg):
+    """A button takes the typed path, refusals included.
+
+    Every documented example names v783 cell types, which the synthetic
+    fixture does not have, so the click is expected to be refused -- and the
+    refusal is the proof that the button went through ``_apply_filter``
+    rather than drawing something on its own.
+    """
+    from PyQt5.QtWidgets import QPushButton  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        before_title = window.windowTitle()
+        panel = window._controls_dock.widget()
+        button = next(b for b in panel.findChildren(QPushButton) if b.text() == "circuit:compass")
+        button.click()
+        assert window._filter_box.text() == "circuit:compass"
+        assert window.windowTitle() == before_title  # scene kept
+        assert "Cannot show that" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
+def test_an_example_that_resolves_is_drawn(qapp, kg):
+    """The same path with a spec the fixture does have actually redraws."""
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._draw_example("MN9")
+        assert window._filter_box.text() == "MN9"
+        assert window._specs == ["MN9"]
+        assert set(window._picks.neuron_ids) == set(kg.neurons_of("MN9"))
     finally:
         window.close()
 

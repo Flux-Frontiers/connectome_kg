@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`circuit:<name>`, a spec form for a named circuit.** Some circuits are
+  worth drawing together and nobody remembers them as a list of cell types.
+  `circuit:compass` expands to the union of the central complex's five
+  head-direction types, and goes anywhere a SPEC goes -- `quilt`, `viz3d`,
+  `path`, `cone`, `influence`, `link` -- because it resolves inside
+  `ConnectomeKG.neurons_of`. Four ship: `compass` (151 neurons),
+  `optic-flow` (24), `mushroom-body` (99) and `clock` (48). The union is
+  flat, and the circuit view still colors by each neuron's own cell type, so
+  a circuit draws one color per type it contains. Names fold case and `_` to
+  `-`; an unknown one is refused by name, listing the circuits there are.
+- **The 3-D viewer draws an example when you click it.** The controls dock
+  listed the spec grammar as text to be retyped into the Show box; every
+  documented spec, answer and circuit is now a button that fills the box and
+  applies it, taking the same path a typed spec does, refusals included. The
+  meaning moved to the tooltip.
+
 ### Fixed
 
 - **`--floor` no longer corrupts skeletons drawn as lines.** VTK's shadow-map

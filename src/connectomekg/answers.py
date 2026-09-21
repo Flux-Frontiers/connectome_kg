@@ -42,6 +42,7 @@ __all__ = [
     "SPEC_EXAMPLES",
     "Answer",
     "answer_groups",
+    "circuit_examples",
     "is_answer",
     "parse_answer",
     "spec_help",
@@ -61,6 +62,7 @@ SPEC_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
     ("connectome:fafb783:n:720575940622838154", "the same neuron, by node id"),
     ("label:giant fib", "every neuron a community label matches, as a regex"),
     ("label:^LPLC2_", "anchored, so it matches the label's start"),
+    ("circuit:compass", "a named circuit, the cell types it spans drawn together"),
 )
 
 #: The answer forms, which any command taking a spec also takes. Every one of
@@ -77,16 +79,33 @@ ANSWER_EXAMPLES: Final[tuple[tuple[str, str], ...]] = (
 )
 
 
+def circuit_examples() -> tuple[tuple[str, str], ...]:
+    """The named circuits as ``(spec, what it means)``, like the other tables.
+
+    Built rather than written out, so that adding a circuit to
+    :data:`connectomekg.circuits.CIRCUITS` is the only edit needed for it to
+    appear in ``connkg specs``, ``connkg circuits`` and the viewer.
+
+    :return: One pair per circuit, in registry order.
+    """
+    from connectomekg.circuits import CIRCUIT_PREFIX, CIRCUITS  # noqa: PLC0415 - cycle
+
+    return tuple((f"{CIRCUIT_PREFIX}{name}", circuit.summary) for name, circuit in CIRCUITS.items())
+
+
 def spec_help() -> str:
     """The spec and answer grammar with examples, as plain text.
 
-    :return: Two labeled blocks, one line per form.
+    :return: Three labeled blocks, one line per form.
     """
-    width = max(len(example) for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES))
+    circuits = circuit_examples()
+    width = max(len(example) for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES, *circuits))
     lines = ["A SPEC names neurons:", ""]
     lines += [f"  {example:<{width}}  {meaning}" for example, meaning in SPEC_EXAMPLES]
     lines += ["", "An answer draws a query instead, and goes anywhere a SPEC does:", ""]
     lines += [f"  {example:<{width}}  {meaning}" for example, meaning in ANSWER_EXAMPLES]
+    lines += ["", "A named circuit is a set of cell types worth drawing together:", ""]
+    lines += [f"  {example:<{width}}  {meaning}" for example, meaning in circuits]
     return "\n".join(lines)
 
 

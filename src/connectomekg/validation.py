@@ -169,16 +169,24 @@ def normalize_node_id(raw: str) -> str:
 def normalize_spec(raw: str) -> str:
     """Return a usable neuron spec, checking a ``label:`` regex before it runs.
 
-    A spec is a cell type name, a root id, a neuron node id, or
-    ``label:<regex>``. The regex is matched against every community label, so
-    it is length-capped and must compile.
+    A spec is a cell type name, a root id, a neuron node id,
+    ``label:<regex>`` or ``circuit:<name>``. The regex is matched against
+    every community label, so it is length-capped and must compile; the
+    circuit name is checked here so that a typo is reported before any query
+    runs, naming the circuits there are.
 
     :param raw: Spec as supplied.
     :return: The normalized spec.
-    :raises ValueError: If it is empty, too long, or a ``label:`` pattern is
-        empty, longer than :data:`MAX_LABEL_PATTERN` or not a valid regex.
+    :raises ValueError: If it is empty, too long, a ``label:`` pattern is
+        empty, longer than :data:`MAX_LABEL_PATTERN` or not a valid regex, or
+        a ``circuit:`` name is empty or unknown.
     """
+    from connectomekg.circuits import circuit_specs, is_circuit  # noqa: PLC0415 - cycle
+
     spec = _unwrap(raw, "spec")
+    if is_circuit(spec):
+        circuit_specs(spec)  # raises, naming the circuits, if the name is unknown
+        return spec
     if spec.startswith("label:"):
         pattern = spec[len("label:") :]
         if not pattern:

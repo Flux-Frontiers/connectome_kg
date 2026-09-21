@@ -15,7 +15,9 @@ The toolbar's Show box re-resolves specs and redraws in place, so exploring
 does not mean restarting. It refuses a spec that matches nothing, or one over
 ``MAX_SCENE_NEURONS``, and leaves the scene as it was -- including when only
 one spec of several is bad, since drawing the rest would look like a scene
-that contained them all.
+that contained them all. The controls dock lists every documented spec,
+answer and named circuit as a button that fills the Show box and applies it,
+so the grammar can be explored without being retyped.
 
 Picking is bound to **P**, not to a left click. A left click is where VTK
 begins a rotation, so picking on it would re-answer the question on every
@@ -31,6 +33,7 @@ License: Elastic 2.0
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import partial
 from pathlib import Path
 
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
@@ -44,6 +47,8 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPushButton,
+    QScrollArea,
     QSpinBox,
     QTextEdit,
     QToolBar,
@@ -53,7 +58,15 @@ from PyQt5.QtWidgets import (
 from pyvistaqt import QtInteractor
 
 from connectomekg import scene as render3d
-from connectomekg.answers import ANSWER_SYNTAX, Answer, answer_groups, is_answer, spec_help
+from connectomekg.answers import (
+    ANSWER_EXAMPLES,
+    ANSWER_SYNTAX,
+    SPEC_EXAMPLES,
+    Answer,
+    answer_groups,
+    circuit_examples,
+    is_answer,
+)
 from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
@@ -244,16 +257,68 @@ class BrainSceneWindow(QMainWindow):
 
         layout.addWidget(self._separator())
         layout.addWidget(self._heading("Examples"))
-        examples = QTextEdit(panel)
-        examples.setReadOnly(True)
-        examples.setPlainText(spec_help())
-        examples.setLineWrapMode(QTextEdit.NoWrap)
-        layout.addWidget(examples, stretch=1)
+        layout.addWidget(self._example_buttons(panel), stretch=1)
 
         dock = QDockWidget("Controls", self)
         dock.setWidget(panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         self._controls_dock = dock
+
+    def _example_buttons(self, parent: QWidget) -> QScrollArea:
+        """Every documented spec, answer and circuit as a button that draws it.
+
+        The panel used to show :func:`connectomekg.answers.spec_help` as
+        text to be retyped into
+        the Show box. The grammar is the same list either way, so the buttons
+        are built from it rather than from a second list that could drift:
+        each one puts its example in the Show box and applies it, which is
+        the path a typed spec takes, refusals included.
+
+        Circuits come first, and an example already shown is not repeated:
+        ``circuit:compass`` is in the spec grammar to document the *form* and
+        in the circuit list as one of the circuits, which is two lines of
+        help but should not be two buttons.
+
+        :param parent: The controls panel.
+        :return: A scroll area of buttons, grouped as the help text is.
+        """
+        inner = QWidget(parent)
+        column = QVBoxLayout(inner)
+        column.setSpacing(2)
+        seen: set[str] = set()
+        for title, examples in (
+            ("Circuits", circuit_examples()),
+            ("Specs", SPEC_EXAMPLES),
+            ("Answers", ANSWER_EXAMPLES),
+        ):
+            fresh = [(e, m) for e, m in examples if e not in seen]
+            if not fresh:
+                continue
+            label = QLabel(title, inner)
+            label.setStyleSheet("color: gray;")
+            column.addWidget(label)
+            for example, meaning in fresh:
+                seen.add(example)
+                button = QPushButton(example, inner)
+                button.setToolTip(meaning)
+                button.setStyleSheet("text-align: left; padding: 2px 6px;")
+                # default=False keeps Return in the Show box out of these.
+                button.setAutoDefault(False)
+                button.clicked.connect(partial(self._draw_example, example))
+                column.addWidget(button)
+        column.addStretch(1)
+        area = QScrollArea(parent)
+        area.setWidget(inner)
+        area.setWidgetResizable(True)
+        return area
+
+    def _draw_example(self, example: str) -> None:
+        """Draw a clicked example, exactly as typing it would.
+
+        :param example: The spec, answer or circuit on the button.
+        """
+        self._filter_box.setText(example)
+        self._apply_filter()
 
     def _heading(self, text: str) -> QLabel:
         label = QLabel(text, self)
