@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reset view, and a wait cursor on the slow steps.** The viewer gained a
+  toolbar action that frames the current scene again, undoing an orbit or a
+  zoom, matching what `gutenberg_kg` and `pycode_kg` already offer. Composing
+  a scene and casting both run seconds long on the GUI thread; both now show
+  a wait cursor and say what they are doing in the status bar, and the cast
+  reports its four stages through the progress sink the SDK already took and
+  the viewer was not passing.
 - **`circuit:<name>`, a spec form for a named circuit.** Some circuits are
   worth drawing together and nobody remembers them as a list of cell types.
   `circuit:compass` expands to the union of the central complex's five

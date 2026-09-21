@@ -32,7 +32,8 @@ License: Elastic 2.0
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
+    QApplication,
     QCheckBox,
     QDockWidget,
     QFrame,
@@ -159,6 +161,9 @@ class BrainSceneWindow(QMainWindow):
         self._elevation = elevation
         self._answer: Answer | None = None
         self._picks = PickTargets.empty()
+        # The composed scene's world points, kept so Reset view can re-aim at
+        # the same framing the scene was first given.
+        self._points: object = None
 
         self._info_panel = QTextEdit(self)
         self._info_panel.setReadOnly(True)
@@ -173,6 +178,10 @@ class BrainSceneWindow(QMainWindow):
         cast_action = QAction("Cast to Looking Glass", self)
         cast_action.triggered.connect(self._cast)
         toolbar.addAction(cast_action)
+        reset_action = QAction("Reset view", self)
+        reset_action.setToolTip("Frame the current scene again, undoing any orbit or zoom.")
+        reset_action.triggered.connect(self._reset_view)
+        toolbar.addAction(reset_action)
         toolbar.addSeparator()
         toolbar.addWidget(QLabel(" Show: ", self))
         self._filter_box = QLineEdit(self)
@@ -355,7 +364,30 @@ class BrainSceneWindow(QMainWindow):
         """
         camera = self.plotter.camera_position if keep_camera else None
         self.plotter.clear()
-        info = render3d.build_brain_scene(
+        with self._busy("Composing the scene..."):
+            info = self._build(specs, answer)
+        self._specs = list(specs)
+        self._answer = answer
+        self._picks = info.picks
+        self._points = info.points
+        title = f"{answer.title} | {info.title}" if answer else info.title
+        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
+        if camera is None:
+            render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
+        else:
+            self.plotter.camera_position = camera
+        if self._floor:
+            render3d.add_floor(self.plotter)
+        self._describe_scene()
+
+    def _build(self, specs: Sequence[str], answer: Answer | None):
+        """Compose the scene into the live plotter.
+
+        :param specs: The specs to draw.
+        :param answer: A resolved path or cone, or ``None``.
+        :return: The ``SceneInfo`` the scene reports.
+        """
+        return render3d.build_brain_scene(
             self.plotter,
             self._kg,
             specs=() if answer else specs,
@@ -369,18 +401,9 @@ class BrainSceneWindow(QMainWindow):
             neuropils=self._neuropils,
             cloud=self._cloud,
         )
-        self._specs = list(specs)
-        self._answer = answer
-        self._picks = info.picks
-        title = f"{answer.title} | {info.title}" if answer else info.title
-        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
-        if camera is None:
-            render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
-        else:
-            self.plotter.camera_position = camera
-        if self._floor:
-            render3d.add_floor(self.plotter)
 
+    def _describe_scene(self) -> None:
+        """Say what was drawn and whether there is anything to pick in it."""
         if len(self._picks):
             drawn = f"{len(self._picks.neuron_ids)} neurons drawn."
             self._info_panel.setPlainText(
@@ -397,6 +420,42 @@ class BrainSceneWindow(QMainWindow):
             )
             self._dock.setVisible(self._view != "flow")
             self._say("No neurons drawn.")
+
+    @contextmanager
+    def _busy(self, message: str) -> Iterator[None]:
+        """Show *message* under a wait cursor while a slow step runs.
+
+        Composing a scene reads skeletons and glyphs 139k somas, and a cast
+        renders 48 views; both take seconds on the GUI thread, during which
+        the window is unresponsive and, without this, silent. The cursor is
+        the part that reads as "working" rather than "hung".
+
+        Restored in a ``finally``: an override cursor that outlives its
+        operation leaves the whole application looking busy for good.
+
+        :param message: What is happening, for the status bar.
+        """
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self._say(message)
+        QApplication.processEvents()
+        try:
+            yield
+        finally:
+            QApplication.restoreOverrideCursor()
+            QApplication.processEvents()
+
+    def _reset_view(self) -> None:
+        """Frame the current scene again, undoing an orbit or a zoom.
+
+        Re-aims rather than restoring a saved camera, so it lands where the
+        scene was first framed however far the view has been dragged since.
+        """
+        if self._points is None:
+            self._say("Nothing to frame.")
+            return
+        render3d.aim_camera(self.plotter, self._points, elevation=self._elevation)
+        self.plotter.render()
+        self._say("View reset.")
 
     def _say(self, message: str) -> None:
         """Put a line in the status bar, which QMainWindow types as optional."""
@@ -504,8 +563,26 @@ class BrainSceneWindow(QMainWindow):
                 render3d.add_floor(plotter)
             plotter.camera.view_angle = view_angle
 
+        def step(n: int, total: int, message: str) -> None:
+            """Report a cast stage, pumping the event loop so it is seen.
+
+            The cast runs on the GUI thread, so without this the window is
+            frozen from the click to the dialog -- some seconds, all of it
+            silent.
+
+            :param n: Stage number.
+            :param total: How many stages there are.
+            :param message: What is happening now.
+            """
+            self._say(f"Cast {n}/{total} -- {message}")
+            QApplication.processEvents()
+
         out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
-        result = cast_scene_to_looking_glass(build, self.plotter.camera_position, out_stem, spec)
+        with self._busy("Casting to Looking Glass..."):
+            result = cast_scene_to_looking_glass(
+                build, self.plotter.camera_position, out_stem, spec, progress=step
+            )
+        self._say(result.message)
         box = QMessageBox.information if result.path else QMessageBox.warning
         box(self, "Cast to Looking Glass", result.message)
 

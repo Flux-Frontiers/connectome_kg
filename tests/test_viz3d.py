@@ -477,3 +477,106 @@ def test_a_cast_keeps_the_viewport_s_view_angle(qapp, kg, monkeypatch):
             offscreen.close()
     finally:
         window.close()
+
+
+def test_reset_view_reframes_after_an_orbit(qapp, kg):
+    """Reset view re-aims at the scene, however far the camera has been dragged."""
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        framed = np.asarray(window.plotter.camera_position[0], dtype=float)
+        window.plotter.camera.azimuth = 55
+        window.plotter.camera.zoom(3)
+        moved = np.asarray(window.plotter.camera_position[0], dtype=float)
+        assert not np.allclose(framed, moved), "the orbit must actually move the camera"
+
+        window._reset_view()
+        back = np.asarray(window.plotter.camera_position[0], dtype=float)
+        assert np.allclose(back, framed, rtol=1e-6, atol=1e-6)
+    finally:
+        window.close()
+
+
+def test_reset_view_says_so_when_there_is_nothing_framed(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._points = None
+        window._reset_view()
+        assert "Nothing to frame" in window.statusBar().currentMessage()
+    finally:
+        window.close()
+
+
+def test_a_slow_step_shows_a_wait_cursor_and_always_restores_it(qapp, kg):
+    """An override cursor that outlives its operation leaves the app looking hung."""
+    import pytest  # noqa: PLC0415
+    from PyQt5.QtCore import Qt  # noqa: PLC0415
+    from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert QApplication.overrideCursor() is None
+        with window._busy("working..."):
+            cursor = QApplication.overrideCursor()
+            assert cursor is not None
+            assert cursor.shape() == Qt.CursorShape.WaitCursor
+            assert "working..." in window.statusBar().currentMessage()
+        assert QApplication.overrideCursor() is None
+
+        # And restored even when the slow step raises.
+        with pytest.raises(RuntimeError), window._busy("failing..."):
+            raise RuntimeError("boom")
+        assert QApplication.overrideCursor() is None
+    finally:
+        window.close()
+
+
+def test_composing_leaves_no_override_cursor_behind(qapp, kg):
+    from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert QApplication.overrideCursor() is None
+        window._draw_example("MN9")
+        assert QApplication.overrideCursor() is None
+    finally:
+        window.close()
+
+
+def test_a_cast_reports_its_stages_in_the_status_bar(qapp, kg, monkeypatch):
+    """The cast runs on the GUI thread, so it has to say what it is doing."""
+    from kg_utils.viz3d.qt import CastResult  # noqa: PLC0415
+    from PyQt5.QtWidgets import QMessageBox  # noqa: PLC0415
+
+    from connectomekg import viz3d as mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    seen: list[str] = []
+
+    def fake_cast(build, camera_position, out_stem, spec, *, progress=None, **kwargs):
+        assert progress is not None, "the viewer must pass a progress sink"
+        progress(1, 4, "building scene...")
+        progress(4, 4, "handing to Bridge...")
+        seen.append("called")
+        return CastResult(path=None, error="not cast in tests", elapsed=0.0, message="done")
+
+    monkeypatch.setattr(mod, "cast_scene_to_looking_glass", fake_cast)
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._cast()
+        assert seen == ["called"]
+        assert window.statusBar().currentMessage() == "done"
+    finally:
+        window.close()
