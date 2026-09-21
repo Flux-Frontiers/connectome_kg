@@ -36,6 +36,15 @@ queries take: `connkg quilt LPLC2 DNp01 --tubes --cloud`.*
     The render is an adaptation of it, shared under the same license, not
     under the software's Elastic License 2.0.
 
+## How it fits together
+
+[![ConnectomeKG architecture: source files to ingest, graph, engine and surfaces](images/connectomekg-architecture.png)](images/connectomekg-architecture.pdf)
+
+*The whole system on one sheet: the FlyWire files that go in, the reader and
+normalized tables that make the graph reusable, what the graph holds, the
+queries over it, and the four ways out. Figures are from the built FAFB v783
+graph. [PDF](images/connectomekg-architecture.pdf).*
+
 ## Where to start
 
 | page | covers |

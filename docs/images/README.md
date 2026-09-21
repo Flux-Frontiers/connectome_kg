@@ -1,8 +1,14 @@
 # Images
 
-Every image in this directory is a render of the FlyWire FAFB v783
+Most images in this directory are renders of the FlyWire FAFB v783
 connectome. Regenerate them all from a built graph and the skeleton download
 with `poetry run python docs/scripts/render_images.py`.
+
+`connectomekg-architecture.png` and `.pdf` are the exception: a hand-made
+architecture infographic, drawn from `architecture-infographic-brief.txt` in
+the repository root. It is a diagram, not a render, so the render script does
+not touch it; the figures in it come from the built graph and are dated on
+the sheet.
 
 The data comes from FlyWire (https://flywire.ai):
 
