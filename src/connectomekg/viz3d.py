@@ -476,6 +476,14 @@ class BrainSceneWindow(QMainWindow):
         floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
 
         answer = self._answer
+        # PyVista's camera_position is (position, focal point, view up) and
+        # carries no view angle, so the cast helper's fresh off-screen plotter
+        # keeps VTK's default 30 degrees while the viewport is at the 14 that
+        # aim_camera framed with. The subject then lands tan(15)/tan(7) = 2.2x
+        # too small, which is eight scroll-wheel steps to undo by hand. The
+        # angle is set inside build(), before the helper assigns
+        # camera_position, which does not disturb it.
+        view_angle = self.plotter.camera.view_angle
 
         def build(plotter) -> None:
             render3d.build_brain_scene(
@@ -494,6 +502,7 @@ class BrainSceneWindow(QMainWindow):
             )
             if floor:
                 render3d.add_floor(plotter)
+            plotter.camera.view_angle = view_angle
 
         out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
         result = cast_scene_to_looking_glass(build, self.plotter.camera_position, out_stem, spec)

@@ -433,3 +433,47 @@ def test_a_new_subject_is_reframed(qapp, kg):
         assert not np.allclose(np.array(window.plotter.camera_position.to_list()), rotated)
     finally:
         window.close()
+
+
+def test_a_cast_keeps_the_viewport_s_view_angle(qapp, kg, monkeypatch):
+    """The cast must be framed like the viewport, not at VTK's default 30 degrees.
+
+    ``camera_position`` is (position, focal point, view up) and carries no
+    view angle, so a fresh off-screen plotter keeps 30 while the viewport sits
+    at the angle ``aim_camera`` framed with. That put the subject
+    tan(15)/tan(7) = 2.2x too small on the panel. This drives the same
+    sequence the cast helper does -- build, then assign ``camera_position`` --
+    and checks the angle survives it.
+    """
+    import pyvista as pv  # noqa: PLC0415
+    from kg_utils.viz3d.qt import CastResult  # noqa: PLC0415
+    from PyQt5.QtWidgets import QMessageBox  # noqa: PLC0415
+
+    from connectomekg import viz3d as mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    captured: dict[str, object] = {}
+
+    def fake_cast(build, camera_position, out_stem, spec, **kwargs):
+        captured["build"] = build
+        captured["camera_position"] = camera_position
+        return CastResult(path=None, error="not cast in tests", elapsed=0.0, message="ok")
+
+    monkeypatch.setattr(mod, "cast_scene_to_looking_glass", fake_cast)
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False, floor=True)
+    try:
+        expected = window.plotter.camera.view_angle
+        window._cast()
+        offscreen = pv.Plotter(off_screen=True)
+        try:
+            assert offscreen.camera.view_angle != expected, "fixture must differ from the default"
+            captured["build"](offscreen)
+            offscreen.camera_position = captured["camera_position"]
+            assert offscreen.camera.view_angle == expected
+        finally:
+            offscreen.close()
+    finally:
+        window.close()

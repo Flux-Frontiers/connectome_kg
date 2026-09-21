@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cast from the 3-D viewer is framed like the viewport.** PyVista's
+  `camera_position` is (position, focal point, view up) and carries no view
+  angle, so the cast helper's fresh off-screen plotter kept VTK's default 30
+  degrees while the viewport sat at the 14 that `aim_camera` framed with. The
+  subject landed tan(15)/tan(7) = 2.2x too small on the panel, about eight
+  scroll-wheel steps to undo by hand. The viewer now carries its view angle
+  across. Note the viewport's aspect still differs from the quilt tile's
+  (1.56 against 1.78), which adds margin left and right but does not change
+  the size of what is cast.
+
 ### Added
 
 - **`circuit:<name>`, a spec form for a named circuit.** Some circuits are
