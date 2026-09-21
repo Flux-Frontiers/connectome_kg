@@ -15,7 +15,9 @@ The toolbar's Show box re-resolves specs and redraws in place, so exploring
 does not mean restarting. It refuses a spec that matches nothing, or one over
 ``MAX_SCENE_NEURONS``, and leaves the scene as it was -- including when only
 one spec of several is bad, since drawing the rest would look like a scene
-that contained them all.
+that contained them all. The controls dock lists every documented spec,
+answer and named circuit as a button that fills the Show box and applies it,
+so the grammar can be explored without being retyped.
 
 Picking is bound to **P**, not to a left click. A left click is where VTK
 begins a rotation, so picking on it would re-answer the question on every
@@ -30,13 +32,16 @@ License: Elastic 2.0
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
+    QApplication,
     QCheckBox,
     QDockWidget,
     QFrame,
@@ -44,6 +49,8 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPushButton,
+    QScrollArea,
     QSpinBox,
     QTextEdit,
     QToolBar,
@@ -53,7 +60,15 @@ from PyQt5.QtWidgets import (
 from pyvistaqt import QtInteractor
 
 from connectomekg import scene as render3d
-from connectomekg.answers import ANSWER_SYNTAX, Answer, answer_groups, is_answer, spec_help
+from connectomekg.answers import (
+    ANSWER_EXAMPLES,
+    ANSWER_SYNTAX,
+    SPEC_EXAMPLES,
+    Answer,
+    answer_groups,
+    circuit_examples,
+    is_answer,
+)
 from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
@@ -146,6 +161,9 @@ class BrainSceneWindow(QMainWindow):
         self._elevation = elevation
         self._answer: Answer | None = None
         self._picks = PickTargets.empty()
+        # The composed scene's world points, kept so Reset view can re-aim at
+        # the same framing the scene was first given.
+        self._points: object = None
 
         self._info_panel = QTextEdit(self)
         self._info_panel.setReadOnly(True)
@@ -160,6 +178,10 @@ class BrainSceneWindow(QMainWindow):
         cast_action = QAction("Cast to Looking Glass", self)
         cast_action.triggered.connect(self._cast)
         toolbar.addAction(cast_action)
+        reset_action = QAction("Reset view", self)
+        reset_action.setToolTip("Frame the current scene again, undoing any orbit or zoom.")
+        reset_action.triggered.connect(self._reset_view)
+        toolbar.addAction(reset_action)
         toolbar.addSeparator()
         toolbar.addWidget(QLabel(" Show: ", self))
         self._filter_box = QLineEdit(self)
@@ -244,16 +266,68 @@ class BrainSceneWindow(QMainWindow):
 
         layout.addWidget(self._separator())
         layout.addWidget(self._heading("Examples"))
-        examples = QTextEdit(panel)
-        examples.setReadOnly(True)
-        examples.setPlainText(spec_help())
-        examples.setLineWrapMode(QTextEdit.NoWrap)
-        layout.addWidget(examples, stretch=1)
+        layout.addWidget(self._example_buttons(panel), stretch=1)
 
         dock = QDockWidget("Controls", self)
         dock.setWidget(panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         self._controls_dock = dock
+
+    def _example_buttons(self, parent: QWidget) -> QScrollArea:
+        """Every documented spec, answer and circuit as a button that draws it.
+
+        The panel used to show :func:`connectomekg.answers.spec_help` as
+        text to be retyped into
+        the Show box. The grammar is the same list either way, so the buttons
+        are built from it rather than from a second list that could drift:
+        each one puts its example in the Show box and applies it, which is
+        the path a typed spec takes, refusals included.
+
+        Circuits come first, and an example already shown is not repeated:
+        ``circuit:compass`` is in the spec grammar to document the *form* and
+        in the circuit list as one of the circuits, which is two lines of
+        help but should not be two buttons.
+
+        :param parent: The controls panel.
+        :return: A scroll area of buttons, grouped as the help text is.
+        """
+        inner = QWidget(parent)
+        column = QVBoxLayout(inner)
+        column.setSpacing(2)
+        seen: set[str] = set()
+        for title, examples in (
+            ("Circuits", circuit_examples()),
+            ("Specs", SPEC_EXAMPLES),
+            ("Answers", ANSWER_EXAMPLES),
+        ):
+            fresh = [(e, m) for e, m in examples if e not in seen]
+            if not fresh:
+                continue
+            label = QLabel(title, inner)
+            label.setStyleSheet("color: gray;")
+            column.addWidget(label)
+            for example, meaning in fresh:
+                seen.add(example)
+                button = QPushButton(example, inner)
+                button.setToolTip(meaning)
+                button.setStyleSheet("text-align: left; padding: 2px 6px;")
+                # default=False keeps Return in the Show box out of these.
+                button.setAutoDefault(False)
+                button.clicked.connect(partial(self._draw_example, example))
+                column.addWidget(button)
+        column.addStretch(1)
+        area = QScrollArea(parent)
+        area.setWidget(inner)
+        area.setWidgetResizable(True)
+        return area
+
+    def _draw_example(self, example: str) -> None:
+        """Draw a clicked example, exactly as typing it would.
+
+        :param example: The spec, answer or circuit on the button.
+        """
+        self._filter_box.setText(example)
+        self._apply_filter()
 
     def _heading(self, text: str) -> QLabel:
         label = QLabel(text, self)
@@ -290,7 +364,30 @@ class BrainSceneWindow(QMainWindow):
         """
         camera = self.plotter.camera_position if keep_camera else None
         self.plotter.clear()
-        info = render3d.build_brain_scene(
+        with self._busy("Composing the scene..."):
+            info = self._build(specs, answer)
+        self._specs = list(specs)
+        self._answer = answer
+        self._picks = info.picks
+        self._points = info.points
+        title = f"{answer.title} | {info.title}" if answer else info.title
+        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
+        if camera is None:
+            render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
+        else:
+            self.plotter.camera_position = camera
+        if self._floor:
+            render3d.add_floor(self.plotter)
+        self._describe_scene()
+
+    def _build(self, specs: Sequence[str], answer: Answer | None):
+        """Compose the scene into the live plotter.
+
+        :param specs: The specs to draw.
+        :param answer: A resolved path or cone, or ``None``.
+        :return: The ``SceneInfo`` the scene reports.
+        """
+        return render3d.build_brain_scene(
             self.plotter,
             self._kg,
             specs=() if answer else specs,
@@ -304,18 +401,9 @@ class BrainSceneWindow(QMainWindow):
             neuropils=self._neuropils,
             cloud=self._cloud,
         )
-        self._specs = list(specs)
-        self._answer = answer
-        self._picks = info.picks
-        title = f"{answer.title} | {info.title}" if answer else info.title
-        self.setWindowTitle(f"ConnectomeKG viz3d -- {title}")
-        if camera is None:
-            render3d.aim_camera(self.plotter, info.points, elevation=self._elevation)
-        else:
-            self.plotter.camera_position = camera
-        if self._floor:
-            render3d.add_floor(self.plotter)
 
+    def _describe_scene(self) -> None:
+        """Say what was drawn and whether there is anything to pick in it."""
         if len(self._picks):
             drawn = f"{len(self._picks.neuron_ids)} neurons drawn."
             self._info_panel.setPlainText(
@@ -332,6 +420,52 @@ class BrainSceneWindow(QMainWindow):
             )
             self._dock.setVisible(self._view != "flow")
             self._say("No neurons drawn.")
+
+    @contextmanager
+    def _busy(self, message: str) -> Iterator[None]:
+        """Show *message* under a wait cursor while a slow step runs.
+
+        Composing a scene reads skeletons and glyphs 139k somas, and a cast
+        renders 48 views; both take seconds on the GUI thread, during which
+        the window is unresponsive and, without this, silent. The cursor is
+        the part that reads as "working" rather than "hung".
+
+        Restored in a ``finally``: an override cursor that outlives its
+        operation leaves the whole application looking busy for good.
+
+        :param message: What is happening, for the status bar.
+        """
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self._say(message)
+        QApplication.processEvents()
+        try:
+            yield
+        finally:
+            QApplication.restoreOverrideCursor()
+            QApplication.processEvents()
+
+    def _reset_view(self) -> None:
+        """Frame the current scene again, undoing an orbit or a zoom.
+
+        Re-aims rather than restoring a saved camera, so it lands where the
+        scene was first framed however far the view has been dragged since.
+
+        The floor comes off first and goes back after. ``aim_camera`` frames
+        ``plotter.bounds``, and the floor is a 120-unit plane around a brain
+        about 8 across, so framing with it in place fits the floor and the
+        subject shrinks to nothing -- which is why ``_compose`` aims before
+        it adds the floor, and why this has to put it back the same way.
+        """
+        if self._points is None:
+            self._say("Nothing to frame.")
+            return
+        if self._floor:
+            self.plotter.remove_actor("floor")
+        render3d.aim_camera(self.plotter, self._points, elevation=self._elevation)
+        if self._floor:
+            render3d.add_floor(self.plotter)
+        self.plotter.render()
+        self._say("View reset.")
 
     def _say(self, message: str) -> None:
         """Put a line in the status bar, which QMainWindow types as optional."""
@@ -411,6 +545,14 @@ class BrainSceneWindow(QMainWindow):
         floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
 
         answer = self._answer
+        # PyVista's camera_position is (position, focal point, view up) and
+        # carries no view angle, so the cast helper's fresh off-screen plotter
+        # keeps VTK's default 30 degrees while the viewport is at the 14 that
+        # aim_camera framed with. The subject then lands tan(15)/tan(7) = 2.2x
+        # too small, which is eight scroll-wheel steps to undo by hand. The
+        # angle is set inside build(), before the helper assigns
+        # camera_position, which does not disturb it.
+        view_angle = self.plotter.camera.view_angle
 
         def build(plotter) -> None:
             render3d.build_brain_scene(
@@ -429,9 +571,28 @@ class BrainSceneWindow(QMainWindow):
             )
             if floor:
                 render3d.add_floor(plotter)
+            plotter.camera.view_angle = view_angle
+
+        def step(n: int, total: int, message: str) -> None:
+            """Report a cast stage, pumping the event loop so it is seen.
+
+            The cast runs on the GUI thread, so without this the window is
+            frozen from the click to the dialog -- some seconds, all of it
+            silent.
+
+            :param n: Stage number.
+            :param total: How many stages there are.
+            :param message: What is happening now.
+            """
+            self._say(f"Cast {n}/{total} -- {message}")
+            QApplication.processEvents()
 
         out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
-        result = cast_scene_to_looking_glass(build, self.plotter.camera_position, out_stem, spec)
+        with self._busy("Casting to Looking Glass..."):
+            result = cast_scene_to_looking_glass(
+                build, self.plotter.camera_position, out_stem, spec, progress=step
+            )
+        self._say(result.message)
         box = QMessageBox.information if result.path else QMessageBox.warning
         box(self, "Cast to Looking Glass", result.message)
 

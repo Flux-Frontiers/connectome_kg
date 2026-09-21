@@ -28,6 +28,31 @@ free text written by annotators: the v783 label for the giant fiber reads
 `giant fiber/giant fibre/GF/GFN`, which is why the short pattern `label:giant
 fib` is the reliable one.
 
+## A named circuit names several cell types
+
+Some circuits are worth drawing together and nobody remembers them as a list
+of names. `circuit:<name>` expands to the union of its cell types, and goes
+anywhere a SPEC goes:
+
+```bash
+connkg quilt circuit:compass --floor
+connkg viz3d circuit:optic-flow
+connkg path circuit:compass>DNp01
+```
+
+| Circuit | What it is | Neurons |
+|---|---|---|
+| `circuit:compass` | the central complex's head-direction system: `EPG`, `Delta7`, `PEG`, `PEN_a/PEN1`, `PEN_b/PEN2` | 151 |
+| `circuit:optic-flow` | lobula plate tangential cells `HSN`/`HSE`/`HSS` and `VS1`-`VS8`, plus `DNp15` | 24 |
+| `circuit:mushroom-body` | the mushroom body output neurons, `label:^MBON` | 99 |
+| `circuit:clock` | the circadian pacemaker network | 48 |
+
+The name is matched case-insensitively and `_` counts as `-`, so
+`circuit:Optic_Flow` works. An unknown name is refused by name, listing the
+circuits there are. The union is flat, but the circuit view colors by each
+neuron's own cell type, so `circuit:compass` still draws five colors.
+`connkg specs` lists every circuit with its summary.
+
 ## An ANSWER names a query
 
 An answer goes anywhere a spec goes, and stands for the neurons a query

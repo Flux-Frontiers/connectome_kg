@@ -12,6 +12,7 @@ from kg_utils.extractor import KGExtractor
 from kg_utils.pipeline import KGModule
 from kg_utils.specs import QueryResult, SnippetPack
 
+from connectomekg.circuits import circuit_specs, is_circuit
 from connectomekg.extractor import DEFAULT_RELS, EDGE_KINDS, NODE_KINDS, ConnectomeExtractor
 from connectomekg.neuroglancer import SPEC_COLORS, neuroglancer_url
 from connectomekg.paths import InfluenceResult, PathResult, SynapseGraph
@@ -201,11 +202,19 @@ class ConnectomeKG(KGModule):
         """Resolve a cell type name, a root id, a neuron node id, or a label regex.
 
         :param spec: ``"LC4"``, ``"720575940612345678"``, a ``connectome:...:n:`` id,
-            or ``"label:<regex>"``.
+            ``"label:<regex>"`` or ``"circuit:<name>"``.
         :return: Neuron node ids, possibly empty.
-        :raises ValueError: If the spec is empty, too long, or a bad ``label:`` pattern.
+        :raises ValueError: If the spec is empty, too long, a bad ``label:``
+            pattern, or an unknown ``circuit:`` name.
         """
         spec = normalize_spec(spec)
+        if is_circuit(spec):
+            # Flat union: the circuit view colors by each neuron's own cell
+            # type, so a circuit still draws one color per type it contains.
+            found: set[str] = set()
+            for member in circuit_specs(spec):
+                found.update(self.neurons_of(member))
+            return sorted(found)
         con = self.store.con
         if spec.startswith("connectome:") and ":n:" in spec:
             return [spec] if self.store.node(spec) else []

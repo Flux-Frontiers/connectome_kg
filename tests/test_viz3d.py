@@ -330,16 +330,70 @@ def test_min_syn_narrows_a_cone_answer(qapp, kg, monkeypatch):
         window.close()
 
 
-def test_the_controls_list_the_spec_examples(qapp, kg):
-    from connectomekg.answers import ANSWER_EXAMPLES, SPEC_EXAMPLES  # noqa: PLC0415
+def test_the_controls_offer_every_example_as_a_button(qapp, kg):
+    from PyQt5.QtWidgets import QPushButton  # noqa: PLC0415
+
+    from connectomekg.answers import (  # noqa: PLC0415
+        ANSWER_EXAMPLES,
+        SPEC_EXAMPLES,
+        circuit_examples,
+    )
     from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
 
     window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
     try:
         panel = window._controls_dock.widget()
-        shown = "\n".join(w.toPlainText() for w in panel.findChildren(type(window._info_panel)))
-        for example, _ in (*SPEC_EXAMPLES, *ANSWER_EXAMPLES):
-            assert example in shown, example
+        texts = [b.text() for b in panel.findChildren(QPushButton)]
+        buttons = {b.text(): b for b in panel.findChildren(QPushButton)}
+        documented = (*circuit_examples(), *SPEC_EXAMPLES, *ANSWER_EXAMPLES)
+        for example, _ in documented:
+            assert example in buttons, example
+        # circuit:compass documents the form in the spec grammar and is also
+        # one of the circuits; that is two lines of help but one button.
+        assert len(texts) == len(set(texts)), "an example was offered twice"
+        for example, button in buttons.items():
+            meanings = {m for e, m in documented if e == example}
+            # The meaning is not lost by dropping the help text: it is the tooltip.
+            assert button.toolTip() in meanings, example
+    finally:
+        window.close()
+
+
+def test_clicking_an_example_fills_the_box_and_applies_it(qapp, kg):
+    """A button takes the typed path, refusals included.
+
+    Every documented example names v783 cell types, which the synthetic
+    fixture does not have, so the click is expected to be refused -- and the
+    refusal is the proof that the button went through ``_apply_filter``
+    rather than drawing something on its own.
+    """
+    from PyQt5.QtWidgets import QPushButton  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        before_title = window.windowTitle()
+        panel = window._controls_dock.widget()
+        button = next(b for b in panel.findChildren(QPushButton) if b.text() == "circuit:compass")
+        button.click()
+        assert window._filter_box.text() == "circuit:compass"
+        assert window.windowTitle() == before_title  # scene kept
+        assert "Cannot show that" in window._info_panel.toPlainText()
+    finally:
+        window.close()
+
+
+def test_an_example_that_resolves_is_drawn(qapp, kg):
+    """The same path with a spec the fixture does have actually redraws."""
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._draw_example("MN9")
+        assert window._filter_box.text() == "MN9"
+        assert window._specs == ["MN9"]
+        assert set(window._picks.neuron_ids) == set(kg.neurons_of("MN9"))
     finally:
         window.close()
 
@@ -377,5 +431,182 @@ def test_a_new_subject_is_reframed(qapp, kg):
         window._filter_box.setText("MN9")
         window._apply_filter()
         assert not np.allclose(np.array(window.plotter.camera_position.to_list()), rotated)
+    finally:
+        window.close()
+
+
+def test_a_cast_keeps_the_viewport_s_view_angle(qapp, kg, monkeypatch):
+    """The cast must be framed like the viewport, not at VTK's default 30 degrees.
+
+    ``camera_position`` is (position, focal point, view up) and carries no
+    view angle, so a fresh off-screen plotter keeps 30 while the viewport sits
+    at the angle ``aim_camera`` framed with. That put the subject
+    tan(15)/tan(7) = 2.2x too small on the panel. This drives the same
+    sequence the cast helper does -- build, then assign ``camera_position`` --
+    and checks the angle survives it.
+    """
+    import pyvista as pv  # noqa: PLC0415
+    from kg_utils.viz3d.qt import CastResult  # noqa: PLC0415
+    from PyQt5.QtWidgets import QMessageBox  # noqa: PLC0415
+
+    from connectomekg import viz3d as mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    captured: dict[str, object] = {}
+
+    def fake_cast(build, camera_position, out_stem, spec, **kwargs):
+        captured["build"] = build
+        captured["camera_position"] = camera_position
+        return CastResult(path=None, error="not cast in tests", elapsed=0.0, message="ok")
+
+    monkeypatch.setattr(mod, "cast_scene_to_looking_glass", fake_cast)
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False, floor=True)
+    try:
+        expected = window.plotter.camera.view_angle
+        window._cast()
+        offscreen = pv.Plotter(off_screen=True)
+        try:
+            assert offscreen.camera.view_angle != expected, "fixture must differ from the default"
+            captured["build"](offscreen)
+            offscreen.camera_position = captured["camera_position"]
+            assert offscreen.camera.view_angle == expected
+        finally:
+            offscreen.close()
+    finally:
+        window.close()
+
+
+def test_reset_view_reframes_after_an_orbit(qapp, kg):
+    """Reset view re-aims at the scene, however far the camera has been dragged."""
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        framed = np.asarray(window.plotter.camera_position[0], dtype=float)
+        window.plotter.camera.azimuth = 55
+        window.plotter.camera.zoom(3)
+        moved = np.asarray(window.plotter.camera_position[0], dtype=float)
+        assert not np.allclose(framed, moved), "the orbit must actually move the camera"
+
+        window._reset_view()
+        back = np.asarray(window.plotter.camera_position[0], dtype=float)
+        assert np.allclose(back, framed, rtol=1e-6, atol=1e-6)
+    finally:
+        window.close()
+
+
+def test_reset_view_says_so_when_there_is_nothing_framed(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._points = None
+        window._reset_view()
+        assert "Nothing to frame" in window.statusBar().currentMessage()
+    finally:
+        window.close()
+
+
+def test_a_slow_step_shows_a_wait_cursor_and_always_restores_it(qapp, kg):
+    """An override cursor that outlives its operation leaves the app looking hung."""
+    import pytest  # noqa: PLC0415
+    from PyQt5.QtCore import Qt  # noqa: PLC0415
+    from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert QApplication.overrideCursor() is None
+        with window._busy("working..."):
+            cursor = QApplication.overrideCursor()
+            assert cursor is not None
+            assert cursor.shape() == Qt.CursorShape.WaitCursor
+            assert "working..." in window.statusBar().currentMessage()
+        assert QApplication.overrideCursor() is None
+
+        # And restored even when the slow step raises.
+        with pytest.raises(RuntimeError), window._busy("failing..."):
+            raise RuntimeError("boom")
+        assert QApplication.overrideCursor() is None
+    finally:
+        window.close()
+
+
+def test_composing_leaves_no_override_cursor_behind(qapp, kg):
+    from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert QApplication.overrideCursor() is None
+        window._draw_example("MN9")
+        assert QApplication.overrideCursor() is None
+    finally:
+        window.close()
+
+
+def test_a_cast_reports_its_stages_in_the_status_bar(qapp, kg, monkeypatch):
+    """The cast runs on the GUI thread, so it has to say what it is doing."""
+    from kg_utils.viz3d.qt import CastResult  # noqa: PLC0415
+    from PyQt5.QtWidgets import QMessageBox  # noqa: PLC0415
+
+    from connectomekg import viz3d as mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    seen: list[str] = []
+
+    def fake_cast(build, camera_position, out_stem, spec, *, progress=None, **kwargs):
+        assert progress is not None, "the viewer must pass a progress sink"
+        progress(1, 4, "building scene...")
+        progress(4, 4, "handing to Bridge...")
+        seen.append("called")
+        return CastResult(path=None, error="not cast in tests", elapsed=0.0, message="done")
+
+    monkeypatch.setattr(mod, "cast_scene_to_looking_glass", fake_cast)
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._cast()
+        assert seen == ["called"]
+        assert window.statusBar().currentMessage() == "done"
+    finally:
+        window.close()
+
+
+def test_reset_view_frames_the_subject_not_the_floor(qapp, kg):
+    """aim_camera measures plotter.bounds, and the floor is a 120-unit plane.
+
+    Framing with it in place fits the floor, and the subject shrinks to a
+    speck -- so the floor comes off for the reframe and goes back after.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False, floor=True)
+    try:
+        framed = np.asarray(window.plotter.camera_position[0], dtype=float)
+        focus = np.asarray(window.plotter.camera_position[1], dtype=float)
+        subject_distance = float(np.linalg.norm(framed - focus))
+
+        window.plotter.camera.azimuth = 40
+        window._reset_view()
+
+        back = np.asarray(window.plotter.camera_position[0], dtype=float)
+        after = float(np.linalg.norm(back - np.asarray(window.plotter.camera_position[1])))
+        assert after == pytest.approx(subject_distance, rel=1e-6), (
+            "reset pulled the camera back to fit the floor"
+        )
+        assert np.allclose(back, framed, rtol=1e-6, atol=1e-6)
+        assert "floor" in window.plotter.renderer.actors, "the floor must come back"
     finally:
         window.close()
