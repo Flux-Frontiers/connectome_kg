@@ -571,3 +571,38 @@ def test_the_floor_draws_translucent_surfaces_after_the_shadowed_opaque_pass(kg)
     assert names[:2] == ["vtkShadowMapBakerPass", "vtkShadowMapPass"]
     assert names[2] in ("vtkTranslucentPass", "vtkDepthPeelingPass")
     assert names[3:] == ["vtkVolumetricPass", "vtkOverlayPass"]
+
+
+def test_rebuilding_a_shadowed_scene_restores_normal_passes(kg, tmp_path, caplog):
+    """Switching examples must not shade new lines with the previous floor's pass."""
+    pv = pytest.importorskip("pyvista")
+    swc_dir = tmp_path / "sk_lod1_783_healed"
+    swc_dir.mkdir()
+    for rid in _lc4_root_ids(kg):
+        _write_stub_skeleton(swc_dir, rid)
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    try:
+        info = scene.build_brain_scene(
+            plotter, kg, specs=["LC4"], data_dir=tmp_path, cloud=False, neuropils=False
+        )
+        scene.aim_camera(plotter, info.points)
+        scene.add_floor(plotter)
+        plotter.show(auto_close=False)
+        with caplog.at_level(logging.ERROR):
+            for floor in (True, False, True):
+                info = scene.build_brain_scene(
+                    plotter, kg, specs=["LC4"], data_dir=tmp_path, cloud=False, neuropils=False
+                )
+                assert plotter.renderer._render_passes._shadow_map_pass is None
+                assert plotter.renderer.GetPass() is None
+                assert "floor" not in plotter.renderer.actors
+                scene.aim_camera(plotter, info.points)
+                if floor:
+                    scene.add_floor(plotter)
+                    assert plotter.renderer._render_passes._shadow_map_pass is not None
+                image = plotter.screenshot(return_img=True)
+                assert image.max() > image.min(), "the scene must still render"
+        assert "Could not set shader program" not in caplog.text
+        assert "without a bound program" not in caplog.text
+    finally:
+        plotter.close()
