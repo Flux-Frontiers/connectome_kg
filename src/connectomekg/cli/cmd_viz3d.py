@@ -57,6 +57,22 @@ DEFAULT_PRESET = "16-landscape"
 DEFAULT_VIEW_CONE = 35.0
 
 
+def resolve_cloud(floor: bool, cloud: bool | None) -> bool | None:
+    """Whether to draw the context cloud: explicit, else on with a floor.
+
+    :param floor: Whether ``--floor`` was given.
+    :param cloud: The ``--cloud/--no-cloud`` value, or ``None`` when omitted.
+    :return: *cloud* when given. Otherwise ``True`` with a floor, because the
+        brain's shadow on it is thrown by the cloud's opaque somas and by
+        nothing else -- the translucent surfaces cast none; and ``None``
+        without, leaving the scene to draw the cloud only when the surfaces
+        are not drawn.
+    """
+    if cloud is not None:
+        return cloud
+    return True if floor else None
+
+
 def resolve_elevation(floor: bool, elevation: float | None) -> float:
     """The camera elevation to render at: explicit, else a floor's default.
 
@@ -180,8 +196,9 @@ neuropils_option = click.option(
 cloud_option = click.option(
     "--cloud/--no-cloud",
     default=None,
-    help="Draw the whole-brain context cloud of marked points. Default: only "
-    "when the neuropil surfaces are not drawn.",
+    help="Draw the whole-brain context cloud of marked points. Default: on with "
+    "--floor, whose shadow of the brain the cloud throws; else only when the "
+    "neuropil surfaces are not drawn.",
 )
 elevation_option = click.option(
     "--elevation",
@@ -422,7 +439,7 @@ def quilt(
             tubes=tubes,
             top=top,
             neuropils=neuropils,
-            cloud=cloud,
+            cloud=resolve_cloud(floor, cloud),
             progress=lambda m: click.echo(f"  {m}", err=True),
         )
 
@@ -537,7 +554,7 @@ def viz3d(
             tubes=tubes,
             top=top,
             neuropils=neuropils,
-            cloud=cloud,
+            cloud=resolve_cloud(floor, cloud),
             floor=floor,
             elevation=resolve_elevation(floor, elevation),
             preset=preset,

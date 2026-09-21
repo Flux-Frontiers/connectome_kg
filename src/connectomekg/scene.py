@@ -65,6 +65,7 @@ from connectomekg.validation import (
 if TYPE_CHECKING:
     import pyvista as pv
     from quiltwright import QuiltSpec
+    from vtkmodules.vtkRenderingOpenGL2 import vtkShadowMapPass
 
     from connectomekg.module import ConnectomeKG
 
@@ -777,6 +778,64 @@ def add_studio_lighting(plotter: pv.Plotter) -> None:
         plotter.add_light(light)
 
 
+def _shade_skeleton_lines(plotter: pv.Plotter) -> None:
+    """Render every skeleton drawn as lines as GPU tubes, so the shadow pass can shade it.
+
+    VTK's shadow-map pass splices ``calcShadow(vertexVC, ...)`` into each
+    actor's fragment shader but declares ``vertexVC`` only for lit geometry.
+    Lines have no normals, take the unlit branch, and their shader fails to
+    compile -- silently: the render still completes, and the lines come out
+    as stray red strokes, or not at all. Tube rendering gives a line normals
+    on the GPU without adding geometry; real ``--tubes`` skeletons carry no
+    line cells and are untouched.
+
+    :param plotter: Plotter with the scene composed.
+    """
+    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
+
+    for name, actor in plotter.renderer.actors.items():
+        if name.startswith("skeleton:") and isinstance(actor, pv.Actor):
+            actor.prop.render_lines_as_tubes = True
+
+
+def _draw_translucency_after_shadows(plotter: pv.Plotter, shadow_pass: vtkShadowMapPass) -> None:
+    """Re-sequence the render passes so translucent surfaces survive the floor.
+
+    PyVista appends the shadow pass after VTK's stock ``vtkRenderStepsPass``,
+    so each frame draws everything once without shadows, then draws the
+    opaque geometry again with them, straight over any translucent surface
+    that has the floor behind it: the neuropil shells vanished wherever they
+    overlapped it. VTK's own arrangement is the shadowed opaque pass first
+    and the translucent pass after it. Rebuilt from scratch, so a second
+    ``add_floor`` on the same plotter lands in the same order.
+
+    :param plotter: Plotter with shadows enabled.
+    :param shadow_pass: The plotter's ``vtkShadowMapPass``.
+    """
+    from vtkmodules.vtkRenderingOpenGL2 import (  # noqa: PLC0415 - the viz3d-render-only import boundary
+        vtkDepthPeelingPass,
+        vtkOverlayPass,
+        vtkTranslucentPass,
+        vtkVolumetricPass,
+    )
+
+    renderer = plotter.renderer
+    translucent = vtkTranslucentPass()
+    if renderer.GetUseDepthPeeling():
+        peeling = vtkDepthPeelingPass()
+        peeling.SetTranslucentPass(translucent)
+        peeling.SetMaximumNumberOfPeels(renderer.GetMaximumNumberOfPeels())
+        peeling.SetOcclusionRatio(renderer.GetOcclusionRatio())
+        translucent = peeling
+    passes = renderer._render_passes._pass_collection
+    passes.RemoveAllItems()
+    passes.AddItem(shadow_pass.GetShadowMapBakerPass())
+    passes.AddItem(shadow_pass)  # lights and opaque geometry, shadowed
+    passes.AddItem(translucent)
+    passes.AddItem(vtkVolumetricPass())
+    passes.AddItem(vtkOverlayPass())
+
+
 def add_floor(plotter: pv.Plotter) -> None:
     """Put a shadow-receiving floor under the composed scene, lit from above.
 
@@ -841,6 +900,8 @@ def add_floor(plotter: pv.Plotter) -> None:
     shadow_pass = plotter.renderer._render_passes._shadow_map_pass
     if shadow_pass is not None:
         shadow_pass.GetShadowMapBakerPass().SetResolution(_SHADOW_MAP_RESOLUTION)
+        _draw_translucency_after_shadows(plotter, shadow_pass)
+    _shade_skeleton_lines(plotter)
 
 
 def build_brain_scene(
