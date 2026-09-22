@@ -67,6 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Save scene, in the 3-D viewer.** A button above Cast writes what is on
+  screen without a Looking Glass in the loop: **Image** renders one 4K still
+  the way `connkg quilt --still` does, floor and shadows included, and
+  **Quilt** writes the quilt Cast would send. Both re-compose the scene
+  off-screen from the current specs, settings and camera, sharing the
+  cast's scene builder, so the file matches the viewport rather than being
+  a screen grab of it. The dialog opens in `renders/stills/` or
+  `renders/quilts/`, the chosen name is the stem, and quiltwright appends
+  its spec suffix, so the naming matches the CLI's. A failed render is
+  reported in the status bar and a dialog and leaves the viewer usable.
 - **A command reference, `docs/cli.md`.** Every `connkg` command and
   `connkg-mcp` on one page: options with defaults and ranges, one example
   each with output from the built FAFB v783 graph, and a link to the page

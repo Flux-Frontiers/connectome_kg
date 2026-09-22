@@ -33,22 +33,25 @@ License: Elastic 2.0
 from __future__ import annotations
 
 import shlex
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -74,7 +77,7 @@ from connectomekg.answers import (
     circuit_examples,
     is_answer,
 )
-from connectomekg.cli.cmd_viz3d import QUILTS_DIR, scene_stem
+from connectomekg.cli.cmd_viz3d import QUILTS_DIR, STILL_HEIGHT, STILLS_DIR, scene_stem
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
 from connectomekg.picking import PickTargets, pick_summary
@@ -123,6 +126,9 @@ DARK_STYLESHEET = """
     QScrollBar::handle:vertical { background: #3a4358; min-height: 24px; }
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
     QStatusBar { background: #11151e; color: #9aa4b8; }
+    QMenu { background: #232b3d; border: 1px solid #3a4358; padding: 4px 0; }
+    QMenu::item { padding: 6px 18px; }
+    QMenu::item:selected { background: #35465e; }
 """
 
 
@@ -277,6 +283,18 @@ class BrainSceneWindow(QMainWindow):
         self._tabs.addTab(self._examples, "Explore")
         self._tabs.addTab(self._build_controls(), "Display")
         rail.addWidget(self._tabs, stretch=1)
+        self._save_button = QPushButton("Save scene...", self)
+        self._save_button.setMinimumHeight(36)
+        self._save_button.setToolTip(
+            "Write the current scene and camera to disk, without casting.\n"
+            "Image: one 4K still, as `connkg quilt --still` renders.\n"
+            f"Quilt: the {self._preset} quilt Cast would send."
+        )
+        save_menu = QMenu(self._save_button)
+        save_menu.addAction("Image...", self._save_image)
+        save_menu.addAction("Quilt...", self._save_quilt)
+        self._save_button.setMenu(save_menu)
+        rail.addWidget(self._save_button)
         self._cast_button = QPushButton("Cast to Looking Glass", self)
         self._cast_button.setObjectName("cast-scene")
         self._cast_button.setMinimumHeight(36)
@@ -760,24 +778,28 @@ class BrainSceneWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001 - a bad pick must not kill the viewer
             self._info_panel.setPlainText(f"{node_id}\n\nCould not describe it: {exc}")
 
-    def _cast(self) -> None:
-        """Render the current view off-screen and push it to Looking Glass Bridge."""
-        from quiltwright import QUILT_PRESETS  # noqa: PLC0415 - viz3d-only import
+    def _scene_builder(self) -> Callable[[Any], None]:
+        """A function that composes the current scene into a fresh plotter.
 
-        spec = QUILT_PRESETS[self._preset]
+        Everything a cast or a save renders is captured here, so the three
+        share one definition of "the current scene": the specs or answer,
+        every display setting, the floor, and the viewport's view angle.
+
+        PyVista's ``camera_position`` is (position, focal point, view up) and
+        carries no view angle, so a fresh off-screen plotter keeps VTK's
+        default 30 degrees while the viewport is at the 14 that ``aim_camera``
+        framed with. The subject then lands tan(15)/tan(7) = 2.2x too small,
+        which is eight scroll-wheel steps to undo by hand. The angle is set
+        inside the builder, before the caller assigns ``camera_position``,
+        which does not disturb it.
+
+        :return: A callable taking the plotter to compose into.
+        """
         kg, specs, view = self._kg, self._specs, self._view
         data_dir, color_by = self._data_dir, self._color_by
         skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
         floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
-
         answer = self._answer
-        # PyVista's camera_position is (position, focal point, view up) and
-        # carries no view angle, so the cast helper's fresh off-screen plotter
-        # keeps VTK's default 30 degrees while the viewport is at the 14 that
-        # aim_camera framed with. The subject then lands tan(15)/tan(7) = 2.2x
-        # too small, which is eight scroll-wheel steps to undo by hand. The
-        # angle is set inside build(), before the helper assigns
-        # camera_position, which does not disturb it.
         view_angle = self.plotter.camera.view_angle
 
         def build(plotter) -> None:
@@ -799,6 +821,14 @@ class BrainSceneWindow(QMainWindow):
                 render3d.add_floor(plotter)
             plotter.camera.view_angle = view_angle
 
+        return build
+
+    def _cast(self) -> None:
+        """Render the current view off-screen and push it to Looking Glass Bridge."""
+        from quiltwright import QUILT_PRESETS  # noqa: PLC0415 - viz3d-only import
+
+        spec = QUILT_PRESETS[self._preset]
+
         def step(n: int, total: int, message: str) -> None:
             """Report a cast stage, pumping the event loop so it is seen.
 
@@ -813,14 +843,68 @@ class BrainSceneWindow(QMainWindow):
             self._say(f"Cast {n}/{total} -- {message}")
             QApplication.processEvents()
 
-        out_stem = QUILTS_DIR / f"{scene_stem(view, tuple(specs))}_cast"
+        out_stem = QUILTS_DIR / f"{scene_stem(self._view, tuple(self._specs))}_cast"
         with self._busy("Casting to Looking Glass..."):
             result = cast_scene_to_looking_glass(
-                build, self.plotter.camera_position, out_stem, spec, progress=step
+                self._scene_builder(), self.plotter.camera_position, out_stem, spec, progress=step
             )
         self._say(result.message)
         box = QMessageBox.information if result.path else QMessageBox.warning
         box(self, "Cast to Looking Glass", result.message)
+
+    def _save_image(self) -> None:
+        """Save the current view as one 4K still, framed as ``quilt --still`` frames it."""
+        from quiltwright import QUILT_PRESETS  # noqa: PLC0415 - viz3d-only import
+
+        spec = QUILT_PRESETS[self._preset].still(height=STILL_HEIGHT)
+        self._save_scene(spec, STILLS_DIR, "image")
+
+    def _save_quilt(self) -> None:
+        """Save the quilt Cast would send, without sending it."""
+        from quiltwright import QUILT_PRESETS  # noqa: PLC0415 - viz3d-only import
+        from quiltwright.quilt import resolve_view_cone  # noqa: PLC0415
+
+        spec, _ = resolve_view_cone(QUILT_PRESETS[self._preset], None)
+        self._save_scene(spec, QUILTS_DIR, "quilt")
+
+    def _save_scene(self, spec: Any, out_dir: Path, what: str) -> None:
+        """Ask where, render the current scene off-screen at ``spec``, and write it.
+
+        The file is named the way ``connkg quilt`` names its output: the
+        chosen name is the stem, and quiltwright appends the spec suffix
+        (``_qs1x1a1.77778`` for a still, ``_qs8x6a1.77778`` for a quilt) that
+        Looking Glass readers and the render scripts rely on. The path actually
+        written is reported in the status bar and the dialog.
+
+        :param spec: The quilt spec to render at; a still is a one-view spec.
+        :param out_dir: Where the dialog opens, under ``renders/``.
+        :param what: ``"image"`` or ``"quilt"``, for the dialog and messages.
+        """
+        import pyvista as pv  # noqa: PLC0415 - viz3d-only import
+        from quiltwright import render_quilt, save_quilt  # noqa: PLC0415
+
+        default = out_dir / f"{scene_stem(self._view, tuple(self._specs))}.png"
+        chosen, _ = QFileDialog.getSaveFileName(
+            self, f"Save {what}", str(default), "PNG image (*.png)"
+        )
+        if not chosen:
+            return
+        stem = Path(chosen).with_suffix("")
+        stem.parent.mkdir(parents=True, exist_ok=True)
+        with self._busy(f"Rendering {what}..."):
+            offscreen = pv.Plotter(off_screen=True)
+            try:
+                self._scene_builder()(offscreen)
+                offscreen.camera_position = self.plotter.camera_position
+                written = save_quilt(render_quilt(offscreen, spec), stem, spec)
+            except Exception as exc:  # noqa: BLE001 - a failed save must not take the viewer
+                self._say(f"Save failed: {exc}")
+                QMessageBox.warning(self, f"Save {what}", f"Could not save the {what}: {exc}")
+                return
+            finally:
+                offscreen.close()
+        self._say(f"Wrote {written}")
+        QMessageBox.information(self, f"Save {what}", f"Wrote {written}")
 
 
 def launch(
