@@ -319,14 +319,35 @@ optional.
 
 ## Using the viewer
 
-`connkg viz3d` opens a window, and three things in it are worth knowing about.
-Everything here is per-session: the viewer never writes to the graph.
+`connkg viz3d` opens a workspace: a control rail down the left side, and the
+scene beside it with a neuron inspector below. Everything here is
+per-session -- the viewer never writes to the graph.
+
+### The control rail
+
+The rail holds everything that changes what is drawn, top to bottom: the
+**Show** box and its **Show scene** button, an **Explore** and a **Display**
+tab, and **Cast to Looking Glass** pinned at the bottom where a long tab never
+pushes it off-screen.
+
+**Explore** lists every documented spec, answer and named circuit as a button
+that fills the Show box and draws it, grouped as Circuits, Specs and Answers.
+The grammar can be explored without being retyped, and a button takes the same
+path a typed spec does, refusals included.
+
+![The viewer showing circuit:compass, with the Explore tab open](images/viewer_explore.png)
+
+Above: `circuit:compass` drawn inside the whole brain, the Explore tab listing
+the circuits, specs and answers, and the inspector reporting what was drawn.
 
 ### Point at a neuron and press P
 
-Hover the cursor over a drawn neuron and press **P**. The panel on the right
-names it, gives the description the graph already stores, and lists its
-strongest partner cell types in each direction.
+Hover the cursor over a drawn neuron and press **P**. The inspector below the
+scene names it, gives the description the graph already stores, and lists its
+strongest partner cell types in each direction. It opens on a pick even if you
+had collapsed it, and **Neuron details** collapses it again to give the scene
+the full height. The flow view draws no neurons, so it hides the inspector
+entirely.
 
 Picking is bound to a key rather than a left click because a left click is
 where VTK begins a rotation: picking there would re-answer the question on
@@ -347,9 +368,9 @@ says so.
 
 ### The Show box
 
-The toolbar's **Show** box takes the same specs the command does, plus the
-answer forms from [Asking the graph a question](queries.md#an-answer-names-a-query),
-and redraws in place. Typing
+The **Show** box takes the same specs the command does, plus the answer forms
+from [Asking the graph a question](queries.md#an-answer-names-a-query), and
+redraws in place. Press Return or click **Show scene**. Typing
 
 ```text
 path:LPLC2>DNp01
@@ -359,23 +380,62 @@ replaces the scene with that path, hop-colored. Exploring no longer means
 restarting, and **Cast to Looking Glass** follows what is currently shown
 rather than the specs the window opened with.
 
-A spec matching nothing, or one over the scene cap, is refused with the reason
-and the scene is left as it was -- including when only one spec of several is
-bad, since drawing the rest would look like a scene that contained them all.
+Specs are separated by spaces, so a label spec, whose pattern may itself
+contain spaces, is the one case needing care:
 
-### The control panel
+| typing | shows |
+|---|---|
+| `LC4 DNp01` | two cell types |
+| `label:giant fib` | one label pattern -- a leading `label:` takes the whole box |
+| `"label:giant fib" LC4` | that pattern *and* LC4: quote the label to combine it |
+| `label:\bgiant\s+fib` | backslashes reach the regex unescaped |
+
+A spec matching nothing, an unclosed quote, or a spec over the scene cap is
+refused with the reason, and the scene is left as it was -- including when only
+one spec of several is bad, since drawing the rest would look like a scene
+that contained them all. A refusal opens the inspector to explain itself.
+
+### What the scene reports
+
+Above the scene sit its title and two summary lines. The first counts what was
+asked for: the view, the circuit and context neurons, the neuropil surfaces,
+and the skeletons drawn -- or the flow arcs, in the flow view.
+
+The second counts the geometry that reached the renderer: visible meshes,
+points and cells, after glyphs and tubes have expanded into real meshes, with
+a per-group breakdown in its tooltip. Cells are mesh faces, lines, vertices or
+strips -- not neurons, and not GPU triangles. It is the number to watch when a
+scene turns sluggish; the tooltip names the usual remedies, which are hiding
+the cloud or the surfaces, turning tubes off, or raising the stride.
+
+**Scene build** on that line times the composition on your machine, from the
+first query to a framed scene. It is a build cost, not a frame rate and not a
+cast duration.
+
+### The Display tab
 
 | control | what it does |
 |---|---|
-| Whole-brain cloud | one dot per neuron at its cell body |
+| Whole-brain cloud | one dot per neuron at its cell body; see below |
 | Neuropil surfaces | the 78 meshes `connkg meshes` fetches |
 | Floor and shadow | stands the scene on a lit floor |
-| Tubes | draws skeletons as tubes rather than lines |
-| Detail | skeleton stride, where **0** means choose it from the neuron count |
+| Skeletons as tubes | draws skeletons as tubes rather than lines |
+| Skeleton stride | detail, where **0** means choose it from the neuron count |
 | Minimum synapses | drops connections below the threshold |
 
+![The Display tab, with the overlay toggles and the detail settings](images/viewer_display.png)
+
+The cloud toggle has three states rather than two. Checked always draws it,
+unchecked never does, and the third -- partially checked -- is **automatic**:
+draw the cloud only when no neuropil surfaces are available, which is what a
+fresh viewer does when `connkg meshes` has not been run. Automatic is a state
+the viewer keeps, so changing some other setting will not quietly decide the
+question for you.
+
 Minimum synapses is what makes a multi-hop cone usable interactively:
-`cone:LC4>2` is 19,866 neurons at the default and 104 at 200.
+`cone:LC4>2` is 19,866 neurons at the default and 104 at 200. Unlike the
+toggles it is read when specs are next resolved, so it takes effect on the
+next **Show scene**, not the moment it changes -- the rail says so beneath it.
 
 Each toggle redraws rather than hiding an actor, because the overlays are
 *composed*: the cloud is one glyph per neuron and the surfaces are 78 merged
@@ -383,6 +443,14 @@ meshes, so keeping both around to flip visibility costs more than rebuilding
 without them. A toggle keeps the camera where you put it -- it changes what is
 drawn, not what is being looked at -- while a new spec or answer re-frames,
 since the old camera may not contain it.
+
+**Reset view**, under the scene, frames the current scene again, undoing an
+orbit or a zoom.
+
+While a scene composes, the rail and the scene are disabled and the cursor
+turns to a wait cursor. Composing runs on the GUI thread and pumps the event
+loop to stay responsive, which also delivers clicks; disabling the controls is
+what stops a second composition from starting on top of the first.
 
 ### Casting to a Looking Glass
 
