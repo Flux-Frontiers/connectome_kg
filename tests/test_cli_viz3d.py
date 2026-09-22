@@ -282,6 +282,10 @@ def test_path_without_render_draws_nothing(kg, kg_root, tmp_path, monkeypatch):
 
 def test_viz3d_without_a_spec_is_not_a_usage_error(kg_root, monkeypatch):
     """A bare `connkg viz3d` launches; `quilt` still refuses (it renders a file)."""
+    # Patching the viewer's launch imports it, and it imports Qt at module
+    # scope, so this one needs the viz3d extra even though it opens no window.
+    pytest.importorskip("PyQt5")
+    pytest.importorskip("pyvistaqt")
     launched: dict[str, object] = {}
 
     def fake_launch(root, specs, **kwargs):
