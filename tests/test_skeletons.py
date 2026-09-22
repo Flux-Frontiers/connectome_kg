@@ -232,3 +232,52 @@ def test_load_skeletons_reports_missing_without_raising(tmp_path):
     assert set(loaded) == {1}
     assert sorted(missing) == [2, 3]
     assert loaded[1].root_id == 1
+
+
+def _edges_of(chains):
+    """Every (parent, child) index pair a chain list covers, with duplicates kept."""
+    return [(int(a), int(b)) for c in chains for a, b in zip(c[:-1], c[1:], strict=True)]
+
+
+@pytest.mark.parametrize("step", [1, 3, 4, 7])
+def test_polylines_cover_exactly_the_edges_segments_draws(step):
+    """The chains are a regrouping of the same edges, not a different skeleton.
+
+    Random trees rather than a fixture: the interesting cases are forks, long
+    unbranched runs and roots with one child, and a generator hits all three
+    in combination faster than examples can be written.
+    """
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        n = int(rng.integers(2, 60))
+        parent = np.full(n, -1, dtype=np.int64)
+        for i in range(1, n):
+            parent[i] = rng.integers(0, i)
+        labels = np.zeros(n, dtype=np.int64)
+        labels[0] = 1
+        skeleton = sk.Skeleton(1, rng.random((n, 3)) * 1000, rng.random(n) * 100, labels, parent)
+
+        edges = _edges_of(sk.polylines(skeleton, step=step))
+        assert len(edges) == len(set(edges)), "an edge is drawn twice"
+        assert len(edges) == len(sk.segments(skeleton, step=step)), "edge count differs"
+        drawn = {(tuple(a), tuple(b)) for a, b in sk.segments(skeleton, step=step)[:, ::-1]}
+        assert {(tuple(skeleton.points[a]), tuple(skeleton.points[b])) for a, b in edges} == drawn
+
+
+def test_a_polyline_is_a_run_between_branch_points():
+    """A straight chain is one polyline; a fork ends it and starts two more."""
+    #   0 -> 1 -> 2 -> 3      and 2 -> 4, so 2 forks
+    parent = np.array([-1, 0, 1, 2, 2], dtype=np.int64)
+    labels = np.zeros(5, dtype=np.int64)
+    skeleton = sk.Skeleton(
+        1, np.arange(15, dtype=np.float64).reshape(5, 3), np.ones(5), labels, parent
+    )
+    chains = sorted(sk.polylines(skeleton), key=len, reverse=True)
+    assert [c.tolist() for c in chains] == [[0, 1, 2], [2, 3], [2, 4]]
+
+
+def test_a_skeleton_with_no_edges_has_no_polylines():
+    skeleton = sk.Skeleton(
+        1, np.zeros((1, 3)), np.ones(1), np.zeros(1, dtype=np.int64), np.array([-1], dtype=np.int64)
+    )
+    assert sk.polylines(skeleton) == []

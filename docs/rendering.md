@@ -737,6 +737,27 @@ brightness:
    (`skeleton:<type>`), so a 100-neuron type costs one draw call. A sphere
    marks each soma (`soma:<type>`).
 
+   The mesh holds *polylines*, not one line per traced edge:
+   `connectomekg.skeletons.polylines` walks the parent links and returns each
+   unbranched run between one branch point (or root) and the next branch
+   point (or tip). Both carry the same edges, but `--tubes` extrudes a line
+   mesh, and extruding disconnected edges gives one short cylinder per edge
+   meeting its neighbours at an angle with nothing joining them -- a heap of
+   faceted stubs rather than a neuron. Tubing a run instead gives one
+   continuous surface with mitred joins, and costs less: a run's interior
+   points are shared rather than repeated once per edge. On `circuit:compass`
+   that is 2.8 M cells against 3.4 M for the per-edge form, while doubling the
+   tube's sides from 6 to 12.
+
+   A tube's radius is the traced radius at each point, floored at the width
+   every skeleton used to be drawn at. FAFB's median traced radius is 222 nm,
+   which is a thread at whole-brain framing, so the old constant was doing
+   visibility work; keeping it as a floor means nothing draws thinner than it
+   did, and only the thicker structures -- major axons, the soma -- widen from
+   it. On DNp01 that is 12% of points, up to 13x the floor. A cache written
+   before the radius column existed (format 1) reads back zeros and draws at
+   the constant width, so a rebuild is what turns the taper on.
+
 Each cell type's color comes from the seven non-black Okabe-Ito colors,
 indexed by `seed_from_key(type name)`. The same type has the same color in
 every render and every session. The color identifies the type; it does not

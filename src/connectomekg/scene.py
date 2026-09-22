@@ -52,7 +52,7 @@ from connectomekg.skeleton_cache import (
     load_cached_skeletons,
     skeleton_cache_path,
 )
-from connectomekg.skeletons import Skeleton, load_skeletons, segments, soma
+from connectomekg.skeletons import Skeleton, load_skeletons, polylines, soma
 from connectomekg.validation import (
     MAX_FLOW_PAIRS,
     MAX_SCENE_NEURONS,
@@ -114,6 +114,14 @@ _FLOW_CONTEXT_COLOR: Final = "#8A8F96"
 _SOMA_RADIUS: Final = 0.05
 _FALLBACK_RADIUS: Final = 0.09
 _TUBE_RADIUS: Final = 0.01
+#: Sides on a skeleton tube. Tubing polylines rather than per-edge segments
+#: costs far fewer cells, and the saving buys this.
+_TUBE_SIDES: Final = 12
+#: Floor on a tapered tube's radius, in world units. FAFB's median traced
+#: radius is 222 nm, 0.0022 here, which is a thread at whole-brain framing;
+#: the constant width was doing visibility work. Tapering keeps that floor
+#: and only widens from it, so nothing gets harder to see than it was.
+_MIN_TUBE_RADIUS: Final = _TUBE_RADIUS
 #: View C sizes, world units. A neuropil sphere's radius scales with the cube
 #: root of its synapse count, an arc's tube radius with the square root of its
 #: flow, each relative to the largest; idle neuropils (no drawn arc) are drawn
@@ -553,33 +561,6 @@ class SceneInfo:
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:
     color = color.lstrip("#")
     return (int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16))
-
-
-def _segments_to_polydata(segs: np.ndarray) -> pv.PolyData:
-    """One flat-numpy line mesh from ``(m, 2, 3)`` segment pairs.
-
-    One draw call regardless of segment count, the same technique
-    ``genealogy_kg.scene._line_mesh`` uses.
-
-    :param segs: ``(m, 2, 3)`` ``(start, end)`` point pairs.
-    :return: A ``pv.PolyData`` with a ``lines`` cell array; empty if *segs* is empty.
-    """
-    import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
-
-    m = len(segs)
-    if m == 0:
-        return pv.PolyData()
-    points = np.empty((m * 2, 3), dtype=np.float64)
-    points[0::2] = segs[:, 0]
-    points[1::2] = segs[:, 1]
-    cells = np.empty(m * 3, dtype=np.intp)
-    cells[0::3] = 2
-    cells[1::3] = np.arange(0, m * 2, 2)
-    cells[2::3] = np.arange(1, m * 2 + 1, 2)
-    mesh = pv.PolyData()
-    mesh.points = points
-    mesh.lines = cells
-    return mesh
 
 
 def _context_for_view(
@@ -1133,7 +1114,10 @@ def build_brain_scene(
     if circuit_ids:
         _say(f"drawing {n_circuit} circuit neurons")
     for label, color, members in draw_groups:
-        segment_batches: list[np.ndarray] = []
+        chain_points: list[np.ndarray] = []
+        chain_radii: list[np.ndarray] = []
+        chain_cells: list[np.ndarray] = []
+        n_chain_points = 0
         soma_world: list[np.ndarray] = []
         fallback_world: list[np.ndarray] = []
         for nid, meta in members:
@@ -1142,10 +1126,20 @@ def build_brain_scene(
             if skeleton is not None:
                 n_skeletons += 1
                 step = cached_step if skeleton.root_id in cached_roots else skeleton_step
-                segs_nm = segments(skeleton, step=step)
-                if segs_nm.size:
-                    drawn = frame.to_world(segs_nm.reshape(-1, 3))
-                    segment_batches.append(drawn.reshape(-1, 2, 3))
+                chains = polylines(skeleton, step=step)
+                if chains:
+                    drawn = frame.to_world(skeleton.points)
+                    # Chains index the whole skeleton, so the points go in as
+                    # one block and the cells are renumbered past what is
+                    # already in this group's batch.
+                    chain_cells.extend(
+                        np.concatenate([[len(c)], c + n_chain_points]) for c in chains
+                    )
+                    chain_points.append(drawn)
+                    chain_radii.append(
+                        np.maximum(skeleton.radius / NM_PER_WORLD_UNIT, _MIN_TUBE_RADIUS)
+                    )
+                    n_chain_points += len(drawn)
                     collector.add(nid, drawn)
                 soma_nm, is_soma = soma(skeleton)
                 if not is_soma:
@@ -1161,13 +1155,26 @@ def build_brain_scene(
                 # the only thing there is to click on.
                 collector.add(nid, marked)
 
-        if segment_batches:
-            segs = np.concatenate(segment_batches, axis=0)
-            mesh = _segments_to_polydata(segs)
+        if chain_points:
+            points = np.concatenate(chain_points, axis=0)
+            radii = np.concatenate(chain_radii, axis=0)
+            mesh = pv.PolyData(points)
+            mesh.lines = np.concatenate(chain_cells).astype(np.int64)
             if tubes:
-                mesh = mesh.tube(radius=_TUBE_RADIUS, n_sides=6)
+                # A format-1 cache stores no radius, so its skeletons read back
+                # as zeros and floor to the constant width they were drawn at.
+                if radii.max() > _MIN_TUBE_RADIUS:
+                    mesh["radius"] = radii
+                    mesh = mesh.tube(
+                        scalars="radius",
+                        absolute=True,
+                        radius=_TUBE_RADIUS,
+                        n_sides=_TUBE_SIDES,
+                    )
+                else:
+                    mesh = mesh.tube(radius=_TUBE_RADIUS, n_sides=_TUBE_SIDES)
             plotter.add_mesh(mesh, color=color, line_width=2, name=f"skeleton:{label}")
-            world_points.append(segs.reshape(-1, 3))
+            world_points.append(points)
         if soma_world:
             arr = np.asarray(soma_world)
             glyph = pv.PolyData(arr).glyph(
