@@ -77,7 +77,13 @@ from connectomekg.answers import (
     circuit_examples,
     is_answer,
 )
-from connectomekg.cli.cmd_viz3d import QUILTS_DIR, STILL_HEIGHT, STILLS_DIR, scene_stem
+from connectomekg.cli.cmd_viz3d import (
+    QUILTS_DIR,
+    STILL_HEIGHT,
+    STILLS_DIR,
+    opening_specs,
+    scene_stem,
+)
 from connectomekg.cli.options import open_kg
 from connectomekg.module import ConnectomeKG
 from connectomekg.picking import PickTargets, pick_summary
@@ -952,6 +958,7 @@ def launch(
     from PyQt5.QtWidgets import QApplication  # noqa: PLC0415 - viz3d-only import
 
     with open_kg(str(root), dataset=dataset) as kg:
+        specs = opening_specs(kg, specs, view)
         answer = None
         if len(specs) == 1 and is_answer(specs[0]):
             answer = answer_groups(kg, specs[0])

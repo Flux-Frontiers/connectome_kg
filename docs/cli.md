@@ -426,10 +426,19 @@ viewer writes a 4K still or a quilt of the current view, and Cast to Looking
 Glass sends the quilt; both use `--preset`.
 
 ```bash
+connkg --root . viz3d                            # circuit:compass, then explore
 connkg --root . viz3d LC4 DNp01
 connkg --root . viz3d --view flow
 connkg --root . viz3d path:LPLC2>DNp01 --floor
 ```
+
+With no SPEC the viewer opens on `circuit:compass` inside the whole brain, so
+there is a circuit on screen to orbit and pick at from the start. Any SPEC
+replaces it, and the Show box redraws without restarting. On a connectome
+whose cell types the circuit does not name -- the synthetic fixture, say --
+the default resolves to nothing and the viewer opens on the brain alone.
+`connkg quilt` still requires a SPEC for `--view circuit`, since it renders a
+file and exits.
 
 See [Using the viewer](rendering.md#using-the-viewer).
 

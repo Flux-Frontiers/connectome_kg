@@ -52,6 +52,13 @@ STILL_HEIGHT = 2160
 #: The preset an answer render uses; the same default the quilt command takes.
 DEFAULT_PRESET = "16-landscape"
 
+#: What ``connkg viz3d`` opens on when given no SPEC. A whole brain with no
+#: circuit in it draws surfaces and nothing else, which shows no neurons at
+#: all; the compass is small (151 neurons), central, and spans five cell
+#: types, so it reads as a circuit rather than a blob. Only a default: any
+#: SPEC replaces it, and the Show box redraws without restarting.
+DEFAULT_SPEC = "circuit:compass"
+
 #: Default quilt view cone, degrees. quiltwright's library sweeps a preset's
 #: full cone (50 for 16-landscape); its CLI and render scripts cap at 35.
 DEFAULT_VIEW_CONE = 35.0
@@ -111,7 +118,12 @@ def _missing_modules(*names: str) -> list[str]:
 
 
 def require_specs_for_view(view: str, specs: tuple[str, ...]) -> None:
-    """Raise a usage error when ``--view circuit`` has no SPEC to draw.
+    """Raise a usage error when ``quilt --view circuit`` has no SPEC to draw.
+
+    ``quilt`` writes a file and exits, so a circuit with nothing in it spends
+    a 4K render on a picture nobody asked for. ``viz3d`` is exempt: its whole
+    brain is a scene worth looking at, and the Show box is right there to name
+    a circuit without restarting.
 
     :param view: The ``--view`` value.
     :param specs: The SPEC arguments.
@@ -119,6 +131,25 @@ def require_specs_for_view(view: str, specs: tuple[str, ...]) -> None:
     """
     if view == "circuit" and not specs:
         raise click.UsageError("--view circuit needs at least one SPEC")
+
+
+def opening_specs(kg: ConnectomeKG, specs: Sequence[str], view: str) -> list[str]:
+    """What the viewer opens on: the given SPECs, else :data:`DEFAULT_SPEC`.
+
+    The default is applied only when it resolves. Its cell types are FAFB's,
+    so on another connectome -- the synthetic fixture, a future neuPrint
+    build -- it matches nothing, and a window captioned ``circuit:compass``
+    drawing no neurons is worse than one that opens on the brain alone.
+
+    :param kg: An open ``ConnectomeKG``, to resolve the default against.
+    :param specs: The SPECs asked for; empty is what invites the default.
+    :param view: The ``--view`` value; the flow view draws neuropils rather
+        than neurons and is a scene without a circuit already.
+    :return: The SPECs to open with, possibly empty.
+    """
+    if specs or view != "circuit":
+        return list(specs)
+    return [DEFAULT_SPEC] if kg.neurons_of(DEFAULT_SPEC) else []
 
 
 def scene_stem(view: str, specs: tuple[str, ...]) -> str:
@@ -526,6 +557,11 @@ def viz3d(
 ) -> None:
     """Launch an interactive 3-D viewer of SPEC(s)' circuit or the neuropil flow.
 
+    With no SPEC it opens on circuit:compass inside the whole brain, so there
+    is a circuit on screen to orbit and pick at. The Explore tab lists every
+    circuit, spec and answer as a button, and the Show box redraws without
+    restarting.
+
     Orbit/zoom/pan with the mouse. Point at a neuron and press P to identify
     it: the inspector under the scene names it, describes it, and lists its
     strongest partner types each way.
@@ -537,7 +573,6 @@ def viz3d(
     restarting, and the Explore tab offers every documented spec as a button.
     "Cast to Looking Glass" sends the current view to Bridge.
     """
-    require_specs_for_view(view, specs)
     require_viz3d("pyvista", "pyvistaqt", "PyQt5", "quiltwright")
 
     from connectomekg import viz3d as viewer  # noqa: PLC0415 - arrives with the viz3d extra

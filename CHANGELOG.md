@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`connkg viz3d` launches without a SPEC, on `circuit:compass`.** It
+  refused with `--view circuit needs at least one SPEC`, a guard it shared
+  with `connkg quilt`. The guard is right for `quilt`, which renders a file
+  and exits, so an empty circuit spends a 4K render on nothing; the viewer
+  is interactive and has the Show box. Opening on the brain alone was the
+  first try and it draws the neuropil surfaces and no neurons at all, since
+  the automatic cloud stays off whenever surfaces are drawn -- a shell with
+  nothing in it. So a bare `connkg viz3d` opens on the compass circuit
+  instead: 151 neurons across five cell types, central and small enough to
+  read. Any SPEC replaces it. The default is applied only when it resolves,
+  because the shipped circuits name FAFB cell types and a window captioned
+  `circuit:compass` drawing nothing is worse than one that opens on the
+  brain; on the synthetic fixture it falls back that way. `quilt` is
+  unchanged.
+
 ## [0.6.0] - 2026-09-21
 
 ### Added
