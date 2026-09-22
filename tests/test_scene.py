@@ -224,11 +224,11 @@ def _lc4_root_ids(kg) -> list[int]:
     return [int(kg.store.node(nid)["metadata"]["root_id"]) for nid in kg.neurons_of("LC4")]
 
 
-def _write_stub_skeleton(swc_dir, root_id: int) -> None:
+def _write_stub_skeleton(swc_dir, root_id: int, radius_nm: float = 50.0) -> None:
     points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
     labels = np.array([1, 0, 6])  # soma at the root, end at the tip
     parent = np.array([-1, 0, 1])
-    radius = np.full(3, 50.0)
+    radius = np.full(3, radius_nm)
     write_swc(
         Skeleton(root_id=root_id, points=points, radius=radius, labels=labels, parent=parent),
         swc_dir / f"{root_id}.swc",
@@ -606,3 +606,56 @@ def test_rebuilding_a_shadowed_scene_restores_normal_passes(kg, tmp_path, caplog
         assert "without a bound program" not in caplog.text
     finally:
         plotter.close()
+
+
+def _drawn_tube_radius(plotter) -> float:
+    """The widest the drawn tube gets, read off the mesh.
+
+    The stub skeletons run straight along world x, so a tube of radius r puts
+    its surface exactly r away in y; the mesh's y half-extent is the radius
+    that was actually drawn, whatever the traced radius asked for.
+    """
+    mesh = next(
+        a.mapper.dataset
+        for name, a in plotter.renderer.actors.items()
+        if name.startswith("skeleton:")
+    )
+    ys = mesh.points[:, 1]
+    return float((ys.max() - ys.min()) / 2)
+
+
+@pytest.mark.parametrize(
+    ("traced_world", "expected"),
+    [
+        (scene._MAX_TUBE_RADIUS * 5, scene._MAX_TUBE_RADIUS),  # the giant fiber case
+        (scene._MIN_TUBE_RADIUS / 5, scene._MIN_TUBE_RADIUS),  # a thread
+        ((scene._MIN_TUBE_RADIUS + scene._MAX_TUBE_RADIUS) / 2,) * 2,  # in between: as traced
+    ],
+)
+def test_a_tapered_tube_is_clamped_between_the_old_width_and_the_soma(
+    kg, tmp_path, traced_world, expected
+):
+    """No neurite draws thinner than it used to, nor fatter than its own soma.
+
+    Untamed, the giant fiber tapers to 13x the floor and 2.6x the soma sphere,
+    which reads as a sausage swallowing the arbor around it.
+    """
+    pv = pytest.importorskip("pyvista")
+    swc_dir = tmp_path / "sk_lod1_783_healed"
+    swc_dir.mkdir()
+    for rid in _lc4_root_ids(kg):
+        _write_stub_skeleton(swc_dir, rid, radius_nm=traced_world * scene.NM_PER_WORLD_UNIT)
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    try:
+        scene.build_brain_scene(
+            plotter, kg, specs=["LC4"], data_dir=tmp_path, cloud=False, neuropils=False, tubes=True
+        )
+        assert _drawn_tube_radius(plotter) == pytest.approx(expected, rel=0.02)
+    finally:
+        plotter.close()
+
+
+def test_the_radius_clamp_ends_are_the_numbers_they_are_for_a_reason():
+    assert scene._MIN_TUBE_RADIUS == scene._TUBE_RADIUS, "the floor is the old constant width"
+    assert scene._MAX_TUBE_RADIUS == scene._SOMA_RADIUS, "the ceiling is the soma marker"
+    assert scene._MIN_TUBE_RADIUS < scene._MAX_TUBE_RADIUS

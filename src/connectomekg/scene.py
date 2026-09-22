@@ -122,6 +122,14 @@ _TUBE_SIDES: Final = 12
 #: the constant width was doing visibility work. Tapering keeps that floor
 #: and only widens from it, so nothing gets harder to see than it was.
 _MIN_TUBE_RADIUS: Final = _TUBE_RADIUS
+
+#: Ceiling on a tapered tube's radius: the width of the sphere that marks a
+#: soma, so no neurite is drawn fatter than its own cell body. Without it the
+#: giant fiber, the thickest axon in the brain, tapers to 13x the floor and
+#: 2.6x this -- a sausage that swallows the arbor around it. Clipping here
+#: costs 0.6% of DNp01's points and nothing at all on a scene like
+#: ``circuit:compass``, whose widest point is under 3.4x the floor.
+_MAX_TUBE_RADIUS: Final = _SOMA_RADIUS
 #: View C sizes, world units. A neuropil sphere's radius scales with the cube
 #: root of its synapse count, an arc's tube radius with the square root of its
 #: flow, each relative to the largest; idle neuropils (no drawn arc) are drawn
@@ -1137,7 +1145,11 @@ def build_brain_scene(
                     )
                     chain_points.append(drawn)
                     chain_radii.append(
-                        np.maximum(skeleton.radius / NM_PER_WORLD_UNIT, _MIN_TUBE_RADIUS)
+                        np.clip(
+                            skeleton.radius / NM_PER_WORLD_UNIT,
+                            _MIN_TUBE_RADIUS,
+                            _MAX_TUBE_RADIUS,
+                        )
                     )
                     n_chain_points += len(drawn)
                     collector.add(nid, drawn)
