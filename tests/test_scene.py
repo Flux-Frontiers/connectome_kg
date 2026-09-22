@@ -659,3 +659,34 @@ def test_the_radius_clamp_ends_are_the_numbers_they_are_for_a_reason():
     assert scene._MIN_TUBE_RADIUS == scene._TUBE_RADIUS, "the floor is the old constant width"
     assert scene._MAX_TUBE_RADIUS == scene._SOMA_RADIUS, "the ceiling is the soma marker"
     assert scene._MIN_TUBE_RADIUS < scene._MAX_TUBE_RADIUS
+
+
+def test_a_line_skeleton_carries_no_stray_vertex_cells(kg, tmp_path):
+    """Points drawn beside the lines break the floor's shadow pass.
+
+    ``pv.PolyData(points)`` adds a vertex cell per point, and those points
+    render alongside the lines with no normals, so the shadow pass fails to
+    compile their shader. ``_shade_skeleton_lines`` cannot save them: it turns
+    *lines* into tubes. 0.7.0 shipped with one stray point per traced point.
+    """
+    pv = pytest.importorskip("pyvista")
+    swc_dir = tmp_path / "sk_lod1_783_healed"
+    swc_dir.mkdir()
+    for rid in _lc4_root_ids(kg):
+        _write_stub_skeleton(swc_dir, rid)
+    plotter = pv.Plotter(off_screen=True, window_size=(320, 180))
+    try:
+        scene.build_brain_scene(
+            plotter, kg, specs=["LC4"], data_dir=tmp_path, cloud=False, neuropils=False
+        )
+        meshes = [
+            a.mapper.dataset
+            for name, a in plotter.renderer.actors.items()
+            if name.startswith("skeleton:")
+        ]
+        assert meshes, "the scene must have drawn a skeleton"
+        for mesh in meshes:
+            assert mesh.n_lines > 0
+            assert mesh.n_verts == 0, "the lines must be the only primitive drawn"
+    finally:
+        plotter.close()
