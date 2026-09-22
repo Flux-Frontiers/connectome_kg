@@ -7,17 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-22
+
 ### Changed
 
-- **A tapered tube is capped at the soma's width.** Tapering floored the
-  traced radius but never capped it, so the giant fiber -- the thickest
-  axon in the brain -- drew at 13x the floor and 2.6x the sphere that
-  marks its own cell body, a sausage that swallowed the arbor around it.
-  DNp01 was the one scene this broke; `circuit:compass` and the like never
-  exceed 3.4x and are unchanged. The radius is now clamped to the soma
-  marker's width at the top, so no neurite draws fatter than its own cell
-  body, which costs 0.6% of DNp01's points and leaves the taper doing its
-  work everywhere else.
 - **`connkg viz3d` launches without a SPEC, on `circuit:compass`.** It
   refused with `--view circuit needs at least one SPEC`, a guard it shared
   with `connkg quilt`. The guard is right for `quilt`, which renders a file
@@ -54,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   major axons, the soma -- widen. A format-1 cache still loads, reads back
   zeros and draws at the constant width, so nothing breaks; re-running
   `connkg skeletons` is what turns the taper on.
+- **A tapered tube is capped at the soma's width.** Tapering floored the
+  traced radius but never capped it, so the giant fiber -- the thickest
+  axon in the brain -- drew at 13x the floor and 2.6x the sphere that
+  marks its own cell body, a sausage that swallowed the arbor around it.
+  DNp01 was the one scene this broke; `circuit:compass` and the like never
+  exceed 3.4x and are unchanged. The radius is now clamped to the soma
+  marker's width at the top, so no neurite draws fatter than its own cell
+  body, which costs 0.6% of DNp01's points and leaves the taper doing its
+  work everywhere else.
 
 ## [0.6.0] - 2026-09-21
 
