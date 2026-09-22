@@ -749,14 +749,19 @@ brightness:
    that is 2.8 M cells against 3.4 M for the per-edge form, while doubling the
    tube's sides from 6 to 12.
 
-   A tube's radius is the traced radius at each point, floored at the width
-   every skeleton used to be drawn at. FAFB's median traced radius is 222 nm,
-   which is a thread at whole-brain framing, so the old constant was doing
-   visibility work; keeping it as a floor means nothing draws thinner than it
-   did, and only the thicker structures -- major axons, the soma -- widen from
-   it. On DNp01 that is 12% of points, up to 13x the floor. A cache written
-   before the radius column existed (format 1) reads back zeros and draws at
-   the constant width, so a rebuild is what turns the taper on.
+   A tube's radius is the traced radius at each point, clamped between the
+   width every skeleton used to be drawn at and the width of the sphere that
+   marks a soma. The floor is there because FAFB's median traced radius is
+   222 nm, a thread at whole-brain framing: the old constant was doing
+   visibility work, so keeping it as a floor means nothing draws thinner than
+   it did and only thicker structures widen from it. The ceiling is there
+   because the giant fiber, the thickest axon in the brain, otherwise tapers
+   to 13 times the floor and 2.6 times the soma sphere -- a neurite drawn
+   fatter than its own cell body, which reads as a blob rather than an axon.
+   Clipping costs 0.6% of DNp01's points and nothing on a scene like
+   `circuit:compass`, whose widest point is already under 3.4x the floor. A
+   cache written before the radius column existed (format 1) reads back zeros
+   and draws at the constant width, so a rebuild is what turns the taper on.
 
 Each cell type's color comes from the seven non-black Okabe-Ito colors,
 indexed by `seed_from_key(type name)`. The same type has the same color in
