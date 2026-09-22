@@ -298,6 +298,7 @@ synapse edges; later calls reuse them.
 | Doc | What it covers |
 |---|---|
 | [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) | Getting FAFB v783 from Codex, file names, checksum drift, reproducible snapshots, build footprint |
+| [docs/cli.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/cli.md) | Every `connkg` command and `connkg-mcp`: options, defaults, an example each |
 | [CHANGELOG.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/CHANGELOG.md) | Release history |
 
 ---

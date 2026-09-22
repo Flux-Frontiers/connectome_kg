@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Read-only commands no longer advertise build options.** `stats`,
+  `analyze`, `query`, `path`, `cone`, `influence`, `link` and `viz` all listed
+  `--data-dir`, `--source`, `--n`, `--seed`, `--min-syn`, `--connections-file`
+  and `--embed-neurons` in their `--help`, because the decorator that gives
+  `build` its extraction options had been applied to every command that opens
+  a graph. On a built graph the options did nothing, and `connkg stats --seed
+  7` was accepted silently. Only `build` takes them now. `cone` keeps
+  `--min-syn` as its own option, since that one is a real query threshold,
+  and `path --render` and `cone --render` take the same `--data-dir` as
+  `quilt` and `viz3d` do, meaning the skeleton download root for neurons the
+  cache lacks, with the same `fafb_v783` default.
 - **Rebuilding a floored scene no longer shades the new skeletons through the
   old shadow pass.** `clear_actors` keeps render passes, so the second scene's
   line skeletons compiled their shaders against the previous floor's
@@ -37,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A command reference, `docs/cli.md`.** Every `connkg` command and
+  `connkg-mcp` on one page: options with defaults and ranges, one example
+  each with output from the built FAFB v783 graph, and a link to the page
+  that explains the command at length where one exists. Until now the only
+  complete list was the README's task table, which names each command once
+  and documents none of its options; `connkg viz` and three of the five
+  `snapshot` subcommands were not in the docs at all.
 - **A workspace layout for the 3-D viewer, and what the scene costs.** The
   viewer's toolbar and two docks became the control rail `gutenberg_kg` and
   `pycode_kg` use: the Show box, an Explore tab of example buttons and a

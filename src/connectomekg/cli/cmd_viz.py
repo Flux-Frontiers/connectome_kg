@@ -11,19 +11,17 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from typing import Any
 
 import click
 
 from connectomekg.cli.group import cli
-from connectomekg.cli.options import open_kg, source_options, usage_errors
+from connectomekg.cli.options import open_kg, usage_errors
 from connectomekg.validation import MAX_LIMIT
 
 _VIZ_EXTRA = 'pip install "connectome-kg[viz]"'
 
 
 @cli.command("viz")
-@source_options
 @click.argument("cell_type")
 @click.option(
     "--view",
@@ -47,9 +45,7 @@ _VIZ_EXTRA = 'pip install "connectome-kg[viz]"'
     help="HTML file to write (default: <cell type>_<view>.html).",
 )
 @click.pass_context
-def viz(
-    ctx: click.Context, cell_type: str, view: str, limit: int, output: str | None, **source: Any
-) -> None:
+def viz(ctx: click.Context, cell_type: str, view: str, limit: int, output: str | None) -> None:
     """Draw CELL_TYPE's strongest partner types to a self-contained HTML file.
 
     The file has its rendering library inlined, so it opens straight from the
@@ -64,7 +60,7 @@ def viz(
     from connectomekg import viz as render  # noqa: PLC0415 - arrives with the viz extra
 
     path = Path(output or f"{cell_type}_{view}.html".replace("/", "_"))
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
         if view == "network":
             path.write_text(render.type_network_html(kg, cell_type, limit=limit), encoding="utf-8")
         else:

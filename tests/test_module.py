@@ -169,3 +169,35 @@ def test_build_no_index_warns_about_an_index_it_kept(tmp_path):
     second = CliRunner().invoke(cli, [*args, "--wipe"])
     assert second.exit_code == 0, second.output
     assert "warning: kept the vector index from an earlier build" in second.stderr
+
+
+#: Commands that read a built graph. None of them extracts, so none of them
+#: takes the options that say what to extract.
+_READ_COMMANDS = ["stats", "analyze", "query", "path", "cone", "influence", "link", "viz"]
+_BUILD_ONLY = ("--source", "--seed", "--n ", "--connections-file", "--embed-neurons")
+
+
+@pytest.mark.parametrize("command", _READ_COMMANDS)
+def test_read_commands_do_not_offer_build_options(command):
+    """A read command's dataset comes from --root and --dataset alone."""
+    text = CliRunner().invoke(cli, [command, "--help"]).output
+    leaked = [flag for flag in _BUILD_ONLY if flag in text]
+    assert not leaked, f"{command} --help lists build options {leaked}"
+
+
+@pytest.mark.parametrize("command", ["stats", "analyze", "query", "influence", "link", "viz"])
+def test_commands_that_never_draw_take_no_skeleton_dir_or_threshold(command):
+    text = CliRunner().invoke(cli, [command, "--help"]).output
+    assert "--data-dir" not in text and "--min-syn" not in text
+
+
+def test_build_keeps_its_source_options():
+    text = CliRunner().invoke(cli, ["build", "--help"]).output
+    assert all(flag in text for flag in _BUILD_ONLY)
+
+
+def test_cone_keeps_min_syn_and_the_rendering_answers_take_a_skeleton_dir():
+    cone = CliRunner().invoke(cli, ["cone", "--help"]).output
+    assert "--min-syn" in cone and "--data-dir" in cone
+    path = CliRunner().invoke(cli, ["path", "--help"]).output
+    assert "--data-dir" in path and "--min-syn" not in path
