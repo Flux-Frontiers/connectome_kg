@@ -452,6 +452,24 @@ turns to a wait cursor. Composing runs on the GUI thread and pumps the event
 loop to stay responsive, which also delivers clicks; disabling the controls is
 what stops a second composition from starting on top of the first.
 
+### Saving the scene
+
+**Save scene...**, above the cast button, writes what you are looking at
+without a Looking Glass in the loop. **Image** renders one 4K still, framed
+and lit the way `connkg quilt --still` renders, floor and shadows included;
+**Quilt** writes the quilt that Cast would send, at the `--preset` the viewer
+opened with. Both re-compose the scene off-screen from the current specs,
+display settings and camera, so the file matches the viewport rather than
+being a screen grab of it.
+
+The dialog opens in `renders/stills/` or `renders/quilts/` with the scene's
+name filled in. The name you choose is the stem: quiltwright appends the spec
+suffix that Looking Glass readers and the render scripts rely on, so saving
+`compass.png` as an image writes `compass_qs1x1a1.77778.png`, and as a quilt
+`compass_qs8x6a1.77778.png`. The path actually written is shown in the status
+bar. A web-page export is not offered: the scene's point cloud alone is
+hundreds of megabytes once serialized into a page.
+
 ### Casting to a Looking Glass
 
 Click **Cast to Looking Glass** to send the current camera view as a quilt.

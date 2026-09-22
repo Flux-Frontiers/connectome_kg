@@ -711,6 +711,7 @@ def test_busy_disables_scene_actions_and_restores_them_on_error(qapp, kg):
         with pytest.raises(RuntimeError), window._busy("working"):
             assert not window._show_button.isEnabled()
             assert not window._cast_button.isEnabled()
+            assert not window._save_button.isEnabled()
             assert not window._reset_button.isEnabled()
             assert not window.plotter.isEnabled()
             raise RuntimeError("test failure")
@@ -874,5 +875,102 @@ def test_initial_specs_with_label_spaces_round_trip_through_show(qapp, kg, monke
         window._show_button.click()
         assert window._specs == ["label:giant fib", "MN9"]
         assert set(window._picks.neuron_ids) == before
+    finally:
+        window.close()
+
+
+def _accept_save(monkeypatch, path):
+    """Make the save dialog answer ``path`` and the result boxes stay silent."""
+    from PyQt5.QtWidgets import QFileDialog, QMessageBox  # noqa: PLC0415
+
+    boxes: list[str] = []
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(path), "PNG"))
+    )
+    monkeypatch.setattr(
+        QMessageBox, "information", staticmethod(lambda *a, **k: boxes.append("information"))
+    )
+    monkeypatch.setattr(
+        QMessageBox, "warning", staticmethod(lambda *a, **k: boxes.append("warning"))
+    )
+    return boxes
+
+
+def test_save_image_writes_a_still_named_by_the_spec(qapp, kg, monkeypatch, tmp_path):
+    """Save > Image renders one still the way ``quilt --still`` does, at 4K by default."""
+    pytest.importorskip("quiltwright")
+    from connectomekg import viz3d as mod  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    monkeypatch.setattr(mod, "STILL_HEIGHT", 120)
+    boxes = _accept_save(monkeypatch, tmp_path / "scene.png")
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._save_image()
+        written = list(tmp_path.glob("scene_qs1x1a*.png"))
+        assert len(written) == 1 and written[0].stat().st_size > 0
+        assert window.statusBar().currentMessage() == f"Wrote {written[0]}"
+        assert boxes == ["information"]
+    finally:
+        window.close()
+
+
+def test_save_quilt_writes_the_preset_s_quilt_without_casting(qapp, kg, monkeypatch, tmp_path):
+    """Save > Quilt is the cast's file without the Bridge call; nothing reaches Bridge."""
+    quiltwright = pytest.importorskip("quiltwright")
+    from kg_utils.viz3d import qt as sdk_qt  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    # A 1/20-scale preset keeps the 48 views cheap while staying a real render.
+    monkeypatch.setitem(
+        quiltwright.QUILT_PRESETS, "tiny", quiltwright.QUILT_PRESETS["16-landscape"].scaled(0.05)
+    )
+    monkeypatch.setattr(
+        sdk_qt, "cast_scene_to_looking_glass", lambda *a, **k: pytest.fail("must not cast")
+    )
+    boxes = _accept_save(monkeypatch, tmp_path / "out" / "scene.png")
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False, preset="tiny")
+    try:
+        window._save_quilt()
+        written = list((tmp_path / "out").glob("scene_qs8x6a*.png"))
+        assert len(written) == 1 and written[0].stat().st_size > 0
+        assert boxes == ["information"]
+    finally:
+        window.close()
+
+
+def test_cancelling_the_save_dialog_writes_nothing(qapp, kg, monkeypatch, tmp_path):
+    pytest.importorskip("quiltwright")
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    boxes = _accept_save(monkeypatch, "")
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        before = window.statusBar().currentMessage()
+        window._save_image()
+        assert not list(tmp_path.iterdir())
+        assert window.statusBar().currentMessage() == before
+        assert boxes == []
+    finally:
+        window.close()
+
+
+def test_a_failed_save_is_reported_and_leaves_the_viewer_usable(qapp, kg, monkeypatch, tmp_path):
+    quiltwright = pytest.importorskip("quiltwright")
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    def boom(*_a, **_k):
+        raise RuntimeError("no GPU today")
+
+    monkeypatch.setattr(quiltwright, "render_quilt", boom)
+    boxes = _accept_save(monkeypatch, tmp_path / "scene.png")
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        window._save_image()
+        assert boxes == ["warning"]
+        assert "Save failed: no GPU today" in window.statusBar().currentMessage()
+        assert window._save_button.isEnabled() and window._cast_button.isEnabled()
+        assert not list(tmp_path.glob("*.png"))
     finally:
         window.close()

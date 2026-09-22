@@ -421,8 +421,9 @@ two of its own:
 | `--width INTEGER` | Window width in pixels. Default 1400 |
 | `--height INTEGER` | Window height in pixels. Default 900 |
 
-It has no output options: the window is the output, and Cast to Looking Glass
-uses `--preset`.
+It has no output options: the window is the output. **Save scene** in the
+viewer writes a 4K still or a quilt of the current view, and Cast to Looking
+Glass sends the quilt; both use `--preset`.
 
 ```bash
 connkg --root . viz3d LC4 DNp01
