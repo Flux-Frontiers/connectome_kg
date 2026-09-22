@@ -20,10 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in its own terms -- `dataset_id`, `dataset_version`, `n_neurons`,
   `n_cell_types`, `n_neuropils`, `n_pairs` and `n_synapses`. Those are the
   names the dataset node and the snapshots already used, so a snapshot's
-  metrics keep one copy of each figure. The next `snapshot save` will show
-  the six dropped keys as removed and `n_cell_types`, `n_neuropils` and
-  `vector_backend` as added; the counts themselves do not move. The MCP
-  tool returns the new keys too.
+  metrics keep one copy of each figure. A snapshot saved after this change
+  records `n_cell_types`, `n_neuropils` and `vector_backend` and omits the
+  six dropped keys; `snapshot diff` against an older one shows every count
+  unchanged, verified on the v783 graph. The MCP tool returns the new keys
+  too.
 
 ### Fixed
 
