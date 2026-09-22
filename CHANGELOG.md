@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Line skeletons no longer draw a stray point at every traced point.**
+  0.7.0 built the skeleton mesh with `pv.PolyData(points)`, whose
+  constructor adds a vertex cell per point; the lines were then set on top,
+  so every skeleton rendered its points as well. Points carry no normals,
+  so with `--floor` the shadow pass failed to compile their shader and VTK
+  logged `Could not set shader program` on the first floored render -- the
+  same unlit-branch failure `_shade_skeleton_lines` exists to prevent,
+  which it could not fix here because it turns *lines* into tubes, not
+  points. The mesh is built empty and filled, as it was before 0.7.0.
+
 ## [0.7.0] - 2026-09-22
 
 ### Changed

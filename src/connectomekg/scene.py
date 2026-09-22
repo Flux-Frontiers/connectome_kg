@@ -1170,7 +1170,14 @@ def build_brain_scene(
         if chain_points:
             points = np.concatenate(chain_points, axis=0)
             radii = np.concatenate(chain_radii, axis=0)
-            mesh = pv.PolyData(points)
+            # Built empty and filled, not `PolyData(points)`: that constructor
+            # adds a vertex cell per point, and those points then draw beside
+            # the lines. They have no normals, so under the floor's shadow
+            # pass their shader fails to compile -- the same unlit-branch
+            # failure `_shade_skeleton_lines` exists to prevent, which it
+            # cannot fix here because it turns *lines* into tubes.
+            mesh = pv.PolyData()
+            mesh.points = points
             mesh.lines = np.concatenate(chain_cells).astype(np.int64)
             if tubes:
                 # A format-1 cache stores no radius, so its skeletons read back
