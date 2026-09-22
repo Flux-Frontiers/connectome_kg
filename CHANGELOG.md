@@ -7,63 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **`stats` describes a connectome, not a code graph.** `connkg stats`, the
-  `graph_stats` MCP tool and `snapshot save` all read the SDK's generic
-  `GraphStore.stats()`, which reports `module_count`, `class_count`,
-  `function_count`, `method_count`, `docstring_coverage` and
-  `meaningful_nodes`; on a brain every one of them was zero and printed
-  anyway. `ConnectomeKG.stats()` now overrides the module method the way the
-  rest of the fleet does: the SDK's totals, `node_counts` and `edge_counts`
-  stay, the code-graph fields go, and in their place the graph is described
-  in its own terms -- `dataset_id`, `dataset_version`, `n_neurons`,
-  `n_cell_types`, `n_neuropils`, `n_pairs` and `n_synapses`. Those are the
-  names the dataset node and the snapshots already used, so a snapshot's
-  metrics keep one copy of each figure. A snapshot saved after this change
-  records `n_cell_types`, `n_neuropils` and `vector_backend` and omits the
-  six dropped keys; `snapshot diff` against an older one shows every count
-  unchanged, verified on the v783 graph. The MCP tool returns the new keys
-  too.
-
-### Fixed
-
-- **Read-only commands no longer advertise build options.** `stats`,
-  `analyze`, `query`, `path`, `cone`, `influence`, `link` and `viz` all listed
-  `--data-dir`, `--source`, `--n`, `--seed`, `--min-syn`, `--connections-file`
-  and `--embed-neurons` in their `--help`, because the decorator that gives
-  `build` its extraction options had been applied to every command that opens
-  a graph. On a built graph the options did nothing, and `connkg stats --seed
-  7` was accepted silently. Only `build` takes them now. `cone` keeps
-  `--min-syn` as its own option, since that one is a real query threshold,
-  and `path --render` and `cone --render` take the same `--data-dir` as
-  `quilt` and `viz3d` do, meaning the skeleton download root for neurons the
-  cache lacks, with the same `fafb_v783` default.
-- **Rebuilding a floored scene no longer shades the new skeletons through the
-  old shadow pass.** `clear_actors` keeps render passes, so the second scene's
-  line skeletons compiled their shaders against the previous floor's
-  `vtkShadowMapPass` before tube shading was enabled -- VTK logged
-  "Could not set shader program" and the lines came out unlit. The floor's
-  passes are now torn back down to a plain `vtkRenderStepsPass` before a
-  rebuild, releasing the old shadow maps while their render window still
-  exists, and `add_floor` shades the skeleton lines before enabling shadows
-  rather than after. Switching examples in the viewer with the floor on is the
-  way to hit this.
-- **The viewer cannot start a second composition on top of the first.**
-  Composing pumps the Qt event loop to keep the window responsive, which also
-  delivers clicks, so a click on Show scene or Cast during a slow scene queued
-  work against a half-built one. The rail, Reset view and the scene are
-  disabled for the duration and restored afterwards, including when the
-  composition raises.
-- **A cast from the 3-D viewer is framed like the viewport.** PyVista's
-  `camera_position` is (position, focal point, view up) and carries no view
-  angle, so the cast helper's fresh off-screen plotter kept VTK's default 30
-  degrees while the viewport sat at the 14 that `aim_camera` framed with. The
-  subject landed tan(15)/tan(7) = 2.2x too small on the panel, about eight
-  scroll-wheel steps to undo by hand. The viewer now carries its view angle
-  across. Note the viewport's aspect still differs from the quilt tile's
-  (1.56 against 1.78), which adds margin left and right but does not change
-  the size of what is cast.
+## [0.6.0] - 2026-09-21
 
 ### Added
 
@@ -129,39 +73,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documented spec, answer and circuit is now a button that fills the box and
   applies it, taking the same path a typed spec does, refusals included. The
   meaning moved to the tooltip.
-
-### Fixed
-
-- **`--floor` no longer corrupts skeletons drawn as lines.** VTK's shadow-map
-  pass splices `calcShadow(vertexVC, ...)` into every actor's fragment shader
-  but declares `vertexVC` only for lit geometry; a line has no normals, so
-  its shader failed to compile and the render carried on regardless, drawing
-  the skeletons as stray red strokes or not at all. Every documented floor
-  render happened to pair `--floor` with `--tubes` or the flow view, which is
-  why it went unseen. `add_floor` now renders line skeletons as GPU tubes.
-- **Neuropil surfaces show under the floor.** PyVista appends the shadow pass
-  after the stock render-steps pass, so each frame drew the opaque geometry a
-  second time, shadowed, over any translucent surface in front of the floor.
-  `add_floor` re-sequences the passes the way VTK intends: shadowed opaque
-  geometry first, translucency after.
-
-### Changed
-
-- **`--floor` defaults the context cloud on.** The brain's shadow on the
-  floor is thrown by the cloud's opaque somas and by nothing else, since the
-  translucent surfaces cast none; a floor without a cloud showed the circuit's
-  shadow alone. `--no-cloud` still turns it off.
-
-### Removed
-
-- **The `__enter__` override is gone** (`kgrag_priv` sweep item 5).
-  It existed only to narrow `KGModule.__enter__`, which was typed to
-  return the base class, so `with ConnectomeKG(...) as kg:` lost the subclass
-  surface under `ty`. kgmodule-utils 0.23.0 returns `Self`, so the
-  workaround is redundant; `ty` is clean without it.
-
-### Added
-
 - **A documentation page for querying**, `docs/queries.md`: the SPEC grammar,
   the answer forms, and `connkg path`, `cone`, `influence`, `query`, `link`,
   `stats`, `analyze` and `datasets`. 0.5.0 shipped `influence`, `specs` and
@@ -179,6 +90,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`stats` describes a connectome, not a code graph.** `connkg stats`, the
+  `graph_stats` MCP tool and `snapshot save` all read the SDK's generic
+  `GraphStore.stats()`, which reports `module_count`, `class_count`,
+  `function_count`, `method_count`, `docstring_coverage` and
+  `meaningful_nodes`; on a brain every one of them was zero and printed
+  anyway. `ConnectomeKG.stats()` now overrides the module method the way the
+  rest of the fleet does: the SDK's totals, `node_counts` and `edge_counts`
+  stay, the code-graph fields go, and in their place the graph is described
+  in its own terms -- `dataset_id`, `dataset_version`, `n_neurons`,
+  `n_cell_types`, `n_neuropils`, `n_pairs` and `n_synapses`. Those are the
+  names the dataset node and the snapshots already used, so a snapshot's
+  metrics keep one copy of each figure. A snapshot saved after this change
+  records `n_cell_types`, `n_neuropils` and `vector_backend` and omits the
+  six dropped keys; `snapshot diff` against an older one shows every count
+  unchanged, verified on the v783 graph. The MCP tool returns the new keys
+  too.
+- **`--floor` defaults the context cloud on.** The brain's shadow on the
+  floor is thrown by the cloud's opaque somas and by nothing else, since the
+  translucent surfaces cast none; a floor without a cloud showed the circuit's
+  shadow alone. `--no-cloud` still turns it off.
 - **Fleet dependency floors raised and relocked** (`kgrag_priv` sweep item 46):
   `kgmodule-utils` to `>=0.23.0`. The three packages released on 2026-09-20 and put
   every consumer's lock behind them within hours; this is the routine
@@ -201,6 +132,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floor from `>=0.6` to `>=0.15`, inside the existing `<0.16` cap
   (`kgrag_priv` sweep item 49, tier 1). Nothing here depends on 0.15.0's
   toe-in geometry specifically; this is a currency bump.
+
+### Removed
+
+- **The `__enter__` override is gone** (`kgrag_priv` sweep item 5).
+  It existed only to narrow `KGModule.__enter__`, which was typed to
+  return the base class, so `with ConnectomeKG(...) as kg:` lost the subclass
+  surface under `ty`. kgmodule-utils 0.23.0 returns `Self`, so the
+  workaround is redundant; `ty` is clean without it.
+
+### Fixed
+
+- **Read-only commands no longer advertise build options.** `stats`,
+  `analyze`, `query`, `path`, `cone`, `influence`, `link` and `viz` all listed
+  `--data-dir`, `--source`, `--n`, `--seed`, `--min-syn`, `--connections-file`
+  and `--embed-neurons` in their `--help`, because the decorator that gives
+  `build` its extraction options had been applied to every command that opens
+  a graph. On a built graph the options did nothing, and `connkg stats --seed
+  7` was accepted silently. Only `build` takes them now. `cone` keeps
+  `--min-syn` as its own option, since that one is a real query threshold,
+  and `path --render` and `cone --render` take the same `--data-dir` as
+  `quilt` and `viz3d` do, meaning the skeleton download root for neurons the
+  cache lacks, with the same `fafb_v783` default.
+- **Rebuilding a floored scene no longer shades the new skeletons through the
+  old shadow pass.** `clear_actors` keeps render passes, so the second scene's
+  line skeletons compiled their shaders against the previous floor's
+  `vtkShadowMapPass` before tube shading was enabled -- VTK logged
+  "Could not set shader program" and the lines came out unlit. The floor's
+  passes are now torn back down to a plain `vtkRenderStepsPass` before a
+  rebuild, releasing the old shadow maps while their render window still
+  exists, and `add_floor` shades the skeleton lines before enabling shadows
+  rather than after. Switching examples in the viewer with the floor on is the
+  way to hit this.
+- **The viewer cannot start a second composition on top of the first.**
+  Composing pumps the Qt event loop to keep the window responsive, which also
+  delivers clicks, so a click on Show scene or Cast during a slow scene queued
+  work against a half-built one. The rail, Reset view and the scene are
+  disabled for the duration and restored afterwards, including when the
+  composition raises.
+- **A cast from the 3-D viewer is framed like the viewport.** PyVista's
+  `camera_position` is (position, focal point, view up) and carries no view
+  angle, so the cast helper's fresh off-screen plotter kept VTK's default 30
+  degrees while the viewport sat at the 14 that `aim_camera` framed with. The
+  subject landed tan(15)/tan(7) = 2.2x too small on the panel, about eight
+  scroll-wheel steps to undo by hand. The viewer now carries its view angle
+  across. Note the viewport's aspect still differs from the quilt tile's
+  (1.56 against 1.78), which adds margin left and right but does not change
+  the size of what is cast.
+- **`--floor` no longer corrupts skeletons drawn as lines.** VTK's shadow-map
+  pass splices `calcShadow(vertexVC, ...)` into every actor's fragment shader
+  but declares `vertexVC` only for lit geometry; a line has no normals, so
+  its shader failed to compile and the render carried on regardless, drawing
+  the skeletons as stray red strokes or not at all. Every documented floor
+  render happened to pair `--floor` with `--tubes` or the flow view, which is
+  why it went unseen. `add_floor` now renders line skeletons as GPU tubes.
+- **Neuropil surfaces show under the floor.** PyVista appends the shadow pass
+  after the stock render-steps pass, so each frame drew the opaque geometry a
+  second time, shadowed, over any translucent surface in front of the floor.
+  `add_floor` re-sequences the passes the way VTK intends: shadowed opaque
+  geometry first, translucency after.
 
 ## [0.5.0] - 2026-09-20
 
