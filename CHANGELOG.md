@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rebuilding a floored scene no longer shades the new skeletons through the
+  old shadow pass.** `clear_actors` keeps render passes, so the second scene's
+  line skeletons compiled their shaders against the previous floor's
+  `vtkShadowMapPass` before tube shading was enabled -- VTK logged
+  "Could not set shader program" and the lines came out unlit. The floor's
+  passes are now torn back down to a plain `vtkRenderStepsPass` before a
+  rebuild, releasing the old shadow maps while their render window still
+  exists, and `add_floor` shades the skeleton lines before enabling shadows
+  rather than after. Switching examples in the viewer with the floor on is the
+  way to hit this.
+- **The viewer cannot start a second composition on top of the first.**
+  Composing pumps the Qt event loop to keep the window responsive, which also
+  delivers clicks, so a click on Show scene or Cast during a slow scene queued
+  work against a half-built one. The rail, Reset view and the scene are
+  disabled for the duration and restored afterwards, including when the
+  composition raises.
 - **A cast from the 3-D viewer is framed like the viewport.** PyVista's
   `camera_position` is (position, focal point, view up) and carries no view
   angle, so the cast helper's fresh off-screen plotter kept VTK's default 30
@@ -21,6 +37,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A workspace layout for the 3-D viewer, and what the scene costs.** The
+  viewer's toolbar and two docks became the control rail `gutenberg_kg` and
+  `pycode_kg` use: the Show box, an Explore tab of example buttons and a
+  Display tab of settings down the left, the scene beside them, and the neuron
+  inspector below it where **Neuron details** can collapse it. Two lines above
+  the scene say what is in it -- circuit and context neurons, neuropil
+  surfaces, skeletons or flow arcs -- and what it cost: visible meshes, points
+  and cells after glyphs and tubes expand, broken down per group in the
+  tooltip, plus the time the composition took. That is the number to watch
+  when a scene turns sluggish, and it was previously invisible.
+- **Quoting in the Show box, so a label spec can join a union.** Specs are
+  split with `shlex` rather than `str.split`, so `"label:giant fib" LC4` draws
+  both, and a regex keeps its backslashes. A bare leading `label:` still takes
+  the whole box, as before, and an unclosed quote is refused like any other bad
+  spec rather than raising.
+- **The cloud toggle is tri-state, and stride applies once.** Partially
+  checked is automatic -- draw the cloud only when no neuropil surfaces are
+  available -- and it stays automatic when some other display setting changes,
+  instead of collapsing to on. The skeleton stride applies when it has actually
+  been edited, so leaving the field no longer rebuilds the scene for nothing.
 - **Reset view, and a wait cursor on the slow steps.** Reset view takes the
   floor off before reframing and puts it back after: `aim_camera` measures
   `plotter.bounds`, and framing a 120-unit floor plane around an 8-unit brain
