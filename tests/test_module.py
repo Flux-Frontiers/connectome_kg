@@ -19,8 +19,25 @@ from connectomekg.readers.synthetic import write_codex_dir
 
 def test_kind_and_stats(kg):
     assert kg.kind() == "connectome"
-    s = kg.store.stats()
+    s = kg.stats()
     assert s["total_nodes"] > 600 and s["total_edges"] > 600
+    # The graph in its own terms, under the names the snapshots already use.
+    assert s["dataset_id"] == "synthetic"
+    assert s["n_neurons"] == s["node_counts"]["neuron"] > 0
+    assert s["n_cell_types"] == s["node_counts"]["cell_type"] > 0
+    assert s["n_neuropils"] == s["node_counts"]["neuropil"] > 0
+    assert s["n_pairs"] == s["edge_counts"]["SYNAPSES_TO"] > 0
+    assert s["n_synapses"] >= s["n_pairs"]
+    # The SDK's code-graph fields are always zero on a connectome: not reported.
+    code_keys = {
+        "meaningful_nodes",
+        "module_count",
+        "class_count",
+        "function_count",
+        "method_count",
+        "docstring_coverage",
+    }
+    assert not code_keys & s.keys()
 
 
 def test_analyze_is_markdown(kg):
@@ -68,7 +85,9 @@ def test_cli_fixture_build_path(tmp_path):
         "MN9",
     )
     assert "SEZ_IN1" in out and "MN9" in out
-    run("--root", str(root), "--dataset", "synthetic400", "stats")
+    printed = run("--root", str(root), "--dataset", "synthetic400", "stats")
+    assert "n_neurons: 400" in printed and "dataset_id: synthetic400" in printed
+    assert "module_count" not in printed and "docstring_coverage" not in printed
 
 
 def test_cli_rejects_out_of_range_options():

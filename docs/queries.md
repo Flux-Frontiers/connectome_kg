@@ -239,7 +239,7 @@ Three commands report on the graph rather than querying it.
 
 | command | answers |
 |---|---|
-| `connkg stats` | how many nodes and edges, broken down by kind and relation |
+| `connkg stats` | the dataset and its figures -- neurons, cell types, neuropils, connected pairs, synapses -- then nodes and edges by kind and relation |
 | `connkg analyze` | a Markdown report: hubs, the strongest type-to-type links, neuropil coverage, and what fraction of neurons carry a cell type, a sign, a soma |
 | `connkg datasets` | which connectomes are built under `--root`, one graph each |
 
@@ -248,6 +248,13 @@ connkg --root . --dataset fafb783 stats
 ```
 
 ```text
+dataset_id: fafb783
+dataset_version: 783
+n_neurons: 139255
+n_cell_types: 8772
+n_neuropils: 79
+n_pairs: 3732460
+n_synapses: 50666648
 total_nodes: 157698
 total_edges: 5072285
 node_counts: {'cell_type': 8772, ..., 'neuron': 139255, ...}

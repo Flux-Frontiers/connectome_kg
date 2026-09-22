@@ -131,12 +131,26 @@ mcp = FastMCP(
 
 @mcp.tool()
 def graph_stats() -> str:
-    """Node and edge counts by kind and relation for the loaded graph.
+    """What the loaded graph holds: the dataset, its counts, and nodes and edges by kind.
 
-    :return: JSON with total_nodes, total_edges, node_counts and edge_counts.
+    :return: JSON with dataset_id, dataset_version, n_neurons, n_cell_types,
+        n_neuropils, n_pairs, n_synapses, total_nodes, total_edges, node_counts
+        and edge_counts.
     """
-    s = _get_kg().store.stats()
-    keys = ("total_nodes", "total_edges", "node_counts", "edge_counts")
+    s = _get_kg().stats()
+    keys = (
+        "dataset_id",
+        "dataset_version",
+        "n_neurons",
+        "n_cell_types",
+        "n_neuropils",
+        "n_pairs",
+        "n_synapses",
+        "total_nodes",
+        "total_edges",
+        "node_counts",
+        "edge_counts",
+    )
     return _json({k: s[k] for k in keys if k in s})
 
 
