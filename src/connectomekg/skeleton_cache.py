@@ -23,11 +23,18 @@ one core for FAFB v783, or 2m 39s across twelve, since parsing SWC is pure
 Python and splits cleanly across processes. Nothing else in the module needs
 the download afterwards.
 
-The cache carries no radii -- the renderer does not use them -- and its labels
-are reconstructed, not stored: a cached skeleton's only label is the soma's.
+The cache carries each kept point's radius, which is what lets the circuit
+view taper a drawn neuron instead of piping it at one width. Its labels are
+reconstructed, not stored: a cached skeleton's only label is the soma's.
 Everything else about it round-trips, so
-:func:`connectomekg.skeletons.segments` and :func:`connectomekg.skeletons.soma`
-read a cached skeleton exactly as they read a parsed one.
+:func:`connectomekg.skeletons.segments`, :func:`connectomekg.skeletons.polylines`
+and :func:`connectomekg.skeletons.soma` read a cached skeleton exactly as they
+read a parsed one.
+
+A format-1 cache, written before the radius column existed, still loads: its
+radii read back as zeros and its skeletons draw at a constant width, which is
+what they did when it was written. Re-running ``connkg skeletons`` is what
+adds the taper.
 """
 
 from __future__ import annotations
@@ -76,7 +83,13 @@ DEFAULT_CACHE_STEP: Final = 4
 #: for a few hundred neurons touches a few row groups, not the whole file.
 _ROW_GROUP: Final = 2000
 
-_FORMAT: Final = "connectomekg-skeletons-1"
+#: Written by this version. Format 2 added the per-point radius column.
+_FORMAT: Final = "connectomekg-skeletons-2"
+
+#: Formats this version can read. A format-1 cache has no radius column,
+#: so it loads with zeros and its skeletons draw at a constant width --
+#: the behavior it was written for. Rebuilding is what adds the taper.
+_READABLE_FORMATS: Final = ("connectomekg-skeletons-1", _FORMAT)
 
 _SCHEMA: Final = pa.schema(
     [
@@ -84,6 +97,7 @@ _SCHEMA: Final = pa.schema(
         pa.field("x", pa.list_(pa.float32()), nullable=False),
         pa.field("y", pa.list_(pa.float32()), nullable=False),
         pa.field("z", pa.list_(pa.float32()), nullable=False),
+        pa.field("radius", pa.list_(pa.float32()), nullable=True),
         pa.field("parent", pa.list_(pa.int32()), nullable=False),
         pa.field("soma_index", pa.int32(), nullable=False),
     ]
@@ -189,6 +203,7 @@ def _simplified_row(skeleton: Skeleton, step: int) -> tuple[dict, bool, int]:
         "x": points[:, 0].astype(np.float32),
         "y": points[:, 1].astype(np.float32),
         "z": points[:, 2].astype(np.float32),
+        "radius": skeleton.radius[kept].astype(np.float32),
         "parent": parent.astype(np.int32),
         "soma_index": int(soma_rows[0]) if soma_rows.size else -1,
     }
@@ -439,7 +454,7 @@ def cache_info(path: str | Path) -> tuple[int, int]:
             # ARROW:schema entry beside them is not text.
             return (metadata.get(key.encode()) or b"").decode()
 
-        if value("connectomekg.format") != _FORMAT:
+        if value("connectomekg.format") not in _READABLE_FORMATS:
             raise ValueError(f"{shard}: not a {_FORMAT} skeleton cache")
         step = int(value("connectomekg.step"))
         n_neurons += int(value("connectomekg.n_neurons"))
@@ -480,7 +495,11 @@ def load_cached_skeletons(
         loaded[int(row["root_id"])] = Skeleton(
             root_id=int(row["root_id"]),
             points=np.stack([x, y, z], axis=1),
-            radius=np.zeros(len(x), dtype=np.float64),
+            radius=(
+                np.zeros(len(x), dtype=np.float64)
+                if row["radius"] is None
+                else np.asarray(row["radius"], dtype=np.float64)
+            ),
             labels=labels,
             parent=np.asarray(row["parent"], dtype=np.int64),
         )

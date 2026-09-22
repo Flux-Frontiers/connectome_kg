@@ -23,6 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `circuit:compass` drawing nothing is worse than one that opens on the
   brain; on the synthetic fixture it falls back that way. `quilt` is
   unchanged.
+- **Traced neurons are drawn as continuous tubes, and they taper.** The
+  circuit view built its mesh from `segments()`, one line per traced edge
+  with its own two points, so `--tubes` extruded a separate cylinder per
+  edge: consecutive cylinders met at an angle with nothing joining them,
+  and a neuron came out a heap of faceted stubs. `skeletons.polylines()`
+  walks the parent links instead and returns each unbranched run between
+  branch points, which tubes into one continuous surface with mitred
+  joins. It carries exactly the edges `segments()` does -- tested against
+  it on random trees at four strides -- and costs less, because a run's
+  interior points are shared rather than repeated per edge: 2.8 M cells
+  against 3.4 M on `circuit:compass`, while the tube goes from 6 sides to
+  12.
+- **The skeleton cache stores the traced radius, and tubes use it.** A
+  neuron was piped at one width because the radius was parsed, then
+  written to the cache as zeros. Cache format 2 keeps it, and a tube's
+  radius is now the traced radius floored at the old constant. FAFB's
+  median traced radius is 222 nm, a thread at whole-brain framing, so that
+  constant was doing visibility work: flooring rather than replacing it
+  means nothing draws thinner than before and only the thick structures --
+  major axons, the soma -- widen. A format-1 cache still loads, reads back
+  zeros and draws at the constant width, so nothing breaks; re-running
+  `connkg skeletons` is what turns the taper on.
 
 ## [0.6.0] - 2026-09-21
 

@@ -8,6 +8,7 @@ parsed one it came from rather than against an assumption about the format.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
@@ -319,3 +320,49 @@ def test_one_job_starts_no_pool(tmp_path, download, monkeypatch):
     report, _ = sc.build_skeleton_cache(data_dir, list(written), tmp_path / "cache", jobs=1)
     assert report.n_cached == len(written)
     assert report.n_shards == 1
+
+
+def test_round_trip_keeps_the_radius_the_taper_needs(tmp_path, download):
+    """Format 2 stores a radius per kept point; without it a neuron is a pipe."""
+    data_dir, written = download
+    dest = tmp_path / "c.parquet"
+    sc.build_skeleton_cache(data_dir, list(written), dest, step=4)
+    loaded, _ = sc.load_cached_skeletons(dest, list(written))
+    assert loaded
+    for root_id, cached in loaded.items():
+        keep = sk._simplify_keep_mask(written[root_id].parent, written[root_id].labels, 4)
+        np.testing.assert_allclose(cached.radius, written[root_id].radius[keep], rtol=1e-5)
+        assert cached.radius.max() > 0, "a cache of zeros would draw at one width"
+
+
+def test_a_format_1_cache_still_loads_without_a_radius(tmp_path, download):
+    """A cache written before the radius column must not stop the viewer.
+
+    Its radii read back as zeros, which the circuit view floors to the
+    constant width it drew at when that cache was current. Re-running
+    `connkg skeletons` is what upgrades it.
+    """
+    data_dir, written = download
+    dest = tmp_path / "v1.parquet"
+    sc.build_skeleton_cache(data_dir, list(written), dest, step=4)
+    shard = next(Path(dest).glob("*.parquet"))
+
+    # Rewrite the shard as format 1: drop the radius column and relabel it.
+    table = pq.read_table(shard).drop_columns(["radius"])
+    metadata = {
+        **{
+            k.decode(): v.decode()
+            for k, v in (pq.ParquetFile(shard).metadata.metadata or {}).items()
+            if k != b"ARROW:schema"
+        },
+        "connectomekg.format": "connectomekg-skeletons-1",
+    }
+    pq.write_table(table.replace_schema_metadata(metadata), shard)
+
+    step, n = sc.cache_info(dest)
+    assert step == 4 and n == len(written)
+    loaded, missing = sc.load_cached_skeletons(dest, list(written))
+    assert missing == [] and loaded
+    for cached in loaded.values():
+        assert cached.radius.shape == (len(cached.points),)
+        assert not cached.radius.any(), "no radius column means no radius"

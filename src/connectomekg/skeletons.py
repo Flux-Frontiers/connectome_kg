@@ -287,6 +287,62 @@ def segments(skeleton: Skeleton, *, step: int = 1) -> np.ndarray:
     return np.stack([starts, ends], axis=1)
 
 
+def polylines(skeleton: Skeleton, *, step: int = 1) -> list[np.ndarray]:
+    """Maximal unbranched chains, as index arrays into the skeleton's points.
+
+    :func:`segments` returns each child-to-parent edge on its own, which a
+    tube filter extrudes into one short cylinder per edge: consecutive
+    cylinders meet at an angle with nothing joining them, and the drawn
+    neuron is a heap of faceted stubs. A chain is the run of points between
+    one branch point (or root) and the next branch point (or tip), so tubing
+    it produces a single continuous surface with mitred joins. It is also
+    cheaper: a chain's interior points are shared rather than duplicated once
+    per edge.
+
+    Every edge belongs to exactly one chain, so the drawn geometry is the same
+    as :func:`segments` would give -- only joined up.
+
+    :param skeleton: The skeleton to draw.
+    :param step: Simplification stride, as :func:`segments` takes it. Chains
+        are found over the simplified topology, not the full one.
+    :return: One ``(k,)`` int array per chain, ``k >= 2``, indexing
+        ``skeleton.points`` and ``skeleton.radius``.
+    """
+    parent = skeleton.parent
+    if step <= 1:
+        keep = np.ones(len(parent), dtype=bool)
+        anc = parent
+    else:
+        keep = _simplify_keep_mask(parent, skeleton.labels, step)
+        anc = _nearest_kept_ancestor(parent, keep)
+
+    kept = np.nonzero(keep)[0]
+    child = kept[anc[kept] != -1]
+    if child.size == 0:
+        return []
+    par = anc[child]
+    n = len(parent)
+    n_children = np.bincount(par, minlength=n)
+    # The one child of each single-child point, for walking a chain onward.
+    only_child = np.full(n, -1, dtype=np.int64)
+    single = n_children[par] == 1
+    only_child[par[single]] = child[single]
+    # A chain starts at an edge whose parent forks, or is itself a root: any
+    # other parent has exactly one edge in and one out, so the chain runs on
+    # through it.
+    starts = child[(n_children[par] != 1) | (anc[par] == -1)]
+
+    chains: list[np.ndarray] = []
+    for start in starts:
+        chain = [int(anc[start]), int(start)]
+        cur = int(start)
+        while (nxt := only_child[cur]) != -1:
+            cur = int(nxt)
+            chain.append(cur)
+        chains.append(np.asarray(chain, dtype=np.int64))
+    return chains
+
+
 def skeleton_path(data_dir: str | Path, root_id: int) -> Path:
     """The SWC file path for one neuron in the Codex skeleton download.
 
@@ -323,6 +379,7 @@ __all__ = [
     "Skeleton",
     "load_skeletons",
     "read_swc",
+    "polylines",
     "segments",
     "skeleton_path",
     "soma",
