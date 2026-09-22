@@ -260,6 +260,7 @@ A SPEC is a cell type name (`LC4`), a root id, a neuron node id, or
 To open a view in the interactive viewer, run `connkg viz3d`:
 
 ```bash
+connkg --root . viz3d                           # circuit:compass, then explore
 connkg --root . viz3d LC4 DNp01                 # circuit: two cell types
 connkg --root . viz3d --view flow               # flow: whole brain
 connkg --root . viz3d --view flow LC4           # flow carried by LC4 only
@@ -322,6 +323,10 @@ optional.
 `connkg viz3d` opens a workspace: a control rail down the left side, and the
 scene beside it with a neuron inspector below. Everything here is
 per-session -- the viewer never writes to the graph.
+
+Given no SPEC it opens on `circuit:compass`, so there is a circuit to orbit
+and pick at from the start; any SPEC replaces it. On a connectome whose cell
+types that circuit does not name, it opens on the brain alone.
 
 ### The control rail
 

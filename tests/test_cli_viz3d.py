@@ -89,9 +89,13 @@ def test_viz3d_missing_extra_shows_install_hint(kg, monkeypatch, kg_root):
     assert 'pip install "connectome-kg[viz3d]"' in result.output
 
 
-@pytest.mark.parametrize("command", ["quilt", "viz3d"])
-def test_circuit_view_requires_at_least_one_spec(command):
-    result = CliRunner().invoke(cli, [command])
+def test_quilt_circuit_view_requires_at_least_one_spec():
+    """`quilt` renders a file and exits, so an empty circuit renders nothing.
+
+    `viz3d` is interactive and opens on a default circuit instead; see
+    ``test_viz3d_without_a_spec_is_not_a_usage_error``.
+    """
+    result = CliRunner().invoke(cli, ["quilt"])
     assert result.exit_code == 2
     assert "--view circuit needs at least one SPEC" in result.output
 
@@ -274,3 +278,44 @@ def test_path_without_render_draws_nothing(kg, kg_root, tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Wrote" not in result.output
     assert not (tmp_path / "renders").exists()
+
+
+def test_viz3d_without_a_spec_is_not_a_usage_error(kg_root, monkeypatch):
+    """A bare `connkg viz3d` launches; `quilt` still refuses (it renders a file)."""
+    # Patching the viewer's launch imports it, and it imports Qt at module
+    # scope, so this one needs the viz3d extra even though it opens no window.
+    pytest.importorskip("PyQt5")
+    pytest.importorskip("pyvistaqt")
+    launched: dict[str, object] = {}
+
+    def fake_launch(root, specs, **kwargs):
+        launched["specs"] = specs
+        launched["view"] = kwargs["view"]
+
+    monkeypatch.setattr("connectomekg.viz3d.launch", fake_launch)
+    result = CliRunner().invoke(cli, ["--root", str(kg_root), "viz3d"])
+    assert result.exit_code == 0, result.output
+    assert launched == {"specs": [], "view": "circuit"}
+
+
+def test_no_spec_opens_on_the_default_circuit(kg, monkeypatch):
+    """With nothing asked for, the viewer opens on a circuit rather than bare surfaces."""
+    monkeypatch.setattr(mod, "DEFAULT_SPEC", "LC4")
+    assert mod.opening_specs(kg, [], "circuit") == ["LC4"]
+
+
+def test_a_default_that_matches_nothing_opens_on_the_brain_alone(kg):
+    """The shipped circuits are FAFB cell types, so another connectome has none.
+
+    A window captioned circuit:compass drawing no neurons is worse than one
+    that opens on the brain; this fixture is exactly that case.
+    """
+    assert not kg.neurons_of(mod.DEFAULT_SPEC), "fixture must not define the default"
+    assert mod.opening_specs(kg, [], "circuit") == []
+
+
+def test_the_default_never_displaces_what_was_asked_for(kg, monkeypatch):
+    monkeypatch.setattr(mod, "DEFAULT_SPEC", "LC4")
+    assert mod.opening_specs(kg, ["MN9"], "circuit") == ["MN9"]
+    # The flow view draws neuropils, so it is already a scene without a circuit.
+    assert mod.opening_specs(kg, [], "flow") == []
