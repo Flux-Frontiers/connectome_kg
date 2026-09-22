@@ -98,6 +98,8 @@ async def test_lookup_tools(graph_root):
     async with _session(graph_root) as s:
         stats = await _call(s, "graph_stats")
         assert stats["node_counts"]["neuron"] == 600
+        assert stats["n_neurons"] == 600 and stats["dataset_id"] == "synthetic"
+        assert "module_count" not in stats
 
         found = await _call(s, "find_nodes", name="dnp", kind="cell_type")
         assert "connectome:synthetic:t:DNp01" in {n["id"] for n in found}

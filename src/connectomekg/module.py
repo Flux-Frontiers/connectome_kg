@@ -100,6 +100,54 @@ class ConnectomeKG(KGModule):
     def kind(self) -> str:
         return "connectome"
 
+    #: What the SDK's generic ``GraphStore.stats()`` computes for a code graph.
+    #: A connectome has no modules or docstrings, so these are always zero
+    #: here; they are dropped rather than reported as zero.
+    _CODE_GRAPH_KEYS = frozenset(
+        {
+            "meaningful_nodes",
+            "module_count",
+            "class_count",
+            "function_count",
+            "method_count",
+            "docstring_coverage",
+        }
+    )
+
+    def stats(self) -> dict[str, Any]:
+        """Node and edge counts, and what they add up to for a connectome.
+
+        The SDK's counts are kept: ``total_nodes``, ``total_edges``,
+        ``node_counts`` by kind, ``edge_counts`` by relation, ``db_path``,
+        ``snapshot_count`` and ``vector_backend``. Its code-graph fields
+        (module, class, function and method counts, docstring coverage) are
+        dropped, and the graph is described in its own terms instead, under
+        the names the dataset node and the snapshots already use.
+
+        :return: The SDK keys above plus ``dataset_id``, ``dataset_version``,
+            ``n_neurons``, ``n_cell_types``, ``n_neuropils``, ``n_pairs`` (the
+            ``SYNAPSES_TO`` edges) and ``n_synapses`` (their summed synapse
+            count, as the build recorded it on the dataset node).
+        """
+        s = {k: v for k, v in super().stats().items() if k not in self._CODE_GRAPH_KEYS}
+        kinds = s["node_counts"]
+        row = self.store.con.execute(
+            "SELECT qualname, metadata FROM nodes WHERE kind='dataset'"
+        ).fetchone()
+        meta = json.loads(row[1]) if row and row[1] else {}
+        figures = {
+            "dataset_id": row[0] if row else "",
+            "dataset_version": meta.get("version", ""),
+            "n_neurons": kinds.get("neuron", 0),
+            "n_cell_types": kinds.get("cell_type", 0),
+            "n_neuropils": kinds.get("neuropil", 0),
+            "n_pairs": s["edge_counts"].get("SYNAPSES_TO", 0),
+            "n_synapses": meta.get("n_synapses", 0),
+        }
+        # The dataset first, the store's own housekeeping last.
+        db_path = s.pop("db_path", None)
+        return {**figures, **s, "db_path": db_path}
+
     def tables(self) -> ConnectomeTables:
         """Load (once) the normalized tables for the configured source."""
         if self._tables is None:
@@ -514,7 +562,7 @@ class ConnectomeKG(KGModule):
 
     def _analyze(self) -> str:
         con = self.store.con
-        s = self.store.stats()
+        s = self.stats()
         ds = con.execute("SELECT name, metadata FROM nodes WHERE kind='dataset'").fetchone()
         meta = json.loads(ds[1]) if ds and ds[1] else {}
         out = [f"# ConnectomeKG analysis: {ds[0] if ds else 'unknown dataset'}", ""]

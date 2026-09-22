@@ -177,7 +177,7 @@ A **spec** names a starting set of neurons in any of four ways:
 | **Build the graph** | `connkg build` |
 | **List the connectomes built under a root** | `connkg datasets` |
 | **List every SPEC and answer form, with examples** | `connkg specs` |
-| **Count nodes and edges** | `connkg stats` |
+| **Describe the graph: dataset, neurons, types, neuropils, pairs, synapses, then nodes and edges by kind** | `connkg stats` |
 | **Get a Markdown report: hubs, top type-to-type links, neuropils, coverage** | `connkg analyze` |
 | **Search types, neuropils and labels** | `connkg query "..."` |
 | **Find the strongest path between two specs** | `connkg path --from A --to B` |

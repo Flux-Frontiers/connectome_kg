@@ -64,13 +64,12 @@ def save(ctx: click.Context, version: str, subject: str | None, force: bool) -> 
     if mgr.db_path is None or not mgr.db_path.exists():
         raise click.ClickException(f"no graph at {mgr.db_path}; run `connkg build` first")
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
-        stats = kg.store.stats()
-        row = kg.store.con.execute("SELECT qualname FROM nodes WHERE kind='dataset'").fetchone()
+        stats = kg.stats()
     snap = mgr.capture(
         graph_stats_dict=stats,
         hotspots=mgr.hub_neurons(),
         key=version,
-        subject=subject or f"corpus:{row[0] if row else 'unknown'}",
+        subject=subject or f"corpus:{stats['dataset_id'] or 'unknown'}",
     )
     try:
         path = mgr.save_snapshot(snap, force=force)

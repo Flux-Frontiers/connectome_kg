@@ -13,7 +13,7 @@ from connectomekg.cli.options import open_kg
 def stats(ctx: click.Context) -> None:
     """Node and edge counts for the built graph."""
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
-        for k, v in kg.store.stats().items():
+        for k, v in kg.stats().items():
             click.echo(f"{k}: {v}")
 
 

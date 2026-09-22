@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`stats` describes a connectome, not a code graph.** `connkg stats`, the
+  `graph_stats` MCP tool and `snapshot save` all read the SDK's generic
+  `GraphStore.stats()`, which reports `module_count`, `class_count`,
+  `function_count`, `method_count`, `docstring_coverage` and
+  `meaningful_nodes`; on a brain every one of them was zero and printed
+  anyway. `ConnectomeKG.stats()` now overrides the module method the way the
+  rest of the fleet does: the SDK's totals, `node_counts` and `edge_counts`
+  stay, the code-graph fields go, and in their place the graph is described
+  in its own terms -- `dataset_id`, `dataset_version`, `n_neurons`,
+  `n_cell_types`, `n_neuropils`, `n_pairs` and `n_synapses`. Those are the
+  names the dataset node and the snapshots already used, so a snapshot's
+  metrics keep one copy of each figure. The next `snapshot save` will show
+  the six dropped keys as removed and `n_cell_types`, `n_neuropils` and
+  `vector_backend` as added; the counts themselves do not move. The MCP
+  tool returns the new keys too.
+
 ### Fixed
 
 - **Read-only commands no longer advertise build options.** `stats`,

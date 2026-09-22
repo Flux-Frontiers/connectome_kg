@@ -153,16 +153,29 @@ fafb783             2.3 GB  FlyWire FAFB v783
 
 ### `connkg stats`
 
-Node and edge counts by kind and relation. No options.
+What the graph holds: the dataset and its figures, then nodes and edges by
+kind and relation. No options.
 
 ```text
-db_path: /Users/egs/repos/connectome_kg/connectomes/fafb783/.connectomekg/graph.sqlite
+dataset_id: fafb783
+dataset_version: 783
+n_neurons: 139255
+n_cell_types: 8772
+n_neuropils: 79
+n_pairs: 3732460
+n_synapses: 50666648
 total_nodes: 157698
 total_edges: 5072285
 node_counts: {'cell_type': 8772, 'column': 1581, ..., 'neuron': 139255, 'neuropil': 79, ...}
 edge_counts: {..., 'SYNAPSES_TO': 3732460, 'TYPE_SYNAPSES_TO': 507287, ...}
 snapshot_count: 7
+vector_backend: sqlite-vec
+db_path: /Users/egs/repos/connectome_kg/connectomes/fafb783/.connectomekg/graph.sqlite
 ```
+
+`n_pairs` is the `SYNAPSES_TO` edge count and `n_synapses` the synapses those
+pairs carry, as the build recorded them on the dataset node. The `graph_stats`
+MCP tool returns the same figures.
 
 ### `connkg analyze`
 
