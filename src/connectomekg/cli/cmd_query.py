@@ -8,20 +8,20 @@ from typing import Any
 import click
 
 from connectomekg.answers import answer_groups, spec_help
+from connectomekg.cli.cmd_viz3d import data_dir_option
 from connectomekg.cli.group import cli
-from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, source_options, usage_errors
+from connectomekg.cli.options import MAX_HOP, MAX_K, open_kg, usage_errors
 from connectomekg.validation import MAX_LIMIT
 
 
 @cli.command("query")
-@source_options
 @click.argument("q")
 @click.option("--k", default=8, show_default=True, type=click.IntRange(1, MAX_K))
 @click.option("--hop", default=1, show_default=True, type=click.IntRange(0, MAX_HOP))
 @click.pass_context
-def query(ctx: click.Context, q: str, k: int, hop: int, **source: Any) -> None:
+def query(ctx: click.Context, q: str, k: int, hop: int) -> None:
     """Semantic query with graph expansion."""
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
         try:
             result = kg.query(q, k=k, hop=hop)
         except FileNotFoundError as exc:
@@ -37,7 +37,7 @@ render_option = click.option(
 )
 
 
-def _draw(kg: Any, query: str, min_syn: int, data_dir: str | None) -> None:
+def _draw(kg: Any, query: str, data_dir: str | None, *, min_syn: int = 1) -> None:
     """Render an answer query as a still, and say where it landed.
 
     :raises click.UsageError: If the answer will not fit in one scene, or the
@@ -74,19 +74,19 @@ def specs() -> None:
 
 
 @cli.command("path")
-@source_options
 @click.option("--from", "src", required=True, help="Source spec: cell type, neuron or label.")
 @click.option("--to", "dst", required=True, help="Target spec.")
 @render_option
+@data_dir_option
 @click.pass_context
-def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) -> None:
+def path(ctx: click.Context, src: str, dst: str, render: bool, data_dir: str) -> None:
     """Strongest synaptic path between two specs.
 
     With --render, the answer is also drawn: each hop's neuron as a traced
     skeleton in its own color, dark to bright along the path, labeled with
     the synapses entering it, standing on a floor. Needs the viz3d extra.
     """
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
         with usage_errors():
             res = kg.strongest_path(src, dst)
         if res is None:
@@ -103,14 +103,20 @@ def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) ->
             else:
                 click.echo(f"  {tag}")
         if render:
-            _draw(kg, f"path:{src}>{dst}", source["min_syn"], source.get("data_dir"))
+            _draw(kg, f"path:{src}>{dst}", data_dir)
 
 
 @cli.command("cone")
-@source_options
 @click.argument("spec")
 @click.option("--hops", default=1, show_default=True, type=click.IntRange(0, MAX_HOP))
 @click.option("--direction", default="down", show_default=True, type=click.Choice(["down", "up"]))
+@click.option(
+    "--min-syn",
+    default=1,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="Ignore connections below this synapse count.",
+)
 @click.option(
     "--limit",
     default=20,
@@ -119,15 +125,17 @@ def path(ctx: click.Context, src: str, dst: str, render: bool, **source: Any) ->
     help="Neurons listed per hop.",
 )
 @render_option
+@data_dir_option
 @click.pass_context
 def cone(
     ctx: click.Context,
     spec: str,
     hops: int,
     direction: str,
+    min_syn: int,
     limit: int,
     render: bool,
-    **source: Any,
+    data_dir: str,
 ) -> None:
     """Downstream or upstream cone of a spec.
 
@@ -135,9 +143,9 @@ def cone(
     own color, dark to bright outward from the seed, standing on a floor.
     Needs the viz3d extra.
     """
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg:
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
         with usage_errors():
-            reached = kg.cone(spec, hops=hops, min_syn=source["min_syn"], direction=direction)
+            reached = kg.cone(spec, hops=hops, min_syn=min_syn, direction=direction)
         by_hop: dict[int, list[str]] = {}
         for nid, h in reached.items():
             n = kg.store.node(nid) or {}
@@ -148,11 +156,10 @@ def cone(
                 click.echo(f"  {q}")
         if render:
             arrow = "<" if direction == "up" else ">"
-            _draw(kg, f"cone:{spec}{arrow}{hops}", source["min_syn"], source.get("data_dir"))
+            _draw(kg, f"cone:{spec}{arrow}{hops}", data_dir, min_syn=min_syn)
 
 
 @cli.command("influence")
-@source_options
 @click.option("--from", "source_spec", required=True, help="Source spec.")
 @click.option("--to", "target_spec", default=None, help="Target spec; omit to rank cell types.")
 @click.option("--hops", default=3, show_default=True, type=click.IntRange(1, MAX_HOP))
@@ -176,7 +183,6 @@ def influence(
     hops: int,
     unsigned: bool,
     limit: int,
-    **source: Any,
 ) -> None:
     """Effective connectivity: how much one population drives another, hop by hop.
 
@@ -189,13 +195,12 @@ def influence(
     Unlike `connkg path`, which finds one strongest route, this sums every
     route of the given length at once.
     """
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
         result = kg.influence(source_spec, target_spec, hops=hops, signed=not unsigned, limit=limit)
         click.echo(str(result))
 
 
 @cli.command("link")
-@source_options
 @click.argument("specs", nargs=-1, required=True)
 @click.option(
     "--limit",
@@ -205,9 +210,9 @@ def influence(
     help="Neurons shown per spec.",
 )
 @click.pass_context
-def link(ctx: click.Context, specs: tuple[str, ...], limit: int, **source: Any) -> None:
+def link(ctx: click.Context, specs: tuple[str, ...], limit: int) -> None:
     """Neuroglancer URL showing each spec's neurons as meshes, one color per spec."""
-    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"], **source) as kg, usage_errors():
+    with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg, usage_errors():
         res = kg.neuroglancer_link(list(specs), limit=limit)
     for s in res["specs"]:
         more = f", first {s['shown']} shown" if s["shown"] < s["count"] else ""

@@ -59,7 +59,11 @@ _SOURCE_OPTIONS = (
 
 
 def source_options[F: Callable[..., Any]](fn: F) -> F:
-    """Attach the options that say which release a command reads."""
+    """Attach the options that say which release ``connkg build`` extracts.
+
+    Only ``build`` takes these: a command that reads a built graph gets its
+    dataset from ``--root`` and ``--dataset`` alone.
+    """
     for option in reversed(_SOURCE_OPTIONS):
         fn = option(fn)
     return fn

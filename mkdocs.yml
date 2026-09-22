@@ -60,6 +60,8 @@ nav:
       - Get the FAFB v783 data: DOWNLOAD.md
   - Querying:
       - Asking the graph a question: queries.md
+  - CLI reference:
+      - Every connkg command: cli.md
   - Visualization:
       - Rendering in 3-D: rendering.md
   - API reference:
