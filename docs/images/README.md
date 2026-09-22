@@ -4,11 +4,19 @@ Most images in this directory are renders of the FlyWire FAFB v783
 connectome. Regenerate them all from a built graph and the skeleton download
 with `poetry run python docs/scripts/render_images.py`.
 
-`connectomekg-architecture.png` and `.pdf` are the exception: a hand-made
-architecture infographic, drawn from `architecture-infographic-brief.txt` in
-the repository root. It is a diagram, not a render, so the render script does
-not touch it; the figures in it come from the built graph and are dated on
-the sheet.
+Four files are the exception, and the render script does not touch any of
+them:
+
+- `connectomekg-architecture.png` and `.pdf`, a hand-made architecture
+  infographic drawn from `architecture-infographic-brief.txt` in the
+  repository root. It is a diagram, not a render; the figures in it come from
+  the built graph and are dated on the sheet.
+- `viewer_explore.png` and `viewer_display.png`, screenshots of `connkg viz3d`
+  showing `circuit:compass` with each of the two control-rail tabs open. Retake
+  them by hand when the viewer's layout changes: run `connkg viz3d
+  circuit:compass` against a built v783 graph with neuropil meshes fetched,
+  screenshot the window, and downscale to 1400 px wide so the file stays under
+  the 1000 KB `check-added-large-files` limit.
 
 The data comes from FlyWire (https://flywire.ai):
 

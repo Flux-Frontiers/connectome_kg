@@ -335,6 +335,11 @@ that fills the Show box and draws it, grouped as Circuits, Specs and Answers.
 The grammar can be explored without being retyped, and a button takes the same
 path a typed spec does, refusals included.
 
+![The viewer showing circuit:compass, with the Explore tab open](images/viewer_explore.png)
+
+Above: `circuit:compass` drawn inside the whole brain, the Explore tab listing
+the circuits, specs and answers, and the inspector reporting what was drawn.
+
 ### Point at a neuron and press P
 
 Hover the cursor over a drawn neuron and press **P**. The inspector below the
@@ -417,6 +422,8 @@ cast duration.
 | Skeletons as tubes | draws skeletons as tubes rather than lines |
 | Skeleton stride | detail, where **0** means choose it from the neuron count |
 | Minimum synapses | drops connections below the threshold |
+
+![The Display tab, with the overlay toggles and the detail settings](images/viewer_display.png)
 
 The cloud toggle has three states rather than two. Checked always draws it,
 unchecked never does, and the third -- partially checked -- is **automatic**:
