@@ -1,0 +1,140 @@
+{
+  "key": "0.7.1",
+  "branch": "main",
+  "timestamp": "2026-09-23T00:03:38.577156+00:00",
+  "version": "0.7.1",
+  "subject": "corpus:fafb783",
+  "tool": "connectome-kg",
+  "tool_version": "0.7.1",
+  "tree_hash": "1e1da118f7415ca72f62b0e8976104cd47fc40e6",
+  "metrics": {
+    "dataset_id": "fafb783",
+    "dataset_version": "783",
+    "n_neurons": 139255,
+    "n_cell_types": 8772,
+    "n_neuropils": 79,
+    "n_pairs": 3732460,
+    "n_synapses": 50666648,
+    "total_nodes": 157698,
+    "total_edges": 5072285,
+    "node_counts": {
+      "cell_type": 8772,
+      "column": 1581,
+      "connectivity_tag": 4,
+      "dataset": 1,
+      "hemilineage": 214,
+      "label": 7306,
+      "nerve": 8,
+      "neuron": 139255,
+      "neuropil": 79,
+      "ontology_term": 235,
+      "taxon": 243
+    },
+    "edge_counts": {
+      "CONTAINS": 9727,
+      "INNERVATES": 40211,
+      "INSTANCE_OF": 138327,
+      "IN_COLUMN": 45528,
+      "IN_DATASET": 10976,
+      "IN_NEUROPIL": 421132,
+      "LABELED": 139436,
+      "MAPS_TO": 305,
+      "MEMBER_OF": 7540,
+      "MIRROR_OF": 4441,
+      "SYNAPSES_TO": 3732460,
+      "TAGGED": 5268,
+      "TYPE_SYNAPSES_TO": 507287,
+      "VIA_NERVE": 9647
+    },
+    "snapshot_count": 9,
+    "vector_backend": "sqlite-vec",
+    "db_path": ".connectomekg/graph.sqlite",
+    "coverage": {
+      "cell_type": 0.9933,
+      "sign": 0.8588,
+      "visual_family": 0.6825,
+      "column": 0.3269,
+      "ontology_term": 0.3393,
+      "length": 0.9999,
+      "soma": 0.9671
+    }
+  },
+  "hotspots": [
+    {
+      "id": "connectome:fafb783:n:720575940626979621",
+      "name": "CT1",
+      "qualname": "CT1/left/720575940626979621",
+      "n_out_syn": 110708,
+      "n_in_syn": 74505
+    },
+    {
+      "id": "connectome:fafb783:n:720575940628908548",
+      "name": "CT1",
+      "qualname": "CT1/right/720575940628908548",
+      "n_out_syn": 109699,
+      "n_in_syn": 72626
+    },
+    {
+      "id": "connectome:fafb783:n:720575940624547622",
+      "name": "APL",
+      "qualname": "APL/left/720575940624547622",
+      "n_out_syn": 85998,
+      "n_in_syn": 87524
+    },
+    {
+      "id": "connectome:fafb783:n:720575940613583001",
+      "name": "APL",
+      "qualname": "APL/right/720575940613583001",
+      "n_out_syn": 74963,
+      "n_in_syn": 82196
+    },
+    {
+      "id": "connectome:fafb783:n:720575940625952755",
+      "name": "Li33",
+      "qualname": "Li33/right/720575940625952755",
+      "n_out_syn": 46159,
+      "n_in_syn": 38804
+    },
+    {
+      "id": "connectome:fafb783:n:720575940627497244",
+      "name": "Li33",
+      "qualname": "Li33/left/720575940627497244",
+      "n_out_syn": 45647,
+      "n_in_syn": 39865
+    },
+    {
+      "id": "connectome:fafb783:n:720575940620008758",
+      "name": "LPi13",
+      "qualname": "LPi13/right/720575940620008758",
+      "n_out_syn": 40215,
+      "n_in_syn": 31297
+    },
+    {
+      "id": "connectome:fafb783:n:720575940634612194",
+      "name": "LPi15",
+      "qualname": "LPi15/right/720575940634612194",
+      "n_out_syn": 39297,
+      "n_in_syn": 60169
+    },
+    {
+      "id": "connectome:fafb783:n:720575940619991862",
+      "name": "LPi15",
+      "qualname": "LPi15/left/720575940619991862",
+      "n_out_syn": 31254,
+      "n_in_syn": 51223
+    },
+    {
+      "id": "connectome:fafb783:n:720575940611563310",
+      "name": "Sm42",
+      "qualname": "Sm42/right/720575940611563310",
+      "n_out_syn": 27990,
+      "n_in_syn": 25202
+    }
+  ],
+  "issues": [],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 0,
+    "edges": 0
+  }
+}
