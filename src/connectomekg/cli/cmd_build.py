@@ -64,6 +64,10 @@ def build(ctx: click.Context, wipe: bool, no_index: bool, **source: Any) -> None
         ) as kg:
             db_path = kg.db_path
             stats = kg.build_graph(wipe=wipe) if no_index else kg.build(wipe=wipe)
+            # A wiped rebuild drops the old index in the SDK (kgmodule-utils
+            # 0.24.0, KGModule.drop_index), so only an unwiped graph-only build
+            # can reach here with one: kept on purpose, since an unchanged
+            # graph still matches it, but worth saying.
             if no_index and kg.vectors_path.exists():
                 progress(
                     f"warning: kept the vector index from an earlier build at "

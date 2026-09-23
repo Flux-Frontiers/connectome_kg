@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`kgmodule-utils` floor raised to `>=0.24.0`** in the core dependency and
+  all three extras. 0.24.0 drops the vector index when the graph is wiped
+  (`KGModule.drop_index()`), so `build --no-index --wipe` now removes a stale
+  index instead of keeping it and warning. An unwiped `build --no-index`
+  still keeps an existing index and warns, as before: an unchanged graph
+  still matches it.
+
 ## [0.7.1] - 2026-09-22
 
 ### Fixed

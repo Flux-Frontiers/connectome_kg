@@ -184,10 +184,24 @@ def test_build_no_index_warns_about_an_index_it_kept(tmp_path):
     assert first.exit_code == 0, first.output
     assert "kept the vector index" not in first.stderr
 
-    (tmp_path / "connectomes" / "synthetic" / ".connectomekg" / "vectors.sqlite").touch()
-    second = CliRunner().invoke(cli, [*args, "--wipe"])
+    vectors = tmp_path / "connectomes" / "synthetic" / ".connectomekg" / "vectors.sqlite"
+    vectors.touch()
+    second = CliRunner().invoke(cli, args)
     assert second.exit_code == 0, second.output
     assert "warning: kept the vector index from an earlier build" in second.stderr
+    assert vectors.exists()
+
+
+def test_a_wiped_graph_only_build_drops_the_stale_index(tmp_path):
+    """kgmodule-utils 0.24.0: a wiped graph drops the index it invalidates."""
+    args = ["--root", str(tmp_path), "build", "--source", "synthetic", "--n", "400", "--no-index"]
+    assert CliRunner().invoke(cli, args).exit_code == 0
+    vectors = tmp_path / "connectomes" / "synthetic" / ".connectomekg" / "vectors.sqlite"
+    vectors.touch()
+    result = CliRunner().invoke(cli, [*args, "--wipe"])
+    assert result.exit_code == 0, result.output
+    assert not vectors.exists()
+    assert "kept the vector index" not in result.stderr
 
 
 #: Commands that read a built graph. None of them extracts, so none of them
