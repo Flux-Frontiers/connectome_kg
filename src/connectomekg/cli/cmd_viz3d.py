@@ -240,6 +240,26 @@ elevation_option = click.option(
 )
 
 
+def _resolve_background(_ctx: click.Context, _param: click.Parameter, value: str) -> str:
+    """Click callback: a background name or hex color, as ``#RRGGBB``."""
+    from connectomekg.scene import resolve_background  # noqa: PLC0415 - keeps CLI startup light
+
+    try:
+        return resolve_background(value)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
+
+
+background_option = click.option(
+    "--background",
+    default="gray",
+    show_default=True,
+    callback=_resolve_background,
+    help="Scene background: gray, charcoal, light, or a #RRGGBB color. The "
+    "context cloud is muted toward it and the floor is shaded from it.",
+)
+
+
 def require_viz3d(*names: str) -> None:
     """Stop with a usage error naming whichever viz3d modules are absent.
 
@@ -362,6 +382,7 @@ def _label_neurons(plotter: pv.Plotter, info: SceneInfo, labels: Sequence[tuple[
 @cloud_option
 @floor_option
 @elevation_option
+@background_option
 @preset_option
 @click.option(
     "--view-cone",
@@ -415,6 +436,7 @@ def quilt(
     cloud: bool | None,
     floor: bool,
     elevation: float | None,
+    background: str,
     preset: str,
     view_cone: float,
     fov: float,
@@ -472,6 +494,7 @@ def quilt(
             neuropils=neuropils,
             cloud=resolve_cloud(floor, cloud),
             progress=lambda m: click.echo(f"  {m}", err=True),
+            background=background,
         )
 
     if view == "circuit":
@@ -495,7 +518,7 @@ def quilt(
     if not still:
         click.echo(depth_report(plotter, spec_obj, fov=None, zoom=zoom))
     if floor:
-        render3d.add_floor(plotter)
+        render3d.add_floor(plotter, background)
 
     if preview is not None:
         preview_path = resolve_preview_path(preview)
@@ -534,6 +557,7 @@ def quilt(
 @cloud_option
 @floor_option
 @elevation_option
+@background_option
 @preset_option
 @click.option("--width", default=1400, show_default=True, type=int, help="Window width, pixels.")
 @click.option("--height", default=900, show_default=True, type=int, help="Window height, pixels.")
@@ -551,6 +575,7 @@ def viz3d(
     cloud: bool | None,
     floor: bool,
     elevation: float | None,
+    background: str,
     preset: str,
     width: int,
     height: int,
@@ -592,6 +617,7 @@ def viz3d(
             cloud=resolve_cloud(floor, cloud),
             floor=floor,
             elevation=resolve_elevation(floor, elevation),
+            background=background,
             preset=preset,
             dataset=ctx.obj["dataset"],
             width=width,

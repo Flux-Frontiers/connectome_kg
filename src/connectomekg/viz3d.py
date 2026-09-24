@@ -11,6 +11,10 @@ interactor style, and Cast to Looking Glass is wired straight to
 ``kg_utils.viz3d.qt.cast_scene_to_looking_glass``, which does the entire cast
 on the GUI thread.
 
+The control rail's Dataset and View boxes switch connectome and view in place;
+switching dataset keeps the Show box's specs where they resolve in the new
+graph, and falls back to the opening scene where they do not.
+
 The control rail's Show box re-resolves specs and redraws in place, so exploring
 does not mean restarting. It refuses a spec that matches nothing, or one over
 ``MAX_SCENE_NEURONS``, and leaves the scene as it was -- including when only
@@ -42,9 +46,12 @@ from typing import Any
 
 from kg_utils.viz3d.qt import DEFAULT_QUILT_PRESET, cast_scene_to_looking_glass
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
+    QColorDialog,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -85,6 +92,7 @@ from connectomekg.cli.cmd_viz3d import (
     scene_stem,
 )
 from connectomekg.cli.options import open_kg
+from connectomekg.datasets import scan_datasets
 from connectomekg.module import ConnectomeKG
 from connectomekg.picking import PickTargets, pick_summary
 from connectomekg.validation import MAX_MIN_SYN, MAX_SKELETON_STEP
@@ -122,6 +130,11 @@ DARK_STYLESHEET = """
     QPushButton#show-scene { background: #2e8b57; font-weight: bold; }
     QPushButton#cast-scene { background: #3e5f8a; font-weight: bold; }
     QPushButton:disabled { color: #788297; background: #1a2030; }
+    QComboBox { background: #232b3d; border: 1px solid #3a4358;
+        border-radius: 4px; padding: 5px 8px; }
+    QComboBox:focus { border-color: #5fa8d3; }
+    QComboBox QAbstractItemView { background: #232b3d;
+        selection-background-color: #35465e; }
     QTabWidget::pane { border: 0; }
     QTabBar::tab { padding: 9px 16px; color: #9aa4b8; border: none;
         border-bottom: 2px solid transparent; }
@@ -156,6 +169,11 @@ def _split_specs(text: str) -> list[str]:
     return list(lexer)
 
 
+def _dataset_id(kg: ConnectomeKG) -> str:
+    """The id of *kg*'s dataset: its directory under ``connectomes/``."""
+    return Path(kg.db_path).parents[1].name
+
+
 class BrainSceneWindow(QMainWindow):
     """Main window: whole-brain context plus a circuit or flow, orbit/zoom/pan, one Cast action.
 
@@ -177,6 +195,9 @@ class BrainSceneWindow(QMainWindow):
     :param preset: Quilt preset name for the Cast action.
     :param answer: A resolved path or cone to open on, drawn hop-colored
         instead of by cell type.
+    :param background: Scene background, ``#RRGGBB``.
+    :param root: Directory holding ``connectomes/``; enables the Dataset box,
+        which lists every dataset built there. ``None`` hides it.
     :param width: Window width in pixels; also the render window's width,
         which the camera framing divides by and so cannot be left at zero.
     :param height: Window height in pixels, likewise.
@@ -201,9 +222,13 @@ class BrainSceneWindow(QMainWindow):
         width: int = DEFAULT_WINDOW_SIZE[0],
         height: int = DEFAULT_WINDOW_SIZE[1],
         answer: Answer | None = None,
+        background: str = render3d.BACKGROUND,
+        root: str | Path | None = None,
     ) -> None:
         super().__init__()
         self._kg = kg
+        self._root = root
+        self._background = background
         self._specs = specs
         self._view = view
         self._data_dir = data_dir
@@ -264,6 +289,7 @@ class BrainSceneWindow(QMainWindow):
         subtitle = QLabel("3D CONNECTOME EXPLORER", self)
         subtitle.setProperty("role", "muted")
         rail.addWidget(subtitle)
+        rail.addLayout(self._build_pickers())
         rail.addWidget(self._heading("Show"))
         self._filter_box = QLineEdit(self)
         self._filter_box.setPlaceholderText("LC4 DNp01, circuit:compass, path:...")
@@ -399,6 +425,18 @@ class BrainSceneWindow(QMainWindow):
             layout.addWidget(box)
             self._toggles[key] = box
 
+        layout.addWidget(QLabel("Background", panel))
+        self._background_box = QComboBox(panel)
+        for name, color in render3d.BACKGROUNDS.items():
+            self._background_box.addItem(name.capitalize(), color)
+        self._background_box.addItem("Custom...", None)
+        self._show_background(self._background)
+        self._background_box.setToolTip(
+            "Scene background. Saved images, quilts and casts use it too."
+        )
+        self._background_box.activated.connect(self._on_background)
+        layout.addWidget(self._background_box)
+
         layout.addWidget(self._separator())
         layout.addWidget(self._heading("Detail"))
         layout.addWidget(QLabel("Skeleton stride (0 = automatic)", panel))
@@ -431,6 +469,116 @@ class BrainSceneWindow(QMainWindow):
         area.setFrameShape(QFrame.NoFrame)
         area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         return area
+
+    def _build_pickers(self) -> QHBoxLayout:
+        """The Dataset and View boxes at the top of the rail.
+
+        The Dataset box lists every dataset built under ``root``, and is
+        hidden when the window was given no root or there is only one.
+        """
+        row = QHBoxLayout()
+        column = QVBoxLayout()
+        column.addWidget(QLabel("Dataset", self))
+        self._dataset_box = QComboBox(self)
+        self._dataset_box.setToolTip("Switch connectome without restarting.")
+        self._dataset_box.setAccessibleName("Dataset")
+        ids = scan_datasets(self._root) if self._root is not None else []
+        self._dataset_box.addItems(ids)
+        current = _dataset_id(self._kg)
+        if current in ids:
+            self._dataset_box.setCurrentIndex(ids.index(current))
+        self._dataset_box.activated.connect(self._on_dataset)
+        column.addWidget(self._dataset_box)
+        dataset_widget = QWidget(self)
+        dataset_widget.setLayout(column)
+        dataset_widget.setVisible(len(ids) > 1)
+        row.addWidget(dataset_widget, stretch=1)
+
+        column = QVBoxLayout()
+        column.addWidget(QLabel("View", self))
+        self._view_box = QComboBox(self)
+        self._view_box.addItems(render3d.VIEWS)
+        self._view_box.setCurrentIndex(list(render3d.VIEWS).index(self._view))
+        self._view_box.setToolTip(
+            "circuit: the Show box's neurons as skeletons.\n"
+            "flow: signal flow between neuropils, carried by the Show box's neurons if any."
+        )
+        self._view_box.setAccessibleName("View")
+        self._view_box.activated.connect(self._on_view)
+        column.addWidget(self._view_box)
+        row.addLayout(column, stretch=1)
+        return row
+
+    @property
+    def kg(self) -> ConnectomeKG:
+        """The graph currently shown; the window closes any it replaces."""
+        return self._kg
+
+    def _on_dataset(self, index: int) -> None:
+        """Open the chosen dataset and redraw the Show box's scene in it.
+
+        The specs are kept when they resolve in the new graph. Cell type
+        names differ between connectomes, so when they do not, the scene
+        falls back to what the viewer opens on, rather than refusing the
+        switch.
+
+        :param index: The chosen row of the Dataset box.
+        """
+        dataset = self._dataset_box.itemText(index)
+        if self._root is None or dataset == _dataset_id(self._kg):
+            return
+        with self._busy(f"Opening {dataset}..."):
+            try:
+                kg = open_kg(str(self._root), dataset=dataset)
+            except Exception as exc:  # noqa: BLE001 - a bad dataset must not kill the viewer
+                self._dataset_box.setCurrentText(_dataset_id(self._kg))
+                self._reject(f"Could not open {dataset}: {exc}")
+                return
+        previous, self._kg = self._kg, kg
+        previous.close()
+        try:
+            specs, answer = self._resolve(self._filter_box.text().strip())
+        except ValueError:
+            specs, answer = opening_specs(kg, [], self._view), None
+            self._filter_box.setText(shlex.join(specs))
+        self._compose(specs, answer)
+
+    def _on_view(self, index: int) -> None:
+        """Redraw the current specs in the chosen view, framed afresh.
+
+        :param index: The chosen row of the View box.
+        """
+        view = self._view_box.itemText(index)
+        if view == self._view:
+            return
+        self._view = view
+        self._compose(self._specs, self._answer)
+
+    def _show_background(self, color: str) -> None:
+        """Select *color*'s row in the Background box, or Custom for any other."""
+        index = self._background_box.findData(color.upper())
+        custom = self._background_box.count() - 1
+        self._background_box.setCurrentIndex(custom if index < 0 else index)
+        self._background_box.setItemText(
+            custom, f"Custom ({color.upper()})..." if index < 0 else "Custom..."
+        )
+
+    def _on_background(self, index: int) -> None:
+        """Apply the chosen background, asking for a color on Custom.
+
+        :param index: The chosen row of the Background box.
+        """
+        color = self._background_box.itemData(index)
+        if color is None:
+            picked = QColorDialog.getColor(QColor(self._background), self, "Scene background")
+            if not picked.isValid():
+                self._show_background(self._background)
+                return
+            color = picked.name().upper()
+        self._show_background(color)
+        if color != self._background:
+            self._background = color
+            self._compose(self._specs, self._answer, keep_camera=True)
 
     def _example_buttons(self, parent: QWidget) -> QScrollArea:
         """Every documented spec, answer and circuit as a button that draws it.
@@ -564,7 +712,7 @@ class BrainSceneWindow(QMainWindow):
         else:
             self.plotter.camera_position = camera
         if self._floor:
-            render3d.add_floor(self.plotter)
+            render3d.add_floor(self.plotter, self._background)
         self._update_geometry_stats(started)
         self._describe_scene()
 
@@ -633,6 +781,7 @@ class BrainSceneWindow(QMainWindow):
             top=self._top,
             neuropils=self._neuropils,
             cloud=self._cloud,
+            background=self._background,
         )
 
     def _describe_scene(self) -> None:
@@ -708,7 +857,7 @@ class BrainSceneWindow(QMainWindow):
             self.plotter.remove_actor("floor")
         render3d.aim_camera(self.plotter, self._points, elevation=self._elevation)
         if self._floor:
-            render3d.add_floor(self.plotter)
+            render3d.add_floor(self.plotter, self._background)
         self.plotter.render()
         self._say("View reset.")
 
@@ -725,33 +874,34 @@ class BrainSceneWindow(QMainWindow):
         or a spec over ``MAX_SCENE_NEURONS`` leaves the view as it was rather
         than emptying it.
         """
-        text = self._filter_box.text().strip()
-        if is_answer(text):
-            try:
-                answer = answer_groups(self._kg, text, min_syn=self._min_syn.value())
-            except ValueError as exc:
-                self._reject(str(exc))
-                return
-            self._compose([text], answer)
-            return
-
         try:
-            specs = _split_specs(text)
-            # An unknown name is not an error to `neurons_of`, it is an empty
-            # result, so emptiness has to be checked for rather than caught --
-            # and per spec, not over the union. "LC4 NoSuchType" resolves to
-            # LC4's neurons, and drawing those silently would look like a
-            # scene that contains both.
-            empty = [spec for spec in specs if not self._kg.neurons_of(spec)]
-            if specs and not empty:
-                render3d.circuit_neurons(self._kg, specs)  # raises over the cap
+            specs, answer = self._resolve(self._filter_box.text().strip())
         except ValueError as exc:
             self._reject(str(exc))
             return
+        self._compose(specs, answer)
+
+    def _resolve(self, text: str) -> tuple[list[str], Answer | None]:
+        """Resolve Show box *text* against the current graph.
+
+        :param text: Specs or one answer; empty is the brain alone.
+        :return: ``(specs, answer)``, the answer ``None`` for plain specs.
+        :raises ValueError: Saying why *text* cannot be drawn.
+        """
+        if is_answer(text):
+            return [text], answer_groups(self._kg, text, min_syn=self._min_syn.value())
+        specs = _split_specs(text)
+        # An unknown name is not an error to `neurons_of`, it is an empty
+        # result, so emptiness has to be checked for rather than caught --
+        # and per spec, not over the union. "LC4 NoSuchType" resolves to
+        # LC4's neurons, and drawing those silently would look like a
+        # scene that contains both.
+        empty = [spec for spec in specs if not self._kg.neurons_of(spec)]
         if empty:
-            self._reject(f"No neuron matches {', '.join(empty)}. Specs are case-sensitive.")
-            return
-        self._compose(specs)
+            raise ValueError(f"No neuron matches {', '.join(empty)}. Specs are case-sensitive.")
+        if specs:
+            render3d.circuit_neurons(self._kg, specs)  # raises over the cap
+        return specs, None
 
     def _reject(self, message: str) -> None:
         """Explain why a filter was not applied, leaving the scene as it was.
@@ -805,7 +955,7 @@ class BrainSceneWindow(QMainWindow):
         data_dir, color_by = self._data_dir, self._color_by
         skeleton_step, tubes, top = self._skeleton_step, self._tubes, self._top
         floor, neuropils, cloud = self._floor, self._neuropils, self._cloud
-        answer = self._answer
+        answer, background = self._answer, self._background
         view_angle = self.plotter.camera.view_angle
 
         def build(plotter) -> None:
@@ -822,9 +972,10 @@ class BrainSceneWindow(QMainWindow):
                 top=top,
                 neuropils=neuropils,
                 cloud=cloud,
+                background=background,
             )
             if floor:
-                render3d.add_floor(plotter)
+                render3d.add_floor(plotter, background)
             plotter.camera.view_angle = view_angle
 
         return build
@@ -927,6 +1078,7 @@ def launch(
     cloud: bool | None = None,
     floor: bool = False,
     elevation: float = 0.0,
+    background: str = render3d.BACKGROUND,
     preset: str = DEFAULT_QUILT_PRESET,
     dataset: str | None = None,
     width: int = DEFAULT_WINDOW_SIZE[0],
@@ -948,6 +1100,7 @@ def launch(
         only when no neuropil meshes are.
     :param floor: Stand the scene over a floor lit from above, with shadows.
     :param elevation: Degrees to tilt the camera up from the front view.
+    :param background: Scene background, ``#RRGGBB``.
     :param preset: Quilt preset name for the Cast action.
     :param dataset: Dataset id, or ``None`` for the only built dataset.
     :param width: Window width in pixels.
@@ -957,7 +1110,11 @@ def launch(
     """
     from PyQt5.QtWidgets import QApplication  # noqa: PLC0415 - viz3d-only import
 
-    with open_kg(str(root), dataset=dataset) as kg:
+    # Not a `with`: the Dataset box replaces the graph, and the window closes
+    # each one it replaces, so what is left to close is the window's.
+    kg = open_kg(str(root), dataset=dataset)
+    window: BrainSceneWindow | None = None
+    try:
         specs = opening_specs(kg, specs, view)
         answer = None
         if len(specs) == 1 and is_answer(specs[0]):
@@ -980,9 +1137,13 @@ def launch(
             width=width,
             height=height,
             answer=answer,
+            background=background,
+            root=root,
         )
         window.show()
         app.exec_()
+    finally:
+        (window.kg if window is not None else kg).close()
 
 
 __all__ = ["BrainSceneWindow", "launch"]

@@ -98,9 +98,29 @@ _CONTEXT_DIM: Final = 0.85
 #: context cloud all but disappears; on this gray it reads as the brain's
 #: outline without competing with the subject.
 BACKGROUND: Final = "#5A5D62"
+#: Named backgrounds the viewer and ``--background`` offer. The default mid
+#: gray first; charcoal for the region colors at their most saturated; light
+#: gray for print. Any ``#RRGGBB`` works too, via :func:`resolve_background`.
+BACKGROUNDS: Final[dict[str, str]] = {
+    "gray": BACKGROUND,
+    "charcoal": "#26292E",
+    "light": "#B9BCC1",
+}
 #: The floor, a step darker than the background so the horizon and the lit
 #: pool are visible; see :func:`add_floor`.
 FLOOR_COLOR: Final = "#44474B"
+#: How far a floor under another background is blended away from it: toward
+#: black under a light background, toward white under a dark one.
+_FLOOR_STEP: Final = 0.24
+#: The framed extent of FAFB v783, in nm, that every world-unit marker size
+#: here was tuned against: the larger of its neurons' 1st-99th percentile
+#: width over a 16:9 frame's aspect and their height, which is what the
+#: camera fits. A dataset that frames larger -- BANC's brain and nerve cord
+#: stand 2.3x as tall -- scales its markers up by the ratio, so its spheres
+#: are not half the size on screen. See :func:`world_frame`.
+_REFERENCE_FRAMED_NM: Final = 410_000.0
+_REFERENCE_ASPECT: Final = 16 / 9
+_MAX_MARKER_SCALE: Final = 4.0
 #: The flow view thins the context cloud to every Nth neuron, drawn with
 #: larger glyphs: at full density it hides the neuropil spheres and arcs.
 _FLOW_CONTEXT_STRIDE: Final = 10
@@ -244,10 +264,15 @@ class WorldFrame:
 
     :param center: ``(3,)`` nm; the point that maps to the world origin.
     :param scale: Nanometres per world unit.
+    :param marker_scale: Multiplier on marker sizes (neuropil spheres, flow
+        tubes, soma spheres), so a dataset that frames larger than FAFB draws
+        them the same size on screen; 1 for FAFB. The context cloud is left
+        at FAFB's size: scaled up, its dots speckle the spheres inside it.
     """
 
     center: np.ndarray
     scale: float = NM_PER_WORLD_UNIT
+    marker_scale: float = 1.0
 
     def to_world(self, points_nm: np.ndarray) -> np.ndarray:
         """Map nm points to world units, dorsal up, section axis away from camera.
@@ -273,7 +298,9 @@ def world_frame(store: GraphStore) -> WorldFrame:
 
     :param store: The graph store.
     :return: A frame centered on the median of every neuron's marked point
-        (skipping neurons with no coordinates), at :data:`NM_PER_WORLD_UNIT`.
+        (skipping neurons with no coordinates), at :data:`NM_PER_WORLD_UNIT`,
+        with a ``marker_scale`` of the positions' framed extent over FAFB's,
+        never below 1.
     :raises ValueError: If no neuron in the store has coordinates.
     """
     rows = store.con.execute(
@@ -282,8 +309,13 @@ def world_frame(store: GraphStore) -> WorldFrame:
     ).fetchall()
     if not rows:
         raise ValueError("no neuron in this graph has x/y/z coordinates")
-    center = np.median(np.asarray(rows, dtype=np.float64), axis=0)
-    return WorldFrame(center=center)
+    points = np.asarray(rows, dtype=np.float64)
+    center = np.median(points, axis=0)
+    # Screen width is nm x and screen height nm y (see WorldFrame.to_world).
+    low, high = np.percentile(points, [1, 99], axis=0)
+    framed = max((high[0] - low[0]) / _REFERENCE_ASPECT, high[1] - low[1])
+    marker_scale = min(max(framed / _REFERENCE_FRAMED_NM, 1.0), _MAX_MARKER_SCALE)
+    return WorldFrame(center=center, marker_scale=float(marker_scale))
 
 
 #: Points one FAFB v783 neuron contributes at stride 4, measured over the
@@ -571,6 +603,49 @@ def _hex_to_rgb(color: str) -> tuple[int, int, int]:
     return (int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16))
 
 
+def _blend(color: str, toward: str, t: float) -> str:
+    """*color* moved a fraction *t* of the way to *toward*, as ``#RRGGBB``."""
+    a = np.asarray(_hex_to_rgb(color), dtype=np.float64)
+    b = np.asarray(_hex_to_rgb(toward), dtype=np.float64)
+    rgb = np.clip(np.rint(a + (b - a) * t), 0, 255).astype(int)
+    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
+def resolve_background(value: str) -> str:
+    """A background color from a :data:`BACKGROUNDS` name or a ``#RRGGBB`` string.
+
+    :param value: ``gray``, ``charcoal``, ``light``, or a hex color.
+    :return: The color as upper-case ``#RRGGBB``.
+    :raises ValueError: If *value* is neither.
+    """
+    text = value.strip()
+    if text.lower() in BACKGROUNDS:
+        return BACKGROUNDS[text.lower()]
+    if len(text) == 7 and text[0] == "#":
+        try:
+            int(text[1:], 16)
+        except ValueError:
+            pass
+        else:
+            return text.upper()
+    raise ValueError(
+        f"background must be one of {', '.join(BACKGROUNDS)} or #RRGGBB, not {value!r}"
+    )
+
+
+def floor_color(background: str) -> str:
+    """The floor under *background*: :data:`FLOOR_COLOR` under the default,
+    else a step darker, or a step lighter under a dark background.
+
+    :param background: The scene background, ``#RRGGBB``.
+    :return: The floor color, ``#RRGGBB``.
+    """
+    if background.upper() == BACKGROUND:
+        return FLOOR_COLOR
+    dark = sum(_hex_to_rgb(background)) / 3 < 64
+    return _blend(background, "#FFFFFF" if dark else "#000000", _FLOOR_STEP)
+
+
 def _context_for_view(
     view: str, ids: list[str], points_nm: np.ndarray, colors: list[str]
 ) -> tuple[list[str], np.ndarray, list[str], float]:
@@ -659,12 +734,13 @@ def _draw_flow(
     drawn = [(a, b, w) for a, b, w in flow.pairs if placed[index[a]] and placed[index[b]]][:top]
     active = {name for a, b, _ in drawn for name in (a, b)}
 
+    k = frame.marker_scale
     max_syn = float(flow.n_synapses.max()) if len(flow.n_synapses) else 0.0
     for i, name in enumerate(flow.names):
         if not placed[i]:
             continue
         rel = np.cbrt(flow.n_synapses[i] / max_syn) if max_syn > 0 else 1.0
-        radius = max(_NEUROPIL_MAX_RADIUS * float(rel), _FLOW_MIN_RADIUS)
+        radius = k * max(_NEUROPIL_MAX_RADIUS * float(rel), _FLOW_MIN_RADIUS)
         color = region_color(name)
         if name not in active:
             radius *= 0.5
@@ -684,7 +760,7 @@ def _draw_flow(
     tubes_by_source: dict[str, list[pv.PolyData]] = defaultdict(list)
     for source, target, weight in drawn:
         arc = flow_arc(centers[index[source]], centers[index[target]])
-        radius = max(_FLOW_MAX_RADIUS * float(np.sqrt(weight / max_flow)), _FLOW_MIN_RADIUS)
+        radius = k * max(_FLOW_MAX_RADIUS * float(np.sqrt(weight / max_flow)), _FLOW_MIN_RADIUS)
         tubes_by_source[source].append(pv.lines_from_points(arc).tube(radius=radius, n_sides=8))
         world_points.append(arc)
     for source, meshes in tubes_by_source.items():
@@ -850,10 +926,10 @@ def _reset_floor_passes(plotter: pv.Plotter) -> None:
     passes._update_passes()
 
 
-def add_floor(plotter: pv.Plotter) -> None:
+def add_floor(plotter: pv.Plotter, background: str = BACKGROUND) -> None:
     """Put a shadow-receiving floor under the composed scene, lit from above.
 
-    Adds a floor plane (actor ``floor``) in the background gray just below
+    Adds a floor plane (actor ``floor``) a step off the background just below
     ``plotter.bounds``, replaces the lights with a shadow-casting key
     spotlight above the scene plus a weak headlight, and enables shadow
     mapping. The floor is only visible from a camera that looks down on it,
@@ -862,6 +938,8 @@ def add_floor(plotter: pv.Plotter) -> None:
     otherwise decide the framing.
 
     :param plotter: Plotter with the scene composed and the camera framed.
+    :param background: The scene's background, which the floor is shaded
+        from (:func:`floor_color`).
     """
     import pyvista as pv  # noqa: PLC0415 - the viz3d-render-only import boundary
 
@@ -883,7 +961,7 @@ def add_floor(plotter: pv.Plotter) -> None:
     # to stand on, not a wall, and it has no underside worth seeing.
     plotter.add_mesh(
         floor,
-        color=FLOOR_COLOR,
+        color=floor_color(background),
         ambient=0.12,
         diffuse=0.95,
         specular=0.0,
@@ -933,6 +1011,7 @@ def build_brain_scene(
     cloud: bool | None = None,
     groups: Sequence[NeuronGroup] | None = None,
     progress: Callable[[str], None] | None = None,
+    background: str = BACKGROUND,
 ) -> SceneInfo:
     """Compose the whole-brain context cloud plus a circuit or neuropil flow into *plotter*.
 
@@ -963,6 +1042,9 @@ def build_brain_scene(
         default) keeps the build silent. The same
         ``Callable[[str], None]`` contract as ``ConnectomeExtractor``'s, so
         the CLI and the viewer share it.
+    :param background: Scene background, a :data:`BACKGROUNDS` name or
+        ``#RRGGBB``; the context cloud is muted toward it. Pass the same one
+        to :func:`add_floor`.
     :return: The composed :class:`SceneInfo`.
     :raises ValueError: On an out-of-range argument, an unknown ``view`` or
         ``color_by``, or a circuit over :data:`connectomekg.validation.MAX_SCENE_NEURONS`.
@@ -975,6 +1057,7 @@ def build_brain_scene(
     else:
         skeleton_step = bounded_int("skeleton_step", skeleton_step, 1, MAX_SKELETON_STEP)
     top = bounded_int("top", top, 1, MAX_FLOW_PAIRS)
+    background = resolve_background(background)
 
     def _say(message: str) -> None:
         if progress is not None:
@@ -982,7 +1065,7 @@ def build_brain_scene(
 
     _reset_floor_passes(plotter)
     plotter.clear_actors()
-    plotter.set_background(BACKGROUND)  # ty: ignore[invalid-argument-type]
+    plotter.set_background(background)  # ty: ignore[invalid-argument-type]
     frame = world_frame(kg.store)
     world_points: list[np.ndarray] = []
 
@@ -1018,7 +1101,7 @@ def build_brain_scene(
             cloud_mesh = pv.PolyData(ctx_world)
             rgb = np.asarray([_hex_to_rgb(c) for c in ctx_colors], dtype=np.float64)
             rgb = (
-                rgb + (np.asarray(_hex_to_rgb(BACKGROUND), dtype=np.float64) - rgb) * _CONTEXT_MUTE
+                rgb + (np.asarray(_hex_to_rgb(background), dtype=np.float64) - rgb) * _CONTEXT_MUTE
             )
             cloud_mesh.point_data["rgb"] = np.clip(rgb, 0, 255).astype(np.uint8)
             glyphs = cloud_mesh.glyph(
@@ -1197,14 +1280,18 @@ def build_brain_scene(
         if soma_world:
             arr = np.asarray(soma_world)
             glyph = pv.PolyData(arr).glyph(
-                geom=pv.Sphere(radius=_SOMA_RADIUS), orient=False, scale=False
+                geom=pv.Sphere(radius=_SOMA_RADIUS * frame.marker_scale),
+                orient=False,
+                scale=False,
             )
             plotter.add_mesh(glyph, color=color, name=f"soma:{label}")
             world_points.append(arr)
         if fallback_world:
             arr = np.asarray(fallback_world)
             glyph = pv.PolyData(arr).glyph(
-                geom=pv.Sphere(radius=_FALLBACK_RADIUS), orient=False, scale=False
+                geom=pv.Sphere(radius=_FALLBACK_RADIUS * frame.marker_scale),
+                orient=False,
+                scale=False,
             )
             plotter.add_mesh(glyph, color=color, name=f"fallback:{label}")
             world_points.append(arr)
@@ -1230,6 +1317,7 @@ def build_brain_scene(
 
 __all__ = [
     "BACKGROUND",
+    "BACKGROUNDS",
     "FLOOR_ELEVATION",
     "NM_PER_WORLD_UNIT",
     "VIEWS",
@@ -1243,9 +1331,11 @@ __all__ = [
     "build_brain_scene",
     "circuit_neurons",
     "context_points",
+    "floor_color",
     "flow_arc",
     "neuropil_flow",
     "region_color",
+    "resolve_background",
     "type_color",
     "world_frame",
 ]

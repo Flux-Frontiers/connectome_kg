@@ -57,9 +57,10 @@ plugins:
 nav:
   - Home: index.md
   - Getting started:
-      - Get the FAFB v783 data: DOWNLOAD.md
+      - Get the data: DOWNLOAD.md
   - Querying:
       - Asking the graph a question: queries.md
+      - What is in the graph: graph.md
   - CLI reference:
       - Every connkg command: cli.md
   - Visualization:

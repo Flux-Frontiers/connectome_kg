@@ -974,3 +974,119 @@ def test_a_failed_save_is_reported_and_leaves_the_viewer_usable(qapp, kg, monkey
         assert not list(tmp_path.glob("*.png"))
     finally:
         window.close()
+
+
+@pytest.fixture(scope="module")
+def two_datasets(tmp_path_factory, tables):
+    """A root holding two built datasets: ``alpha`` (the session's tables) and ``beta``."""
+    from connectomekg import ConnectomeKG  # noqa: PLC0415
+    from connectomekg.datasets import dataset_dir  # noqa: PLC0415
+    from connectomekg.readers.synthetic import synthetic_tables  # noqa: PLC0415
+
+    root = tmp_path_factory.mktemp("two")
+    for dataset, data in (("alpha", tables), ("beta", synthetic_tables(400, seed=3))):
+        with ConnectomeKG(dataset_dir(root, dataset), tables=data) as module:
+            module.build_graph(wipe=True)
+    return root
+
+
+def _window_on(root, dataset, specs, **kwargs):
+    from connectomekg.cli.options import open_kg  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    return BrainSceneWindow(
+        open_kg(str(root), dataset=dataset),
+        specs,
+        cloud=False,
+        neuropils=False,
+        root=root,
+        **kwargs,
+    )
+
+
+def test_the_dataset_box_lists_every_built_dataset(qapp, two_datasets):
+    window = _window_on(two_datasets, "alpha", ["GRN_sugar"])
+    try:
+        box = window._dataset_box
+        assert [box.itemText(i) for i in range(box.count())] == ["alpha", "beta"]
+        assert box.currentText() == "alpha"
+    finally:
+        window.kg.close()
+        window.close()
+
+
+def test_switching_dataset_keeps_specs_that_resolve_there(qapp, two_datasets):
+    window = _window_on(two_datasets, "alpha", ["GRN_sugar"])
+    old = window.kg
+    try:
+        window._on_dataset(1)
+        assert window.kg is not old
+        assert "beta" in str(window.kg.db_path)
+        assert window._specs == ["GRN_sugar"]
+        assert set(window._picks.neuron_ids) == set(window.kg.neurons_of("GRN_sugar"))
+    finally:
+        window.kg.close()
+        window.close()
+
+
+def test_switching_dataset_drops_specs_that_do_not_resolve_there(qapp, two_datasets):
+    from connectomekg.cli.options import open_kg  # noqa: PLC0415
+
+    with open_kg(str(two_datasets), dataset="alpha") as alpha:
+        root_id = alpha.store.node(alpha.neurons_of("GRN_sugar")[0])["metadata"]["root_id"]
+    window = _window_on(two_datasets, "alpha", [str(root_id)])
+    try:
+        window._on_dataset(1)
+        assert str(root_id) not in window._filter_box.text()
+        assert str(root_id) not in window._specs
+    finally:
+        window.kg.close()
+        window.close()
+
+
+def test_the_view_box_switches_between_circuit_and_flow(qapp, kg):
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        assert window._view_box.currentText() == "circuit"
+        window._view_box.setCurrentText("flow")
+        window._on_view(window._view_box.currentIndex())
+        assert window._view == "flow"
+        assert len(window._picks) == 0
+        assert "Flow view" in window._scene_stats.text()
+    finally:
+        window.close()
+
+
+def test_the_background_box_recolors_the_scene(qapp, kg):
+    from connectomekg import scene  # noqa: PLC0415
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        box = window._background_box
+        assert box.currentData() == scene.BACKGROUND
+        box.setCurrentIndex(box.findData(scene.BACKGROUNDS["charcoal"]))
+        window._on_background(box.currentIndex())
+        assert window._background == scene.BACKGROUNDS["charcoal"]
+        assert window.plotter.background_color.hex_rgb.upper() == scene.BACKGROUNDS["charcoal"]
+    finally:
+        window.close()
+
+
+def test_a_custom_background_comes_from_the_color_dialog(qapp, kg, monkeypatch):
+    from PyQt5.QtGui import QColor  # noqa: PLC0415
+    from PyQt5.QtWidgets import QColorDialog  # noqa: PLC0415
+
+    from connectomekg.viz3d import BrainSceneWindow  # noqa: PLC0415
+
+    monkeypatch.setattr(QColorDialog, "getColor", lambda *_a, **_k: QColor("#102030"))
+    window = BrainSceneWindow(kg, ["GRN_sugar"], cloud=False, neuropils=False)
+    try:
+        box = window._background_box
+        window._on_background(box.count() - 1)
+        assert window._background == "#102030"
+        assert box.currentText() == "Custom (#102030)..."
+    finally:
+        window.close()

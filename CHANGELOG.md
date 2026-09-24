@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `optic_lobe_intrinsic` to `optic`, the nerve cord's to
   `ventral_nerve_cord`); community labels become one label each, less MCNS's
   `statusLabel` and `mancBodyid`. See `docs/DOWNLOAD.md`.
+- **Soma positions for BANC and MCNS, so their 3-D views draw something.**
+  Codex exports no coordinates for either release, which left every neuron at
+  a null position: no cell-body cloud, no circuit view, and no flow view
+  either, since neuropil centres are weighted over the positions of the
+  neurons in them. Both projects publish the positions outside Codex, and the
+  reader now picks up one Feather table per release directory, matched on its
+  columns rather than its name (`SOMA_POSITION_SOURCES`, and
+  `soma_position_table` for callers that only want the path). BANC's
+  `root_position_nm` is already in nanometres, keyed on `root_888`; MCNS's
+  `somaLocation` is an `[x y z]` array in 8 nm EM voxels, scaled on read.
+  Coverage is 88.7% of BANC's neurons and 83.8% of MCNS's, against FAFB's
+  96.7%. Both files are CC BY 4.0 and neither is required: without one the
+  build is exactly as it was. `connkg verify` now names the table it found,
+  or reports that it found none. See `docs/DOWNLOAD.md`.
+
 - **`DatasetInfo.min_pair_syn`**: pairs whose synapses, summed over
   neuropils, fall below it are dropped at read time. BANC keeps pairs of 3
   or more, so BANC and MCNS set 5 to compare with FAFB's filtered table;
@@ -30,6 +45,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-region unassigned buckets, in both releases' spellings, with new
   regions `VNC`, `NERVE` and `CV`. BANC's `Xnerve` (54 synapses) is left
   unnamed.
+
+- **Dataset and View boxes in `connkg viz3d`.** The control rail switches
+  between every dataset built under `--root`, and between the circuit and flow
+  views, without restarting. A switch keeps the Show box's specs where they
+  resolve in the new graph and falls back to the opening scene where they do
+  not. The window now owns the open graph and closes each one it replaces.
+- **Scene background: `--background` on `quilt` and `viz3d`, and a Background
+  box in the viewer's Display tab.** `gray` (the default), `charcoal`, `light`,
+  or any `#RRGGBB`; Custom in the viewer opens a color dialog. The context
+  cloud mutes toward the chosen background, the floor shades from it, and
+  saved images, quilts and casts use it. Region colors are unchanged.
+- **Marker sizes scale with the dataset.** Neuropil spheres, flow tubes and
+  soma spheres were sized in world units for FAFB v783, so on BANC, whose
+  brain and nerve cord stand 2.3 times as tall, the camera zoomed out and
+  they drew at under half the size. `world_frame` now measures each
+  dataset's framed extent against FAFB's and scales them by the ratio
+  (`WorldFrame.marker_scale`): 1.0 on FAFB, so its renders are unchanged,
+  2.32 on BANC and 1.12 on MCNS. The context cloud keeps FAFB's size.
 
 ### Changed
 
