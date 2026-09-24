@@ -20,6 +20,8 @@ reports/skeletons_*.md
 # real connectome downloads (FlyWire is CC BY-NC-SA; keep it out of the repo)
 data/
 fafb_v783/
+banc_v888/
+mcns_v1/
 # source papers, for the DocKG corpus beside the graph. Open access, but the
 # publishers' PDFs are theirs to distribute, not ours -- and they are ~45 MB.
 # The text extracted from them is derived and stays out too; what IS tracked

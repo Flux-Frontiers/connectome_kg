@@ -24,6 +24,7 @@ SUPER_CLASS_COLOR: Final[dict[str, str]] = {
     "descending": "#882255",
     "motor": "#332288",
     "endocrine": "#999933",
+    "ventral_nerve_cord": "#117733",
 }
 
 #: Fallback color for a super class not in :data:`SUPER_CLASS_COLOR`.
@@ -67,11 +68,15 @@ def hop_color(hop: int, n_hops: int) -> str:
 #: Color per brain region (keys of ``connectomekg.neuropils.REGION_NAMES``),
 #: for neuropil spheres and flow tubes. Only the eight saturated Okabe-Ito
 #: colors, which stay distinguishable under the common forms of color
-#: blindness; no pastels. Thirteen regions do not fit in eight colors, so
+#: blindness; no pastels. Sixteen regions do not fit in eight colors, so
 #: regions that neighbour each other in the brain share one: the central and
 #: lateral complexes, the lateral horn and superior neuropils, the inferior and
 #: ventromedial neuropils, and the antennal lobe with the periesophageal
-#: neuropils and gnathal ganglia. Neuropil labels tell them apart.
+#: neuropils and gnathal ganglia. The ventral nerve cord (BANC and MCNS only)
+#: takes sky blue, shared with the ventrolateral neuropils at the other end of
+#: the animal; its nerves and the cervical connective, which hold few
+#: synapses, go black with the ocellar ganglion. Neuropil labels tell them
+#: apart.
 REGION_COLOR: Final[dict[str, str]] = {
     "OL": "#E69F00",  # orange
     "VLNP": "#56B4E9",  # sky blue
@@ -87,6 +92,9 @@ REGION_COLOR: Final[dict[str, str]] = {
     "GNG": "#009E73",
     "OCG": "#000000",  # black
     "UNASGD": "#000000",
+    "VNC": "#56B4E9",
+    "NERVE": "#000000",
+    "CV": "#000000",
 }
 
 __all__ = ["REGION_COLOR", "SIGN_COLOR", "SUPER_CLASS_COLOR", "UNKNOWN_COLOR"]

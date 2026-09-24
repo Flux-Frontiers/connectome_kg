@@ -1,5 +1,10 @@
 """Read a FlyWire Codex release directory into the normalized tables.
 
+Codex exports releases in two layouts. BANC v888 and MCNS v1.0 come as one
+consolidated neuron-attributes table with display-name columns (``Root ID``,
+``Super Class``, ...) beside the connections table; see
+:data:`ATTRIBUTE_COLUMNS`. FAFB v783 is split across the files below.
+
 Column names follow the v783 release as verified 2026-09-16:
 
 - ``neurons.csv.gz``: root_id, group, nt_type, nt_type_score, per-transmitter averages
@@ -26,6 +31,7 @@ Optional annotation files, each joined on root_id when present:
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import numpy as np
@@ -166,31 +172,131 @@ def _parse_positions(series: pd.Series) -> np.ndarray:
     return out
 
 
-def read_codex(
-    data_dir: str | Path,
-    dataset: DatasetInfo = FAFB_783,
-    *,
-    connections_file: str | None = None,
-) -> ConnectomeTables:
-    """Load a Codex release directory.
+#: Header of the consolidated "neuron attributes" export that Codex offers for
+#: BANC and MCNS, mapped to the normalized columns. That one file carries what
+#: the FAFB release splits across neurons, classification, cell types, cell
+#: stats and labels, under display names.
+ATTRIBUTE_COLUMNS: dict[str, str] = {
+    "Root ID": "root_id",
+    "Predicted NT type": "nt_type",
+    "Predicted NT confidence": "nt_score",
+    "Flow": "flow",
+    "Super Class": "super_class",
+    "Class": "class",
+    "Sub Class": "sub_class",
+    "Hemilineage": "hemilineage",
+    "Nerve": "nerve",
+    "Soma side": "side",
+    "Primary Cell Type": "cell_type",
+    "Cable length (nm)": "length_nm",
+    "Surface area (nm^2)": "area_nm2",
+    "Volume (nm^3)": "volume_nm3",
+}
+_COMMUNITY_LABELS = "Community labels"
 
-    :param data_dir: Directory with the ``*.csv.gz`` files.
-    :param dataset: Provenance record to attach.
-    :param connections_file: Name of the connections table to use. Omit it to
-        take whichever of :data:`CONNECTIONS_CANDIDATES` the directory holds,
-        preferring the 5-synapse thresholded Princeton table.
-    :return: Validated :class:`ConnectomeTables`.
-    :raises FileNotFoundError: When a required file is absent.
-    :raises ValueError: When the connections table lacks a required column.
+#: MCNS community-label keys left out of the labels table. Every distinct
+#: label text becomes a graph node, and these are not anatomy: ``statusLabel``
+#: is proofreading status, and ``mancBodyid`` is a per-neuron id that would
+#: add one single-use node per neuron (18,572 of them).
+DROPPED_LABEL_KEYS = frozenset({"statusLabel", "mancBodyid"})
+_LABEL_KEY = re.compile(r"^(\w+):\s")
+
+#: Super classes spelled differently across releases, to FAFB's spelling.
+#: BANC and MCNS name the intrinsic classes by region (``optic_lobe_intrinsic``,
+#: ``ol_intrinsic``) and MCNS also splits sensory, motor, efferent and
+#: endocrine by region, where FAFB has one class each. A value not listed is
+#: kept as it is, including MCNS's ``*_tbc`` (to be confirmed) classes.
+SUPER_CLASS_ALIASES: dict[str, str] = {
+    "optic_lobe_intrinsic": "optic",
+    "central_brain_intrinsic": "central",
+    "ventral_nerve_cord_intrinsic": "ventral_nerve_cord",
+    "ol_intrinsic": "optic",
+    "cb_intrinsic": "central",
+    "vnc_intrinsic": "ventral_nerve_cord",
+    "ol_sensory": "sensory",
+    "cb_sensory": "sensory",
+    "vnc_sensory": "sensory",
+    "ascending_neuron": "ascending",
+    "descending_neuron": "descending",
+    "cb_motor": "motor",
+    "vnc_motor": "motor",
+    "cb_efferent": "efferent",
+    "vnc_efferent": "efferent",
+    "cb_endocrine": "endocrine",
+    "vnc_endocrine": "endocrine",
+}
+
+
+def is_attribute_export(data_dir: str | Path) -> bool:
+    """Whether a download holds the consolidated neuron-attributes export.
+
+    :param data_dir: Directory holding the Codex files.
+    :return: True when ``neurons.csv.gz`` has the display-name header
+        (``Root ID``, ...) of the BANC and MCNS exports rather than FAFB's
+        ``root_id``.
     """
-    d = Path(data_dir)
-    for name in ("neurons.csv.gz", "classification.csv.gz"):
-        if not (d / name).is_file():
-            raise FileNotFoundError(f"{name} not found in {d}")
-    con_path = (d / connections_file) if connections_file else find_connections_file(d)
-    if not con_path.is_file():
-        raise FileNotFoundError(f"{con_path.name} not found in {d}")
+    path = Path(data_dir) / "neurons.csv.gz"
+    return path.is_file() and "Root ID" in _header(path)
 
+
+def _split_community_labels(raw: object) -> list[str]:
+    """One consolidated ``Community labels`` cell, as separate label texts.
+
+    :param raw: The cell: comma-separated phrases (BANC) or ``key: value``
+        pairs (MCNS).
+    :return: The labels, minus :data:`DROPPED_LABEL_KEYS`.
+    """
+    if not isinstance(raw, str):
+        return []
+    out = []
+    for item in raw.split(","):
+        text = item.strip()
+        key = _LABEL_KEY.match(text)
+        if text and not (key and key.group(1) in DROPPED_LABEL_KEYS):
+            out.append(text)
+    return out
+
+
+def _read_attribute_export(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Read the consolidated neuron-attributes file.
+
+    :param path: Its ``neurons.csv.gz``.
+    :return: ``(neurons, labels)``: neurons with whichever normalized columns
+        the export fills, and one label row per community label. The export
+        carries no label attribution, so ``user``, ``affiliation`` and ``date``
+        are empty.
+    """
+    have = _header(path)
+    usecols = [c for c in (*ATTRIBUTE_COLUMNS, _COMMUNITY_LABELS) if c in have]
+    raw = _read(path, usecols, dtype=_STR)
+    df = raw.drop(columns=[_COMMUNITY_LABELS], errors="ignore").rename(columns=ATTRIBUTE_COLUMNS)
+    df["root_id"] = df["root_id"].astype(np.int64)
+    for col in ("nt_score", "length_nm", "area_nm2", "volume_nm3"):
+        if col in df:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    if "super_class" in df:
+        df["super_class"] = df["super_class"].map(
+            lambda v: SUPER_CLASS_ALIASES.get(v, v) if isinstance(v, str) else v
+        )
+    df["x"] = df["y"] = df["z"] = np.nan
+
+    rows = [
+        (rid, text)
+        for rid, cell in zip(df["root_id"], raw.get(_COMMUNITY_LABELS, []), strict=False)
+        for text in _split_community_labels(cell)
+    ]
+    lab = pd.DataFrame(rows, columns=["root_id", "text"])
+    for col in ("user", "affiliation", "date"):
+        lab[col] = ""
+    return df, lab
+
+
+def _read_split_release(d: Path) -> pd.DataFrame:
+    """Read the neuron tables of a release split across files, as FAFB is.
+
+    :param d: Release directory.
+    :return: Neurons with every column the directory supplies.
+    """
     neurons_path = d / "neurons.csv.gz"
     avgs = [c for c in _NT_AVG if c in _header(neurons_path)]
     neurons = _read(
@@ -244,9 +350,77 @@ def read_codex(
         df["x"] = df["y"] = df["z"] = np.nan
 
     df = _join_annotations(df, d)
+    return df.rename(columns={"nt_type_score": "nt_score"})
+
+
+def _read_labels_file(d: Path) -> pd.DataFrame:
+    """Read ``labels.csv.gz`` when the release has one.
+
+    :param d: Release directory.
+    :return: Label rows in :data:`LABEL_COLUMNS` order; empty when absent.
+    """
+    lab_path = d / "labels.csv.gz"
+    if not lab_path.is_file():
+        return pd.DataFrame(columns=list(LABEL_COLUMNS))
+    return _read(
+        lab_path,
+        ["root_id", "label", "user_name", "user_affiliation", "date_created"],
+        dtype={"root_id": np.int64},
+    ).rename(
+        columns={
+            "label": "text",
+            "user_name": "user",
+            "user_affiliation": "affiliation",
+            "date_created": "date",
+        }
+    )
+
+
+def read_codex(
+    data_dir: str | Path,
+    dataset: DatasetInfo = FAFB_783,
+    *,
+    connections_file: str | None = None,
+) -> ConnectomeTables:
+    """Load a Codex release directory.
+
+    Reads either layout Codex exports: FAFB's, split across ``neurons``,
+    ``classification`` and optional annotation files, or the consolidated
+    neuron-attributes export of BANC and MCNS (see
+    :func:`is_attribute_export`). Connections are the same in both.
+
+    Two normalizations apply to every release. A connection row with no
+    transmitter takes its presynaptic neuron's, since BANC and MCNS leave the
+    column empty. And pairs with fewer than ``dataset.min_pair_syn`` synapses,
+    summed over neuropils, are dropped.
+
+    :param data_dir: Directory with the ``*.csv.gz`` files.
+    :param dataset: Provenance record to attach.
+    :param connections_file: Name of the connections table to use. Omit it to
+        take whichever of :data:`CONNECTIONS_CANDIDATES` the directory holds,
+        preferring the 5-synapse thresholded Princeton table.
+    :return: Validated :class:`ConnectomeTables`.
+    :raises FileNotFoundError: When a required file is absent.
+    :raises ValueError: When the connections table lacks a required column.
+    """
+    d = Path(data_dir)
+    attribute_export = is_attribute_export(d)
+    required = (
+        ("neurons.csv.gz",) if attribute_export else ("neurons.csv.gz", "classification.csv.gz")
+    )
+    for name in required:
+        if not (d / name).is_file():
+            raise FileNotFoundError(f"{name} not found in {d}")
+    con_path = (d / connections_file) if connections_file else find_connections_file(d)
+    if not con_path.is_file():
+        raise FileNotFoundError(f"{con_path.name} not found in {d}")
+
+    if attribute_export:
+        df, lab = _read_attribute_export(d / "neurons.csv.gz")
+    else:
+        df, lab = _read_split_release(d), _read_labels_file(d)
 
     df["nt_type"] = df["nt_type"].fillna("").astype(str).str.upper()
-    df = df.rename(columns={"nt_type_score": "nt_score"})
     df = df.sort_values("root_id", kind="mergesort").reset_index(drop=True)
     df = df.reindex(columns=list(NEURON_COLUMNS))
     for col in LIST_COLUMNS:
@@ -267,28 +441,19 @@ def read_codex(
     con["nt_type"] = con["nt_type"].fillna("").astype(str).str.upper()
     known = set(df["root_id"].tolist())
     con = con[con["pre"].isin(known) & con["post"].isin(known)]
-    con = con[con["pre"] != con["post"]].reset_index(drop=True)
-    con = con.reindex(columns=list(CONNECTION_COLUMNS))
+    con = con[con["pre"] != con["post"]]
+    blank = con["nt_type"] == ""
+    if blank.any():
+        pre_nt = df.set_index("root_id")["nt_type"]
+        con.loc[blank, "nt_type"] = con.loc[blank, "pre"].map(pre_nt).fillna("")
+    if dataset.min_pair_syn > 1:
+        pair_total = con.groupby(["pre", "post"], sort=False)["syn_count"].transform("sum")
+        con = con[pair_total >= dataset.min_pair_syn]
+    con = con.reset_index(drop=True).reindex(columns=list(CONNECTION_COLUMNS))
 
-    lab_path = d / "labels.csv.gz"
-    if lab_path.is_file():
-        lab = _read(
-            lab_path,
-            ["root_id", "label", "user_name", "user_affiliation", "date_created"],
-            dtype={"root_id": np.int64},
-        ).rename(
-            columns={
-                "label": "text",
-                "user_name": "user",
-                "user_affiliation": "affiliation",
-                "date_created": "date",
-            }
-        )
-        lab["text"] = lab["text"].astype(str).str.strip()
-        lab = lab[lab["root_id"].isin(known) & (lab["text"] != "")]
-        lab = lab.reindex(columns=list(LABEL_COLUMNS)).reset_index(drop=True)
-    else:
-        lab = pd.DataFrame(columns=list(LABEL_COLUMNS))
+    lab["text"] = lab["text"].astype(str).str.strip()
+    lab = lab[lab["root_id"].isin(known) & (lab["text"] != "")]
+    lab = lab.reindex(columns=list(LABEL_COLUMNS)).reset_index(drop=True)
 
     tables = ConnectomeTables(dataset=dataset, neurons=df, connections=con, labels=lab)
     tables.validate()

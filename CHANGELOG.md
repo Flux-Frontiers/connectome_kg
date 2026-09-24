@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **BANC v888 and MCNS v1.0 build alongside FAFB v783.** Codex exports both
+  as one consolidated neuron-attributes table, and `read_codex` now
+  recognizes that layout by its header (`is_attribute_export`) and maps its
+  display-name columns; no classification file is needed. New dataset
+  records `BANC_888` (`banc888`) and `MCNS_1` (`mcns1`), both CC-BY-4.0, and
+  `connkg verify` checks the two-file export against its own manifest.
+  Super classes are mapped to FAFB's spelling (`ol_intrinsic` and
+  `optic_lobe_intrinsic` to `optic`, the nerve cord's to
+  `ventral_nerve_cord`); community labels become one label each, less MCNS's
+  `statusLabel` and `mancBodyid`. See `docs/DOWNLOAD.md`.
+- **`DatasetInfo.min_pair_syn`**: pairs whose synapses, summed over
+  neuropils, fall below it are dropped at read time. BANC keeps pairs of 3
+  or more, so BANC and MCNS set 5 to compare with FAFB's filtered table;
+  FAFB stays at 1 so an unthresholded table chosen with `--connections-file`
+  is kept whole. This is per pair; `--min-syn` still filters per neuropil
+  row.
+- **Nerve-cord neuropils** (`neuropils.py`): names and regions for the
+  ventral nerve cord, its nerves, the cervical connective and the
+  per-region unassigned buckets, in both releases' spellings, with new
+  regions `VNC`, `NERVE` and `CV`. BANC's `Xnerve` (54 synapses) is left
+  unnamed.
+
 ### Changed
+
+- **Histamine is inhibitory** (`HIST`, sign -1). FAFB's predictions have no
+  histamine class; BANC's and MCNS's do. Tyramine stays unresolved (0).
+- **A connection row with no transmitter takes its presynaptic neuron's.**
+  BANC and MCNS leave the column empty; FAFB fills every row, so FAFB builds
+  are unchanged.
+- **Lock: `quiltwright` 0.15.0 -> 0.15.1**, the fleet's current release. The
+  floor stays `>=0.15.0`.
 
 - **`kgmodule-utils` floor raised to `>=0.24.0`** in the core dependency and
   all three extras. 0.24.0 drops the vector index when the graph is wiped

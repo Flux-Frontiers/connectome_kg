@@ -27,6 +27,8 @@ Behind them, one gray dot per neuron at its cell body -- all 139,255 of them, wh
 
 The first corpus is the FlyWire FAFB v783 adult *Drosophila* brain: 139,255 neurons and 3,732,460 connected neuron pairs. ConnectomeKG reads the Codex export, normalizes it into dataset-neutral tables, and writes a typed graph to SQLite. Neurons are instances of cell types, cell types sit under a super class and class taxonomy and belong to hemilineages, and both neurons and types connect to the neuropils they innervate. Each synapse edge carries its count and a transmitter sign. A vector index over the small human vocabulary (cell type names, neuropils, labels, taxa) lets a query like *"sugar sensing gustatory neurons"* find the right place to start.
 
+Two more Codex releases build the same way, each into its own store: BANC v888, the female brain and ventral nerve cord (158,262 neurons), and the FlyEM Male CNS v1.0, the male brain and ventral nerve cord (166,700 neurons). Both are CC BY 4.0. [docs/DOWNLOAD.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md#banc-v888-and-mcns-v10) covers their download and what the reader normalizes.
+
 From there you can ask wiring questions directly: the strongest signed path from a sensory neuron to a motor neuron, the downstream cone of a visual projection type, the hub neurons and strongest type-to-type connections. Because it is a `KGModule` built on [kgmodule-utils](https://github.com/Flux-Frontiers/KG_utils), the same graph also federates with the rest of the KGRAG fleet.
 
 The design follows its siblings: **structure is ground truth; embeddings are an acceleration layer**. In a connectome this is literal. The synapse counts come from the microscope and the semantic layer is a thin set of labels on top. Neurons are not embedded by default; there are 139k of them and their names carry little meaning. Search finds a type or a neuropil, then the graph does the rest.
@@ -35,7 +37,7 @@ Everything runs on your laptop. A full v783 build without the vector index takes
 
 *Author: Eric G. Suchanek, PhD -- Flux-Frontiers, Liberty TWP, OH*
 
-> **Status: pre-alpha (0.7.1).** The Codex reader, the synthetic fixture, the extractor, path, cone and influence queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. Not done yet: the neuPrint reader (hemibrain, MaleCNS) and the LIF what-if simulation. The KGRAG adapter ships in kg-rag 0.16.0: `pip install "kg-rag[connectome]"`.
+> **Status: pre-alpha (0.7.1).** The Codex reader, the synthetic fixture, the extractor, path, cone and influence queries, the Markdown analysis, snapshots, the `connkg` CLI, the `connkg-mcp` server, and the 2-D and 3-D views work end to end, and a real FAFB v783 build has been run and measured. BANC v888 and MCNS v1.0 build from their Codex exports. Not done yet: the neuPrint reader (hemibrain) and the LIF what-if simulation. The KGRAG adapter ships in kg-rag 0.16.0: `pip install "kg-rag[connectome]"`.
 
 ---
 

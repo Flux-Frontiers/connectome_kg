@@ -27,7 +27,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from connectomekg.readers.codex import find_connections_file
+from connectomekg.readers.codex import find_connections_file, is_attribute_export
 
 #: Where to get the October 2024 published snapshot, as the portal itself
 #: recommends for reproducibility. The live portal is a moving target.
@@ -185,6 +185,24 @@ FAFB_783_UNUSED: tuple[ReleaseFile, ...] = (
     ),
 )
 
+#: The consolidated export Codex offers for BANC and MCNS: one neuron-attributes
+#: table in place of FAFB's split files, plus the same connections table. No
+#: digests are recorded; the counts the build prints are the check.
+ATTRIBUTE_EXPORT_FILES: tuple[ReleaseFile, ...] = (
+    ReleaseFile(
+        "neurons.csv.gz",
+        "Neuron Attributes",
+        "root ids, transmitter prediction, taxonomy, cell type, community labels",
+        True,
+    ),
+    ReleaseFile(
+        "connections_princeton.csv.gz",
+        "Connections",
+        "synapse counts per neuron pair per neuropil",
+        True,
+    ),
+)
+
 #: Published counts for v783, the check that actually matters on a live portal.
 FAFB_783_EXPECTED = {"neurons": 139_255, "synapses": 50_666_648, "pairs": 3_732_460}
 
@@ -198,18 +216,19 @@ class ManifestReport:
     :param drifted: Files found whose digest differs from the recorded one. On a
         live portal this is expected and is not by itself a problem.
     :param notes: Human-readable remarks, such as the connections variant found.
+    :param required: Names of the files a build cannot do without.
     """
 
     present: list[str]
     missing: list[str]
     drifted: list[str]
     notes: list[str] = field(default_factory=list)
+    required: frozenset[str] = frozenset(f.name for f in FAFB_783_FILES if f.required)
 
     @property
     def missing_required(self) -> list[str]:
         """Required files that are absent, which is the only hard failure."""
-        required = {f.name for f in FAFB_783_FILES if f.required}
-        return [n for n in self.missing if n in required]
+        return [n for n in self.missing if n in self.required]
 
     @property
     def ok(self) -> bool:
@@ -277,6 +296,10 @@ def verify_dir(
 ) -> ManifestReport:
     """Check a download directory against the release manifest.
 
+    A directory holding the consolidated neuron-attributes export (BANC, MCNS)
+    is checked against :data:`ATTRIBUTE_EXPORT_FILES` instead of the default
+    FAFB manifest.
+
     :param data_dir: Directory holding the Codex files.
     :param files: Manifest to check against.
     :param checksums: Hash the files (slow on the 68 MB connections table).
@@ -290,6 +313,9 @@ def verify_dir(
     missing: list[str] = []
     drifted: list[str] = []
     notes: list[str] = []
+    if files is FAFB_783_FILES and is_attribute_export(data_dir):
+        files = ATTRIBUTE_EXPORT_FILES
+        notes.append("consolidated neuron-attributes export (the BANC and MCNS layout)")
     for f in files:
         p = data_dir / f.name
         if not p.is_file():
@@ -305,7 +331,9 @@ def verify_dir(
             drifted.append(f.name)
             continue
         present.append(f.name)
-    report = ManifestReport(present, missing, drifted, notes)
+    report = ManifestReport(
+        present, missing, drifted, notes, frozenset(f.name for f in files if f.required)
+    )
     if strict and report.missing_required:
         raise FileNotFoundError(f"required release files missing: {report.missing_required}")
     return report
