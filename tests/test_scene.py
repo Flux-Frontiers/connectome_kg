@@ -690,3 +690,72 @@ def test_a_line_skeleton_carries_no_stray_vertex_cells(kg, tmp_path):
             assert mesh.n_verts == 0, "the lines must be the only primitive drawn"
     finally:
         plotter.close()
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("gray", scene.BACKGROUND), ("Charcoal", "#26292E"), ("#abcdef", "#ABCDEF")],
+)
+def test_resolve_background_takes_a_name_or_a_hex_color(value, expected):
+    assert scene.resolve_background(value) == expected
+
+
+@pytest.mark.parametrize("value", ["mauve", "#12345", "#GGGGGG", ""])
+def test_resolve_background_refuses_anything_else(value):
+    with pytest.raises(ValueError, match="background must be"):
+        scene.resolve_background(value)
+
+
+def test_the_floor_steps_away_from_its_background():
+    assert scene.floor_color(scene.BACKGROUND) == scene.FLOOR_COLOR
+    # Darker under a light background, lighter under a dark one.
+    assert scene.floor_color("#B9BCC1") < "#B9BCC1"
+    assert scene.floor_color("#26292E") > "#26292E"
+
+
+class _PointsStore:
+    """Just enough of a GraphStore for :func:`scene.world_frame`: fixed positions."""
+
+    def __init__(self, points: np.ndarray) -> None:
+        self.con = self
+        self._rows = points.tolist()
+
+    def execute(self, *_a):
+        return self
+
+    def fetchall(self):
+        return self._rows
+
+
+@pytest.mark.parametrize(
+    ("height_nm", "expected"),
+    [
+        (100_000.0, 1.0),  # smaller than FAFB: never shrunk below FAFB's sizes
+        (820_000.0, 2.0),  # twice FAFB's framed extent: markers twice as large
+        (1e9, 4.0),  # capped
+    ],
+)
+def test_marker_scale_follows_the_framed_height(height_nm, expected):
+    points = np.array([[0.0, 0.0, 0.0], [100.0, height_nm, 0.0]] * 50)
+    assert scene.world_frame(_PointsStore(points)).marker_scale == pytest.approx(expected)
+
+
+def test_marker_scale_reads_width_over_the_frame_aspect():
+    """A wide scene frames by its width, divided by the 16:9 aspect."""
+    points = np.array([[0.0, 0.0, 0.0], [16 / 9 * 820_000.0, 100.0, 0.0]] * 50)
+    assert scene.world_frame(_PointsStore(points)).marker_scale == pytest.approx(2.0)
+
+
+def test_the_scene_background_is_the_one_asked_for(kg):
+    pv = pytest.importorskip("pyvista")
+    plotter = pv.Plotter(off_screen=True)
+    scene.build_brain_scene(plotter, kg, view="flow", background="charcoal")
+    assert plotter.background_color.hex_rgb.upper() == "#26292E"
+    plotter.close()
+
+
+def test_black_and_navy_are_backgrounds_with_a_visible_floor():
+    for name in ("black", "navy"):
+        color = scene.resolve_background(name)
+        # Both are dark, so the floor is shaded lighter, not darker.
+        assert scene.floor_color(color) > color

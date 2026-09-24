@@ -1,6 +1,14 @@
-# Getting the FlyWire FAFB v783 release
+# Getting the data
 
-The build reads the Codex export files. They are free for non-commercial use
+ConnectomeKG builds three releases, each into its own store: FlyWire **FAFB
+v783** (the female brain), **BANC v888** (female brain and ventral nerve cord)
+and the FlyEM **Male CNS v1.0** (male brain and nerve cord). Most of this page
+is FAFB, which has the most files and the most traps; [BANC v888 and MCNS
+v1.0](#banc-v888-and-mcns-v10) covers the other two, and [soma
+positions](#soma-positions-for-banc-and-mcns) the one file they each need for
+the 3-D views.
+
+The build reads the Codex export files. FAFB's are free for non-commercial use
 under CC BY-NC-SA 4.0 and Codex requires a **Google** sign-in to fetch them,
 so this is a manual step. Under 100 MB for the files the build reads.
 
@@ -281,9 +289,9 @@ classification file. What differs from FAFB:
   `key: value` pairs; `flywireType: Tm33` names the matching FAFB type. Two
   keys are left out: `statusLabel`, which is proofreading status, and
   `mancBodyid`, a per-neuron id.
-- **There are no soma positions or cell sizes.** The export has no
-  coordinates, and its size columns are empty, so the 3-D views have no
-  cell-body cloud for these releases.
+- **The export has no soma positions or cell sizes.** Its coordinate and
+  size columns are empty. Cell sizes stay empty; positions come from one
+  extra file per release, below.
 - **The nerve cord's neuropils and nerves** have names and regions of their
   own (`LegNp_T1_L`, `IntTct`, `ADMN_L`, `cervical_connective`, ...); the
   neuropil surface meshes are FAFB's only.
@@ -299,6 +307,54 @@ low `--min-syn`: `connkg --dataset banc888 cone DNp01 --min-syn 5`.
 Cite Bates et al. 2026 (*Nature*, doi:10.1038/s41586-026-10735-w) and the
 BANC data deposit (doi:10.7910/DVN/7WTH1N) for BANC, and the Male CNS
 connectome paper (bioRxiv, doi:10.1101/2025.10.09.680999) for MCNS.
+
+## Soma positions for BANC and MCNS
+
+Codex exports no coordinates for either release, and without them the 3-D
+views have nothing to place: no cell-body cloud, no circuit view, and no flow
+view either, since neuropil centres are derived from the positions of the
+neurons in them. Both projects publish the positions themselves, outside
+Codex. Each is one file, and the build picks it up from the release directory
+automatically.
+
+| release | file | size | download from |
+|---|---|---|---|
+| BANC v888 | `banc_888_meta.feather` | 55 MB | `https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather` |
+| MCNS v1.0 | `body-annotations-male-cns-v1.0-minconf-0.5.feather` | 13 MB | `https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather` |
+
+```bash
+curl -L -o banc_v888/banc_888_meta.feather \
+  https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather
+
+curl -L -o mcns_v1/body-annotations-male-cns-v1.0-minconf-0.5.feather \
+  https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather
+```
+
+`connkg verify` reports which table it found, or that it found none, so the
+build never silently produces a graph the 3-D views cannot draw:
+
+```
+note     : consolidated neuron-attributes export (the BANC and MCNS layout)
+note     : soma positions from body-annotations-male-cns-v1.0-minconf-0.5.feather
+```
+
+Both are matched on their columns rather than their names, so a renamed or
+re-released file still works; the reader holds one entry per layout in
+`SOMA_POSITION_SOURCES`. BANC's `root_position_nm` is already in nanometres
+and is keyed on `root_888`, the v888 root id -- the table's own `root_id` is a
+later snapshot and matches 13,600 fewer of this build's neurons. MCNS's
+`somaLocation` is an `[x y z]` array in 8 nm EM voxels, scaled on read.
+
+Coverage is lower than FAFB's 96.7%, because a neuron whose soma was never
+located gets no position and is left out of the cloud:
+
+| release | positioned | of | coverage |
+|---|---:|---:|---:|
+| BANC v888 | 140,304 | 158,262 | 88.7% |
+| MCNS v1.0 | 139,662 | 166,700 | 83.8% |
+
+Both files are CC BY 4.0, like the releases they describe. Neither is needed
+to build a graph or to run any query -- they matter only for what gets drawn.
 
 ## License reminder
 

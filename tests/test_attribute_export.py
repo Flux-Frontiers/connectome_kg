@@ -5,6 +5,8 @@ from __future__ import annotations
 import gzip
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from connectomekg import ConnectomeKG
@@ -193,3 +195,38 @@ def test_the_cli_knows_both_releases(dataset):
 def test_nerve_cord_neuropils_have_names_and_regions(abbrev, region, name):
     assert neuropil_region(abbrev) == region
     assert neuropil_full_name(abbrev) == name
+
+
+def test_mcns_soma_positions_are_scaled_from_8nm_voxels(export_dir):
+    pd.DataFrame(
+        {
+            "bodyId": [1, 2, 99],
+            "somaLocation": [np.array([10, 20, 30]), np.array([1, 2, 3]), None],
+            "status": ["", "", ""],
+        }
+    ).to_feather(export_dir / "body-annotations.feather")
+    n = read_codex(export_dir, MCNS_1).neurons.set_index("root_id")
+    assert n.loc[1, ["x", "y", "z"]].tolist() == [80.0, 160.0, 240.0]
+    assert n.loc[2, ["x", "y", "z"]].tolist() == [8.0, 16.0, 24.0]
+    # 3 is absent from the table, 99 is absent from the export.
+    assert n.loc[3, ["x", "y", "z"]].isna().all()
+
+
+def test_banc_soma_positions_are_read_as_nanometres(export_dir):
+    pd.DataFrame(
+        {
+            "root_id": [7, 7, 7],
+            "root_888": [1.0, 3.0, None],
+            "root_position_nm": ["390720, 93568, 86220", "1, 2, 3", "4, 5, 6"],
+        }
+    ).to_feather(export_dir / "banc_888_meta.feather")
+    n = read_codex(export_dir, BANC_888).neurons.set_index("root_id")
+    assert n.loc[1, ["x", "y", "z"]].tolist() == [390720.0, 93568.0, 86220.0]
+    assert n.loc[3, ["x", "y", "z"]].tolist() == [1.0, 2.0, 3.0]
+    assert n.loc[2, ["x", "y", "z"]].isna().all()
+
+
+def test_an_unrelated_feather_table_is_ignored(export_dir):
+    pd.DataFrame({"root_id": [1], "comment": ["x"]}).to_feather(export_dir / "notes.feather")
+    n = read_codex(export_dir, BANC_888).neurons.set_index("root_id")
+    assert n[["x", "y", "z"]].isna().all().all()

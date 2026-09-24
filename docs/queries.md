@@ -272,7 +272,7 @@ graph that knows where its cell bodies are from one that does not: after
   viewer takes the same specs and answers interactively.
 - `connkg-mcp` serves `strongest_path`, `cone`, `influence`, `type_partners`,
   `neuroglancer_link` and the rest to an AI agent over MCP. The
-  [README](https://github.com/Flux-Frontiers/connectome_kg#as-an-mcp-server)
-  has the client configuration.
+  [command reference](cli.md#connkg-mcp) has the client configuration and
+  the tool list.
 - From Python, `ConnectomeKG.strongest_path`, `.cone`, `.influence` and
   `.neurons_of` take the same specs.

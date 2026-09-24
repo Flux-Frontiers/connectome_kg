@@ -3,7 +3,10 @@
 Codex exports releases in two layouts. BANC v888 and MCNS v1.0 come as one
 consolidated neuron-attributes table with display-name columns (``Root ID``,
 ``Super Class``, ...) beside the connections table; see
-:data:`ATTRIBUTE_COLUMNS`. FAFB v783 is split across the files below.
+:data:`ATTRIBUTE_COLUMNS`. That export carries no coordinates, so those two
+releases take soma positions from a Feather table each project publishes
+itself; see :data:`SOMA_POSITION_SOURCES`. FAFB v783 is split across the
+files below.
 
 Column names follow the v783 release as verified 2026-09-16:
 
@@ -36,6 +39,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.feather as feather
 
 from connectomekg.schema import (
     CONNECTION_COLUMNS,
@@ -172,6 +177,84 @@ def _parse_positions(series: pd.Series) -> np.ndarray:
     return out
 
 
+#: Soma-position tables the attribute-export releases can be given, as
+#: ``(id column, position column, nanometres per position unit)``. Codex
+#: exports no coordinates for BANC or MCNS, so a build from its files alone
+#: has nothing for the 3-D views to place; both projects publish positions
+#: beside their own downloads, and dropping either Feather table into the
+#: release directory fills them in. Matched on columns, not file name, since
+#: neither name is stable across releases. See ``docs/DOWNLOAD.md``.
+SOMA_POSITION_SOURCES: tuple[tuple[str, str, float], ...] = (
+    # Male CNS v1.0 body annotations: ``somaLocation`` is an ``[x y z]`` array
+    # in 8 nm EM voxels, keyed by ``bodyId``.
+    ("bodyId", "somaLocation", 8.0),
+    # BANC v888 compiled metadata: ``root_position_nm`` is "x, y, z" already in
+    # nanometres. Key on ``root_888``, the v888 root id; the table's own
+    # ``root_id`` is a later snapshot and matches 13,600 fewer of this build's
+    # neurons.
+    ("root_888", "root_position_nm", 1.0),
+)
+
+
+def _feather_columns(path: Path) -> list[str]:
+    """Column names of a Feather table, without reading a row of it.
+
+    :param path: The table.
+    :return: Its column names, or ``[]`` when the file is not Feather v2.
+    """
+    try:
+        return pa.ipc.open_file(path).schema.names
+    except pa.ArrowInvalid:
+        return []
+
+
+def _match_position_source(d: Path) -> tuple[Path, tuple[str, str, float]] | None:
+    """The first table in *d* whose columns match a :data:`SOMA_POSITION_SOURCES` entry."""
+    for path in sorted(d.glob("*.feather")):
+        names = set(_feather_columns(path))
+        for source in SOMA_POSITION_SOURCES:
+            if {source[0], source[1]} <= names:
+                return path, source
+    return None
+
+
+def soma_position_table(data_dir: str | Path) -> Path | None:
+    """The soma-position table a release directory holds, if any.
+
+    :param data_dir: Release directory.
+    :return: The matching Feather table, or None when there is none. Used by
+        ``connkg verify`` to report whether a build will have coordinates.
+    """
+    found = _match_position_source(Path(data_dir))
+    return found[0] if found else None
+
+
+def _read_soma_positions(d: Path) -> pd.DataFrame | None:
+    """Read soma positions from a project's own metadata table, when present.
+
+    :param d: Release directory, searched for any table whose columns match
+        one of :data:`SOMA_POSITION_SOURCES`.
+    :return: ``root_id``, ``x``, ``y``, ``z`` in nanometres for the neurons
+        the table positions, or None when the directory holds no such table.
+    """
+    found = _match_position_source(d)
+    if found is None:
+        return None
+    path, (id_col, pos_col, nm_per_unit) = found
+    raw = feather.read_table(path, columns=[id_col, pos_col]).to_pandas()
+    raw = raw[raw[id_col].notna() & raw[pos_col].notna()]
+    xyz = _parse_positions(raw[pos_col]) * nm_per_unit
+    out = pd.DataFrame(
+        {
+            "root_id": raw[id_col].to_numpy().astype(np.int64),
+            "x": xyz[:, 0],
+            "y": xyz[:, 1],
+            "z": xyz[:, 2],
+        }
+    )
+    return out.drop_duplicates("root_id", keep="first")
+
+
 #: Header of the consolidated "neuron attributes" export that Codex offers for
 #: BANC and MCNS, mapped to the normalized columns. That one file carries what
 #: the FAFB release splits across neurons, classification, cell types, cell
@@ -260,7 +343,9 @@ def _split_community_labels(raw: object) -> list[str]:
 def _read_attribute_export(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Read the consolidated neuron-attributes file.
 
-    :param path: Its ``neurons.csv.gz``.
+    :param path: Its ``neurons.csv.gz``. Soma positions are read from any
+        table beside it matching :data:`SOMA_POSITION_SOURCES`, since the
+        export itself carries no coordinates.
     :return: ``(neurons, labels)``: neurons with whichever normalized columns
         the export fills, and one label row per community label. The export
         carries no label attribution, so ``user``, ``affiliation`` and ``date``
@@ -278,7 +363,11 @@ def _read_attribute_export(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         df["super_class"] = df["super_class"].map(
             lambda v: SUPER_CLASS_ALIASES.get(v, v) if isinstance(v, str) else v
         )
-    df["x"] = df["y"] = df["z"] = np.nan
+    pos = _read_soma_positions(path.parent)
+    if pos is None:
+        df["x"] = df["y"] = df["z"] = np.nan
+    else:
+        df = df.merge(pos, on="root_id", how="left")
 
     rows = [
         (rid, text)

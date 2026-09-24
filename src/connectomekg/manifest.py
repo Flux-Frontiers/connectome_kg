@@ -27,7 +27,11 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from connectomekg.readers.codex import find_connections_file, is_attribute_export
+from connectomekg.readers.codex import (
+    find_connections_file,
+    is_attribute_export,
+    soma_position_table,
+)
 
 #: Where to get the October 2024 published snapshot, as the portal itself
 #: recommends for reproducibility. The live portal is a moving target.
@@ -316,6 +320,13 @@ def verify_dir(
     if files is FAFB_783_FILES and is_attribute_export(data_dir):
         files = ATTRIBUTE_EXPORT_FILES
         notes.append("consolidated neuron-attributes export (the BANC and MCNS layout)")
+        # The export has no coordinates; a project's own table supplies them.
+        positions = soma_position_table(data_dir)
+        notes.append(
+            f"soma positions from {positions.name}"
+            if positions
+            else "no soma-position table, so the 3-D views have nothing to place"
+        )
     for f in files:
         p = data_dir / f.name
         if not p.is_file():

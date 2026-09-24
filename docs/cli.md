@@ -45,7 +45,7 @@ instead. `connkg specs` prints the whole grammar with examples; the
 
 Prints each Codex portal label beside the file name it downloads as, and the
 URLs of the October 2024 static archives for a reproducible build. No options.
-See [Get the FAFB v783 data](DOWNLOAD.md).
+See [Get the data](DOWNLOAD.md).
 
 ### `connkg verify`
 
@@ -220,7 +220,7 @@ key                                subject            version       nodes       
 ### `connkg specs`
 
 Prints every form a SPEC and an answer can take, with examples, and the named
-circuits. No options. The same list feeds the README and the viewer's Explore
+circuits. No options. The same list feeds the queries page and the viewer's Explore
 tab.
 
 ### `connkg query`
@@ -386,6 +386,7 @@ view and option at length; this is the list.
 | `--cloud / --no-cloud` | Draw the whole-brain context cloud. Default: on with `--floor`, else only when the surfaces are not drawn |
 | `--floor` | Stand the scene over a lit floor with shadows; tilts the camera down |
 | `--elevation FLOAT` | Degrees to tilt the camera down from the front view, -80 to 80. Default 25 with `--floor`, else 0 |
+| `--background TEXT` | Scene background: `gray`, `charcoal`, `black`, `navy`, `light`, or a `#RRGGBB` color. Default `gray` |
 | `--preset TEXT` | Looking Glass quilt preset. Default `16-landscape` |
 | `--view-cone FLOAT` | Degrees the quilt cameras sweep, 1 to 90. Default 35 |
 | `--fov FLOAT` | Per-view vertical field of view, degrees. Default 14 |
@@ -413,7 +414,7 @@ extra.
 
 It takes `quilt`'s scene options, `SPECS...`, `--view`, `--data-dir`,
 `--color-by`, `--skeleton-step`, `--tubes`, `--top`, `--neuropils`,
-`--cloud`, `--floor`, `--elevation` and `--preset`, with the same meanings, and
+`--cloud`, `--floor`, `--elevation`, `--background` and `--preset`, with the same meanings, and
 two of its own:
 
 | option | meaning |
@@ -430,7 +431,12 @@ connkg --root . viz3d                            # circuit:compass, then explore
 connkg --root . viz3d LC4 DNp01
 connkg --root . viz3d --view flow
 connkg --root . viz3d path:LPLC2>DNp01 --floor
+connkg --root . --dataset banc888 viz3d --view flow --background charcoal
 ```
+
+The rail's **Dataset** box switches between the datasets built under
+`--root`, and its **View** box between the circuit and flow views, without
+restarting. `--dataset` and `--view` only choose where the viewer opens.
 
 With no SPEC the viewer opens on `circuit:compass` inside the whole brain, so
 there is a circuit on screen to orbit and pick at from the start. Any SPEC
@@ -468,5 +474,33 @@ subcommand.
 }
 ```
 
-The tools it exposes, and what each one answers, are listed in the
-[README](https://github.com/Flux-Frontiers/connectome_kg#as-an-mcp-server).
+Put the entry in a project's `.mcp.json`, which holds absolute paths and is
+gitignored. If `connkg-mcp` is not on the client's `PATH`, give the full path,
+for example `/path/to/connectome_kg/.venv/bin/connkg-mcp`. To serve two
+datasets, add two entries.
+
+| tool | answers |
+|---|---|
+| `graph_stats`, `analyze_connectome` | Counts; the Markdown report |
+| `find_nodes`, `get_node`, `node_edges` | Find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
+| `neurons_of`, `type_partners` | Resolve a spec to neurons; a type's partner types by synapses |
+| `strongest_path`, `cone` | The strongest synaptic route; everything within N hops |
+| `influence` | Effective connectivity: the share of a target's input the source drives, per hop, signed |
+| `neuroglancer_link` | A Neuroglancer URL showing up to seven specs as meshes, one color each |
+| `query_connectome`, `pack_connectome` | Semantic search. Needs a build with the vector index |
+| `snapshot_list`, `snapshot_show`, `snapshot_diff` | Saved metric snapshots |
+
+Every argument is bounded and checked inside `ConnectomeKG`, so the CLI and
+the server reject the same bad input with the same message:
+
+| argument | allowed |
+|---|---|
+| `k` | 1 to 100 |
+| `hop`, `hops` | 0 to 5 (1 to 5 for `influence`) |
+| `limit`, `max_nodes` | 1 to 500 |
+| `min_syn` | 1 to 10000 |
+| queries and ids | at most 500 characters |
+| `label:` pattern | at most 100 characters, and it must compile as a regular expression |
+
+The first `strongest_path`, `cone` or `influence` call on FAFB v783 loads all
+3.7 million synapse edges; later calls reuse them.

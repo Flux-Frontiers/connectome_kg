@@ -65,7 +65,10 @@ matters.
 
 ### Background and context cloud
 
-The background is a flat gray, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`. It carries no data.
+The background is a flat gray, <span class="swatch" style="background:#5A5D62"></span> `#5A5D62`, unless
+`--background` or the viewer's Background box says otherwise. It carries no
+data. The swatches below are for the default gray: the cloud is muted toward
+whatever background is drawn.
 
 Each small dot is one neuron, at its soma once `connkg skeletons` has
 back-filled somas, and at its marked point otherwise.
@@ -308,6 +311,7 @@ Quilts are never committed.
 | `--cloud` / `--no-cloud` | both | on with `--floor`; else on unless the surfaces are drawn | draw the context cloud |
 | `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
 | `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
+| `--background` | both | `gray` | `gray`, `charcoal`, `black`, `navy`, `light`, or `#RRGGBB`; the cloud mutes toward it and the floor shades from it |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
 | `--view-cone` | quilt | `35` | degrees the quilt cameras sweep |
 | `--fov`, `--zoom` | quilt | `14.0`, `1.0` | per-view field of view in degrees, and camera dolly |
@@ -331,9 +335,16 @@ types that circuit does not name, it opens on the brain alone.
 ### The control rail
 
 The rail holds everything that changes what is drawn, top to bottom: the
-**Show** box and its **Show scene** button, an **Explore** and a **Display**
+**Dataset** and **View** boxes, the **Show** box and its **Show scene** button, an **Explore** and a **Display**
 tab, and **Cast to Looking Glass** pinned at the bottom where a long tab never
 pushes it off-screen.
+
+**Dataset** lists every dataset built under `--root`, and is hidden when
+there is only one. Switching opens that graph and closes the old one. The Show
+box's specs are kept where they resolve in the new graph. Cell type names
+differ between connectomes, so where they do not, the viewer falls back to
+what it opens on. **View** switches between the circuit and flow views,
+keeping the specs, and frames the new view afresh.
 
 **Explore** lists every documented spec, answer and named circuit as a button
 that fills the Show box and draws it, grouped as Circuits, Specs and Answers.
@@ -427,6 +438,7 @@ cast duration.
 | Skeletons as tubes | draws skeletons as tubes rather than lines |
 | Skeleton stride | detail, where **0** means choose it from the neuron count |
 | Minimum synapses | drops connections below the threshold |
+| Background | the scene background: Gray, Charcoal, Black, Navy, Light, or Custom for any color |
 
 ![The Display tab, with the overlay toggles and the detail settings](images/viewer_display.png)
 
@@ -436,6 +448,13 @@ draw the cloud only when no neuropil surfaces are available, which is what a
 fresh viewer does when `connkg meshes` has not been run. Automatic is a state
 the viewer keeps, so changing some other setting will not quietly decide the
 question for you.
+
+Background redraws the scene the same way a toggle does, keeping the camera.
+Saved images, quilts and casts use it too. The default gray suits the region
+colors. Charcoal and Black show them at their most saturated, but hide the
+black spheres of nerves and the cervical connective. Navy is a deep blue,
+`#14213D`, dark enough that the blue regions still stand off it. Light is
+for print.
 
 Minimum synapses is what makes a multi-hop cone usable interactively:
 `cone:LC4>2` is 19,866 neurons at the default and 104 at 200. Unlike the
@@ -507,7 +526,7 @@ NumPy and SQL only. The tests exercise them without the `viz3d` extra.
 
 | data | source | read by |
 |---|---|---|
-| neuron positions | `soma_x`, `soma_y`, `soma_z` in each neuron node's metadata where `connkg skeletons` back-filled one, else `x`, `y`, `z`, the Codex marked point, in nm | world frame, context cloud, flow centroids |
+| neuron positions | `soma_x`, `soma_y`, `soma_z` in each neuron node's metadata where `connkg skeletons` back-filled one, else `x`, `y`, `z` -- the Codex marked point on FAFB, the soma on BANC and MCNS -- in nm | world frame, context cloud, flow centroids |
 | super class and sign | neuron node metadata | context cloud color |
 | skeletons | `.connectomekg/skeletons/` (written by `connkg skeletons`), then `fafb_v783/sk_lod1_783_healed/<root_id>.swc` for whatever it does not hold | circuit |
 | per-neuron neuropil synapse counts | `IN_NEUROPIL` edge evidence, `{"pre": n, "post": m}` | flow |
@@ -529,6 +548,15 @@ world = ((x - cx) / S,  (z - cz) / S,  -(y - cy) / S)       S = 100,000 nm
 
 Negating `y` puts dorsal up. At this scale the brain is about 8 x 4 x 3 world
 units, which fits inside the depth budget of a Looking Glass quilt.
+
+Marker sizes are in world units too, set on FAFB v783, so another dataset
+needs them scaled. `world_frame` measures the dataset's framed extent: the
+larger of its neurons' 1st-99th percentile width divided by 16:9 and their
+height, which is what the camera fits to a landscape frame. It divides that
+by FAFB's 410,000 nm, clamped to 1-4, and neuropil spheres, flow tubes and
+soma spheres are multiplied by the result (`WorldFrame.marker_scale`). The
+context cloud keeps FAFB's size, because scaled-up dots speckle the spheres
+inside them.
 
 ## Camera and framing
 
@@ -856,6 +884,11 @@ Keep three limits in mind when you read a flow picture:
   so A -> B and B -> A curve to opposite sides instead of overlapping.
 - **Idle neuropils**, those with no drawn tube, are drawn at half size and
   darker.
+- **Scale** follows the dataset. The sizes above were set on FAFB v783. A
+  dataset that fills more of the frame has its spheres and tubes scaled up by
+  the ratio, so they are the same size on screen: 2.32x on BANC v888, whose
+  brain and nerve cord stand 2.3 times as tall as FAFB's brain, and 1.12x on
+  MCNS v1.0. See [World coordinates](#world-coordinates).
 
 ### Restrict flow to a population
 
@@ -937,7 +970,11 @@ are in world units, where the brain is about 8 units wide.
 
 | constant | value | controls |
 |---|---|---|
-| `BACKGROUND` | `#5A5D62` | scene background |
+| `BACKGROUND` | `#5A5D62` | default scene background |
+| `BACKGROUNDS` | gray, charcoal, black, navy, light | named backgrounds for `--background` and the viewer |
+| `_FLOOR_STEP` | 0.24 | how far a floor under a non-default background is shaded from it |
+| `_REFERENCE_FRAMED_NM` | 410,000 | FAFB v783's framed extent, which marker sizes are scaled against |
+| `_MAX_MARKER_SCALE` | 4.0 | cap on that scale |
 | `_CONTEXT_RADIUS` | 0.005 | context sphere radius, circuit view |
 | `_FLOW_CONTEXT_RADIUS` | 0.014 | context sphere radius, flow view |
 | `_FLOW_CONTEXT_STRIDE` | 10 | flow view draws every Nth neuron |
@@ -969,7 +1006,15 @@ the CLI and the Python API:
 
 - **Neuropil surfaces are FAFB v783 only.** `connkg meshes` knows one mesh
   source. Another dataset renders without surfaces until its source is added
-  to `connectomekg.neuropil_meshes`.
+  to `connectomekg.neuropil_meshes`. BANC and MCNS therefore draw their cloud
+  and flow in an unbounded space, with no brain shell around them.
+- **BANC and MCNS have no skeletons, so no circuit view.** Their positions
+  come from a soma table, not from traced geometry; see [Soma positions for
+  BANC and MCNS](DOWNLOAD.md#soma-positions-for-banc-and-mcns). The cloud and
+  the flow view work; `--view circuit` has nothing to trace.
+- **`somas=N` reads 0 on BANC and MCNS.** The counter reports `has_soma`,
+  which only `connkg skeletons` writes, so it says nothing about these two
+  releases even though every point in their cloud *is* a soma.
 - **Flow centroids still use marked points.** The context cloud uses somas
   once `connkg skeletons` has back-filled them, and the circuit view has
   always read each soma from its skeleton, but the neuropil centroids in the
