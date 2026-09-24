@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-23
+
 ### Added
 
 - **BANC v888 and MCNS v1.0 build alongside FAFB v783.** Codex exports both
@@ -33,7 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   96.7%. Both files are CC BY 4.0 and neither is required: without one the
   build is exactly as it was. `connkg verify` now names the table it found,
   or reports that it found none. See `docs/DOWNLOAD.md`.
-
 - **`DatasetInfo.min_pair_syn`**: pairs whose synapses, summed over
   neuropils, fall below it are dropped at read time. BANC keeps pairs of 3
   or more, so BANC and MCNS set 5 to compare with FAFB's filtered table;
@@ -45,15 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-region unassigned buckets, in both releases' spellings, with new
   regions `VNC`, `NERVE` and `CV`. BANC's `Xnerve` (54 synapses) is left
   unnamed.
-
 - **Dataset and View boxes in `connkg viz3d`.** The control rail switches
   between every dataset built under `--root`, and between the circuit and flow
   views, without restarting. A switch keeps the Show box's specs where they
   resolve in the new graph and falls back to the opening scene where they do
   not. The window now owns the open graph and closes each one it replaces.
 - **Scene background: `--background` on `quilt` and `viz3d`, and a Background
-  box in the viewer's Display tab.** `gray` (the default), `charcoal`, `black`, `navy`, `light`,
-  or any `#RRGGBB`; Custom in the viewer opens a color dialog. The context
+  box in the viewer's Display tab.** `gray` (the default), `charcoal`,
+  `black`, `navy`, `light`, or any `#RRGGBB`; Custom in the viewer opens a
+  color dialog. The context
   cloud mutes toward the chosen background, the floor shades from it, and
   saved images, quilts and casts use it. Region colors are unchanged.
 - **Marker sizes scale with the dataset.** Neuropil spheres, flow tubes and
@@ -73,13 +74,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unchanged.
 - **Lock: `quiltwright` 0.15.0 -> 0.15.1**, the fleet's current release. The
   floor stays `>=0.15.0`.
-
 - **`kgmodule-utils` floor raised to `>=0.24.0`** in the core dependency and
   all three extras. 0.24.0 drops the vector index when the graph is wiped
   (`KGModule.drop_index()`), so `build --no-index --wipe` now removes a stale
   index instead of keeping it and warning. An unwiped `build --no-index`
   still keeps an existing index and warns, as before: an unchanged graph
   still matches it.
+- **README rewritten** as install, a no-download quickstart with real output,
+  the three datasets, and examples by task. The reference tables moved to a
+  new `docs/graph.md` (node and edge kinds, transmitter signs, the
+  one-graph-per-connectome layout) and to `docs/cli.md` (the MCP tools and
+  their argument bounds).
 
 ## [0.7.1] - 2026-09-22
 
