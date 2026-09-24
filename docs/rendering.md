@@ -311,7 +311,7 @@ Quilts are never committed.
 | `--cloud` / `--no-cloud` | both | on with `--floor`; else on unless the surfaces are drawn | draw the context cloud |
 | `--floor` | both | off | stand the scene over a floor lit from above, with shadows |
 | `--elevation` | both | `25` with `--floor`, else `0` | degrees to tilt the camera up so it looks down, -80 to 80 |
-| `--background` | both | `gray` | `gray`, `charcoal`, `light`, or `#RRGGBB`; the cloud mutes toward it and the floor shades from it |
+| `--background` | both | `gray` | `gray`, `charcoal`, `black`, `navy`, `light`, or `#RRGGBB`; the cloud mutes toward it and the floor shades from it |
 | `--preset` | both | `16-landscape` | quiltwright quilt preset (8 x 6 views) |
 | `--view-cone` | quilt | `35` | degrees the quilt cameras sweep |
 | `--fov`, `--zoom` | quilt | `14.0`, `1.0` | per-view field of view in degrees, and camera dolly |
@@ -438,7 +438,7 @@ cast duration.
 | Skeletons as tubes | draws skeletons as tubes rather than lines |
 | Skeleton stride | detail, where **0** means choose it from the neuron count |
 | Minimum synapses | drops connections below the threshold |
-| Background | the scene background: Gray, Charcoal, Light, or Custom for any color |
+| Background | the scene background: Gray, Charcoal, Black, Navy, Light, or Custom for any color |
 
 ![The Display tab, with the overlay toggles and the detail settings](images/viewer_display.png)
 
@@ -451,8 +451,10 @@ question for you.
 
 Background redraws the scene the same way a toggle does, keeping the camera.
 Saved images, quilts and casts use it too. The default gray suits the region
-colors. Charcoal shows them at their most saturated, but hides the black
-spheres of nerves and the cervical connective. Light is for print.
+colors. Charcoal and Black show them at their most saturated, but hide the
+black spheres of nerves and the cervical connective. Navy is a deep blue,
+`#14213D`, dark enough that the blue regions still stand off it. Light is
+for print.
 
 Minimum synapses is what makes a multi-hop cone usable interactively:
 `cone:LC4>2` is 19,866 neurons at the default and 104 at 200. Unlike the
@@ -969,7 +971,7 @@ are in world units, where the brain is about 8 units wide.
 | constant | value | controls |
 |---|---|---|
 | `BACKGROUND` | `#5A5D62` | default scene background |
-| `BACKGROUNDS` | gray, charcoal, light | named backgrounds for `--background` and the viewer |
+| `BACKGROUNDS` | gray, charcoal, black, navy, light | named backgrounds for `--background` and the viewer |
 | `_FLOOR_STEP` | 0.24 | how far a floor under a non-default background is shaded from it |
 | `_REFERENCE_FRAMED_NM` | 410,000 | FAFB v783's framed extent, which marker sizes are scaled against |
 | `_MAX_MARKER_SCALE` | 4.0 | cap on that scale |

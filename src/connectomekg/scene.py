@@ -99,11 +99,16 @@ _CONTEXT_DIM: Final = 0.85
 #: outline without competing with the subject.
 BACKGROUND: Final = "#5A5D62"
 #: Named backgrounds the viewer and ``--background`` offer. The default mid
-#: gray first; charcoal for the region colors at their most saturated; light
-#: gray for print. Any ``#RRGGBB`` works too, via :func:`resolve_background`.
+#: gray first; charcoal and black for the region colors at their most
+#: saturated, though black hides the black spheres of nerves and the cervical
+#: connective; a deep navy, dark enough that the blue regions still stand
+#: off it; light gray for print. Any ``#RRGGBB`` works too, via
+#: :func:`resolve_background`.
 BACKGROUNDS: Final[dict[str, str]] = {
     "gray": BACKGROUND,
     "charcoal": "#26292E",
+    "black": "#000000",
+    "navy": "#14213D",
     "light": "#B9BCC1",
 }
 #: The floor, a step darker than the background so the horizon and the lit
@@ -614,7 +619,7 @@ def _blend(color: str, toward: str, t: float) -> str:
 def resolve_background(value: str) -> str:
     """A background color from a :data:`BACKGROUNDS` name or a ``#RRGGBB`` string.
 
-    :param value: ``gray``, ``charcoal``, ``light``, or a hex color.
+    :param value: A :data:`BACKGROUNDS` name, or a hex color.
     :return: The color as upper-case ``#RRGGBB``.
     :raises ValueError: If *value* is neither.
     """

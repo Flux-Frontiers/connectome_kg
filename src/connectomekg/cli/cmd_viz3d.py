@@ -255,7 +255,7 @@ background_option = click.option(
     default="gray",
     show_default=True,
     callback=_resolve_background,
-    help="Scene background: gray, charcoal, light, or a #RRGGBB color. The "
+    help="Scene background: gray, charcoal, black, navy, light, or a #RRGGBB color. The "
     "context cloud is muted toward it and the floor is shaded from it.",
 )
 

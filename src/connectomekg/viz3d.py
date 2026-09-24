@@ -54,6 +54,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -470,15 +471,17 @@ class BrainSceneWindow(QMainWindow):
         area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         return area
 
-    def _build_pickers(self) -> QHBoxLayout:
+    def _build_pickers(self) -> QGridLayout:
         """The Dataset and View boxes at the top of the rail.
 
-        The Dataset box lists every dataset built under ``root``, and is
-        hidden when the window was given no root or there is only one.
+        A grid, labels in one row and boxes in the next, so the two boxes
+        line up. The Dataset box lists every dataset built under ``root``,
+        and is hidden when the window was given no root or there is only one.
         """
-        row = QHBoxLayout()
-        column = QVBoxLayout()
-        column.addWidget(QLabel("Dataset", self))
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setVerticalSpacing(4)
+        dataset_label = QLabel("Dataset", self)
         self._dataset_box = QComboBox(self)
         self._dataset_box.setToolTip("Switch connectome without restarting.")
         self._dataset_box.setAccessibleName("Dataset")
@@ -488,14 +491,9 @@ class BrainSceneWindow(QMainWindow):
         if current in ids:
             self._dataset_box.setCurrentIndex(ids.index(current))
         self._dataset_box.activated.connect(self._on_dataset)
-        column.addWidget(self._dataset_box)
-        dataset_widget = QWidget(self)
-        dataset_widget.setLayout(column)
-        dataset_widget.setVisible(len(ids) > 1)
-        row.addWidget(dataset_widget, stretch=1)
+        for widget in (dataset_label, self._dataset_box):
+            widget.setVisible(len(ids) > 1)
 
-        column = QVBoxLayout()
-        column.addWidget(QLabel("View", self))
         self._view_box = QComboBox(self)
         self._view_box.addItems(render3d.VIEWS)
         self._view_box.setCurrentIndex(list(render3d.VIEWS).index(self._view))
@@ -505,9 +503,14 @@ class BrainSceneWindow(QMainWindow):
         )
         self._view_box.setAccessibleName("View")
         self._view_box.activated.connect(self._on_view)
-        column.addWidget(self._view_box)
-        row.addLayout(column, stretch=1)
-        return row
+
+        grid.addWidget(dataset_label, 0, 0)
+        grid.addWidget(QLabel("View", self), 0, 1)
+        grid.addWidget(self._dataset_box, 1, 0)
+        grid.addWidget(self._view_box, 1, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        return grid
 
     @property
     def kg(self) -> ConnectomeKG:

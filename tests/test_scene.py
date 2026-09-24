@@ -752,3 +752,10 @@ def test_the_scene_background_is_the_one_asked_for(kg):
     scene.build_brain_scene(plotter, kg, view="flow", background="charcoal")
     assert plotter.background_color.hex_rgb.upper() == "#26292E"
     plotter.close()
+
+
+def test_black_and_navy_are_backgrounds_with_a_visible_floor():
+    for name in ("black", "navy"):
+        color = scene.resolve_background(name)
+        # Both are dark, so the floor is shaded lighter, not darker.
+        assert scene.floor_color(color) > color

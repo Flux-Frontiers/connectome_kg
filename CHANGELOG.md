@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolve in the new graph and falls back to the opening scene where they do
   not. The window now owns the open graph and closes each one it replaces.
 - **Scene background: `--background` on `quilt` and `viz3d`, and a Background
-  box in the viewer's Display tab.** `gray` (the default), `charcoal`, `light`,
+  box in the viewer's Display tab.** `gray` (the default), `charcoal`, `black`, `navy`, `light`,
   or any `#RRGGBB`; Custom in the viewer opens a color dialog. The context
   cloud mutes toward the chosen background, the floor shades from it, and
   saved images, quilts and casts use it. Region colors are unchanged.

@@ -386,7 +386,7 @@ view and option at length; this is the list.
 | `--cloud / --no-cloud` | Draw the whole-brain context cloud. Default: on with `--floor`, else only when the surfaces are not drawn |
 | `--floor` | Stand the scene over a lit floor with shadows; tilts the camera down |
 | `--elevation FLOAT` | Degrees to tilt the camera down from the front view, -80 to 80. Default 25 with `--floor`, else 0 |
-| `--background TEXT` | Scene background: `gray`, `charcoal`, `light`, or a `#RRGGBB` color. Default `gray` |
+| `--background TEXT` | Scene background: `gray`, `charcoal`, `black`, `navy`, `light`, or a `#RRGGBB` color. Default `gray` |
 | `--preset TEXT` | Looking Glass quilt preset. Default `16-landscape` |
 | `--view-cone FLOAT` | Degrees the quilt cameras sweep, 1 to 90. Default 35 |
 | `--fov FLOAT` | Per-view vertical field of view, degrees. Default 14 |
