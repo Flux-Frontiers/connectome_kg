@@ -234,10 +234,77 @@ neurons table, a classification table and a connections table whose columns the
 reader recognizes. Run `connkg verify --data-dir <dir> --no-checksums`
 to see what it detects before building.
 
+## BANC v888 and MCNS v1.0
+
+Codex serves two more releases that the same reader builds:
+
+| dataset id | release | neurons | pairs kept | license |
+|---|---|---|---|---|
+| `banc888` | BANC v888, adult female brain and ventral nerve cord | 158,262 | 1,528,585 | CC BY 4.0 |
+| `mcns1` | FlyEM Male CNS v1.0, adult male brain and ventral nerve cord | 166,700 | 6,242,085 | CC BY 4.0 |
+
+Their download is shorter than FAFB's. Switch the Codex dataset selector to
+the release, open "Download Data", and take two files: **Neuron Attributes**,
+which lands as `neurons.csv.gz`, and the connections table,
+`connections_princeton.csv.gz`. Put each release in its own directory:
+
+```bash
+connkg verify --data-dir banc_v888 --no-checksums
+connkg --root . --dataset banc888 build --data-dir banc_v888
+connkg --root . --dataset mcns1 build --data-dir mcns_v1
+```
+
+Measured on Apple silicon, September 2026, vector index included: BANC in
+1 minute 22 seconds to a 1.2 GB graph (174,014 nodes, 2,695,592 edges), MCNS
+in 3 minutes 20 seconds to 2.8 GB (188,546 nodes, 8,122,640 edges).
+
+Neuron Attributes is one consolidated table with display-name columns
+(`Root ID`, `Super Class`, `Primary Cell Type`, ...) in place of FAFB's
+split files. The reader recognizes it by its header and needs no
+classification file. What differs from FAFB:
+
+- **Pairs are thresholded at 5 synapses.** BANC's connections table keeps
+  pairs of 3 or more; the reader drops any pair whose synapses, summed over
+  its neuropils, come to fewer than 5, as FAFB's filtered table and MCNS
+  already do. Half of BANC's 3,037,361 pairs fall below. The threshold is
+  `min_pair_syn` on the dataset record.
+- **Super classes take FAFB's spelling.** BANC's `optic_lobe_intrinsic` and
+  MCNS's `ol_intrinsic` both become `optic`; the nerve cord's intrinsic
+  neurons become `ventral_nerve_cord`. MCNS's `*_tbc` (to be confirmed)
+  classes are kept as given.
+- **Connection transmitters come from the presynaptic neuron.** Both
+  exports leave the connections table's `nt_type` empty.
+- **Histamine is inhibitory** (sign -1), as it is at the photoreceptor
+  synapse; FAFB's predictions have no histamine class. BANC's tyramine
+  neurons stay unresolved (0).
+- **Community labels are split into one label each.** MCNS's are
+  `key: value` pairs; `flywireType: Tm33` names the matching FAFB type. Two
+  keys are left out: `statusLabel`, which is proofreading status, and
+  `mancBodyid`, a per-neuron id.
+- **There are no soma positions or cell sizes.** The export has no
+  coordinates, and its size columns are empty, so the 3-D views have no
+  cell-body cloud for these releases.
+- **The nerve cord's neuropils and nerves** have names and regions of their
+  own (`LegNp_T1_L`, `IntTct`, `ADMN_L`, `cervical_connective`, ...); the
+  neuropil surface meshes are FAFB's only.
+
+The nerve cord is what these releases add. In BANC, the giant fiber's
+(`DNp01`) outputs reach the jump motor neuron `TTMn`, `PSI` and the `GFC2`,
+`GFC3` and `GFC4` interneurons in the intermediate tectulum, where FAFB's
+graph stops at the neck. The counts are small, 8 to 13 synapses per partner,
+because the giant fiber drives TTMn and PSI mostly through electrical
+synapses, which EM synapse detection does not record. A cone over it needs a
+low `--min-syn`: `connkg --dataset banc888 cone DNp01 --min-syn 5`.
+
+Cite Bates et al. 2026 (*Nature*, doi:10.1038/s41586-026-10735-w) and the
+BANC data deposit (doi:10.7910/DVN/7WTH1N) for BANC, and the Male CNS
+connectome paper (bioRxiv, doi:10.1101/2025.10.09.680999) for MCNS.
+
 ## License reminder
 
-The built index over FlyWire data is a derived work under CC BY-NC-SA 4.0.
-Keep the download and the built graphs (`connectomes/*/.connectomekg/*.sqlite`) out of the repository
-(`.gitignore` already does) and out of anything commercial. Cite
-Dorkenwald et al. 2024, Schlegel et al. 2024 and Eckstein et al. 2024 for
-the data.
+The built index over FlyWire FAFB data is a derived work under CC BY-NC-SA
+4.0. BANC and MCNS are CC BY 4.0, which allows commercial use with
+attribution. Keep every download and the built graphs
+(`connectomes/*/.connectomekg/*.sqlite`) out of the repository (`.gitignore`
+already does), and keep FAFB out of anything commercial. Cite Dorkenwald et
+al. 2024, Schlegel et al. 2024 and Eckstein et al. 2024 for the FAFB data.

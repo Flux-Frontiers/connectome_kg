@@ -11,10 +11,10 @@ import click
 from connectomekg.datasets import dataset_dir, resolve_dataset
 from connectomekg.module import ConnectomeKG
 from connectomekg.readers.synthetic import SYNTHETIC
-from connectomekg.schema import FAFB_783, DatasetInfo
+from connectomekg.schema import BANC_888, FAFB_783, MCNS_1, DatasetInfo
 
 #: Provenance records for the dataset ids connkg knows by name.
-_KNOWN_DATASETS = {d.dataset_id: d for d in (FAFB_783, SYNTHETIC)}
+_KNOWN_DATASETS = {d.dataset_id: d for d in (FAFB_783, BANC_888, MCNS_1, SYNTHETIC)}
 
 #: Starting bounds from the fleet boundary-validation standard; widen if a real
 #: query needs more.

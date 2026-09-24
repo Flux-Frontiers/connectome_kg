@@ -62,7 +62,7 @@ def files() -> None:
 @click.option("--data-dir", required=True, type=click.Path(file_okay=False))
 @click.option("--no-checksums", is_flag=True, help="Skip the SHA-256 comparison.")
 def verify(data_dir: str, no_checksums: bool) -> None:
-    """Check a Codex download against the v783 manifest."""
+    """Check a Codex download against its manifest (FAFB v783, or the BANC/MCNS export)."""
     report = verify_dir(Path(data_dir), checksums=not no_checksums)
     click.echo(str(report))
     if report.missing_required:

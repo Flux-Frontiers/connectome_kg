@@ -14,8 +14,12 @@ import pandas as pd
 
 #: Presynaptic-neurotransmitter sign convention from Shiu et al. 2024
 #: (Nature 634:210). Glutamate is inhibitory in Drosophila via GluCl-alpha.
+#: Histamine, which FAFB's predictions lack and BANC's and MCNS's carry, is
+#: inhibitory by the same argument: it acts through histamine-gated chloride
+#: channels, as at the photoreceptor synapse. Tyramine (BANC, 209 neurons) has
+#: no settled sign and stays unresolved, 0.
 EXCITATORY = ("ACH", "DA", "OCT", "SER")
-INHIBITORY = ("GABA", "GLUT")
+INHIBITORY = ("GABA", "GLUT", "HIST")
 NT_SIGN: dict[str, int] = {nt: 1 for nt in EXCITATORY} | {nt: -1 for nt in INHIBITORY}
 
 #: Prediction score per transmitter, one column each.
@@ -83,6 +87,12 @@ class DatasetInfo:
     :param license: SPDX-style license name.
     :param url: Where the release lives.
     :param citation: The paper(s) to cite.
+    :param min_pair_syn: Synapses a neuron pair needs, summed over its
+        neuropils, to be kept. Releases threshold differently: FAFB's filtered
+        table and MCNS hold pairs of 5 or more, BANC pairs of 3 or more. BANC
+        and MCNS set 5 so the three compare. FAFB leaves it at 1, so a build
+        from one of its unthresholded tables, chosen with
+        ``--connections-file``, keeps what was asked for.
     """
 
     dataset_id: str
@@ -92,6 +102,7 @@ class DatasetInfo:
     license: str
     url: str
     citation: str
+    min_pair_syn: int = 1
 
 
 FAFB_783 = DatasetInfo(
@@ -106,6 +117,34 @@ FAFB_783 = DatasetInfo(
         "Schlegel et al. 2024 Nature 634:139 (doi:10.1038/s41586-024-07686-5); "
         "Eckstein et al. 2024 Cell 187:2574 (doi:10.1016/j.cell.2024.03.016)"
     ),
+)
+
+BANC_888 = DatasetInfo(
+    dataset_id="banc888",
+    name="BANC",
+    version="888",
+    organism="Drosophila melanogaster, adult female, brain and ventral nerve cord",
+    license="CC-BY-4.0",
+    url="https://codex.flywire.ai/banc",
+    citation=(
+        "Bates et al. 2026 Nature (doi:10.1038/s41586-026-10735-w); "
+        "data: Harvard Dataverse (doi:10.7910/DVN/7WTH1N)"
+    ),
+    min_pair_syn=5,
+)
+
+MCNS_1 = DatasetInfo(
+    dataset_id="mcns1",
+    name="FlyEM Male CNS",
+    version="1.0",
+    organism="Drosophila melanogaster, adult male, brain and ventral nerve cord",
+    license="CC-BY-4.0",
+    url="https://male-cns.janelia.org",
+    citation=(
+        "Sexual dimorphism in the complete connectome of the Drosophila male "
+        "central nervous system, bioRxiv 2025 (doi:10.1101/2025.10.09.680999)"
+    ),
+    min_pair_syn=5,
 )
 
 
