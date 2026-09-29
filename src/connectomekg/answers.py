@@ -29,8 +29,10 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from kg_utils.validation import bounded_int
+
 from connectomekg.colors import hop_color
-from connectomekg.validation import MAX_HOP, MAX_SCENE_NEURONS, bounded_int
+from connectomekg.validation import MAX_HOP, MAX_SCENE_NEURONS
 
 if TYPE_CHECKING:
     from connectomekg.module import ConnectomeKG

@@ -1494,14 +1494,14 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.24.0"
+version = "0.26.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 files = [
-    {file = "kgmodule_utils-0.24.0-py3-none-any.whl", hash = "sha256:15a807ba35e2a781c2feda195c76f7b13399819e366ac631aa5bd2876f11236a"},
-    {file = "kgmodule_utils-0.24.0.tar.gz", hash = "sha256:ab367e286c46bc3f19c290c355fd1bd03ca245205c684c57bba36856dea0cb8d"},
+    {file = "kgmodule_utils-0.26.0-py3-none-any.whl", hash = "sha256:4cacd27d38f8b1dd9fb9a0919bdd7c622c885286a1af047c478b669e91149491"},
+    {file = "kgmodule_utils-0.26.0.tar.gz", hash = "sha256:457dc1c55535233131bc8ef4536240bc8e69ab15e983ad9ae132f090c1d7c513"},
 ]
 
 [package.dependencies]
@@ -3789,15 +3789,15 @@ test = ["pytest (>=6,!=7.0.0,!=7.0.1)", "pytest-cov (>=3.0.0)", "pytest-qt"]
 
 [[package]]
 name = "quiltwright"
-version = "0.15.1"
+version = "0.16.0"
 description = "Holographic output for Looking Glass displays: off-axis multi-view quilts from PyVista, POV-Ray or Blender Cycles scenes"
 optional = true
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 markers = "extra == \"viz3d\""
 files = [
-    {file = "quiltwright-0.15.1-py3-none-any.whl", hash = "sha256:6645ef34d55bbd132525ced954172d25c4b4db8b4b2b047b479e23d12f8dc437"},
-    {file = "quiltwright-0.15.1.tar.gz", hash = "sha256:8afeb9f162e1a40bb0eb3d49ed8052a7205bee0fb6dbfff5f881463a74e729a9"},
+    {file = "quiltwright-0.16.0-py3-none-any.whl", hash = "sha256:f00fdbaf68ef8c9d560812e1604108f2a8a656d8d2eb0cf25b84b9ed65867cf2"},
+    {file = "quiltwright-0.16.0.tar.gz", hash = "sha256:b175cac71af722c320ef246a675ab064c34bfeb8839847a59e896af584b09ebe"},
 ]
 
 [package.dependencies]
@@ -5041,4 +5041,4 @@ viz3d = ["kgmodule-utils", "pyvistaqt", "quiltwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "afa77d3991dfad1dd6d902e355261052bdd99307351fefaabadd422c19f0a17b"
+content-hash = "5b1702c5a4333923df259a29a9878a2def9fed339c417e19bd21e4c96ac7f78b"

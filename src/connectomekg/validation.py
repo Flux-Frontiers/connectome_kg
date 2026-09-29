@@ -14,6 +14,11 @@ Bounds follow the reference implementations (genealogy_kg PR #3, swift_kg):
 a starting point sized to cover real result sizes while capping the worst
 case, not a specification. Out-of-range values raise rather than clamp: a
 truncated result that looks complete is worse than an error.
+
+The generic checks, ``bounded_int`` and ``require_query``, come from
+``kg_utils.validation``; the base class applies them to ``query()`` and
+``pack()`` with the ``max_*`` class attributes. This module keeps
+ConnectomeKG's own limits and the id and spec handling.
 """
 
 from __future__ import annotations
@@ -23,29 +28,21 @@ import re
 __all__ = [
     "MAX_FLOW_PAIRS",
     "MAX_HOP",
-    "MAX_K",
     "MAX_LABEL_PATTERN",
     "MAX_LIMIT",
-    "MAX_MAX_NODES",
     "MAX_MIN_SYN",
     "MAX_QUERY_LEN",
     "MAX_SCENE_NEURONS",
     "SCENE_POINT_BUDGET",
     "MAX_SKELETON_JOBS",
     "MAX_SKELETON_STEP",
-    "bounded_int",
     "normalize_node_id",
     "normalize_spec",
     "require_choice",
-    "require_query",
 ]
 
-#: Search seed count for ``query``/``pack``.
-MAX_K = 100
 #: Graph expansion hops, and cone depth.
 MAX_HOP = 5
-#: Nodes in a snippet pack.
-MAX_MAX_NODES = 500
 #: Rows returned by a listing (neurons per cone hop, partners, edges).
 MAX_LIMIT = 500
 #: Synapse threshold. The strongest v783 pair has 2,633 synapses.
@@ -84,46 +81,6 @@ MAX_SKELETON_JOBS = 64
 #: Neuropil-to-neuropil flow arcs drawn in one viz3d flow scene. FAFB v783 has
 #: 5,786 directed pairs; the top 200 already carry two thirds of all flow.
 MAX_FLOW_PAIRS = 500
-
-
-def bounded_int(name: str, value: int, minimum: int, maximum: int) -> int:
-    """Return ``value`` if it lies within ``[minimum, maximum]``, else raise.
-
-    :param name: Parameter name, used in the error message.
-    :param value: Value to check.
-    :param minimum: Smallest accepted value, inclusive.
-    :param maximum: Largest accepted value, inclusive.
-    :return: The validated value as an ``int``.
-    :raises ValueError: If the value is not an integer or is out of range.
-    """
-    if isinstance(value, bool):
-        raise ValueError(f"{name} must be an integer, got {value!r}")
-    try:
-        ivalue = int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{name} must be an integer, got {value!r}") from exc
-    if ivalue != value:
-        raise ValueError(f"{name} must be an integer, got {value!r}")
-    if not minimum <= ivalue <= maximum:
-        raise ValueError(f"{name} must be between {minimum} and {maximum}, got {ivalue}")
-    return ivalue
-
-
-def require_query(q: str) -> str:
-    """Return a stripped, length-capped query string, or raise.
-
-    :param q: Raw query text.
-    :return: The stripped query.
-    :raises ValueError: If it is not a string, is empty, or exceeds :data:`MAX_QUERY_LEN`.
-    """
-    if not isinstance(q, str):
-        raise ValueError(f"query must be a string, got {type(q).__name__}")
-    stripped = q.strip()
-    if not stripped:
-        raise ValueError("query must not be empty")
-    if len(stripped) > MAX_QUERY_LEN:
-        raise ValueError(f"query must be at most {MAX_QUERY_LEN} characters, got {len(stripped)}")
-    return stripped
 
 
 def require_choice(name: str, value: str, choices: tuple[str, ...]) -> str:
