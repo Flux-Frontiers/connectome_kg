@@ -9,34 +9,26 @@ from connectomekg.cli import cli
 from connectomekg.validation import (
     MAX_LABEL_PATTERN,
     MAX_QUERY_LEN,
-    bounded_int,
     normalize_node_id,
     normalize_spec,
     require_choice,
-    require_query,
 )
 
 
-def test_bounded_int_accepts_the_range_and_names_it_when_out():
-    assert bounded_int("k", 1, 1, 100) == 1 and bounded_int("k", 100, 1, 100) == 100
-    with pytest.raises(ValueError, match="k must be between 1 and 100, got 0"):
-        bounded_int("k", 0, 1, 100)
-    with pytest.raises(ValueError, match="between 1 and 100, got 101"):
-        bounded_int("k", 101, 1, 100)
-
-
-@pytest.mark.parametrize("bad", [True, 2.5, "5", None])
-def test_bounded_int_rejects_non_integers(bad):
-    with pytest.raises(ValueError, match="must be an integer"):
-        bounded_int("k", bad, 1, 100)
-
-
-def test_require_query_strips_and_caps():
-    assert require_query("  giant fiber  ") == "giant fiber"
-    with pytest.raises(ValueError, match="must not be empty"):
-        require_query("   ")
+@pytest.mark.parametrize("method", ["query", "pack"])
+def test_search_bounds_come_from_the_sdk_with_connectomes_query_cap(kg, method):
+    """Bad arguments are reported before a missing vector index."""
+    search = getattr(kg, method)
     with pytest.raises(ValueError, match=f"at most {MAX_QUERY_LEN}"):
-        require_query("x" * (MAX_QUERY_LEN + 1))
+        search("x" * (MAX_QUERY_LEN + 1))
+    with pytest.raises(ValueError, match="must not be empty"):
+        search("   ")
+    with pytest.raises(ValueError, match="k must be an integer"):
+        search("giant fiber", k=True)
+    with pytest.raises(ValueError, match="hop must be between 0 and 5"):
+        search("giant fiber", hop=6)
+    with pytest.raises(ValueError, match="max_nodes must be between 1 and 500"):
+        search("giant fiber", max_nodes=501)
 
 
 def test_require_choice():

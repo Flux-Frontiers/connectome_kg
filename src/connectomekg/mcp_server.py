@@ -45,12 +45,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+from kg_utils.validation import bounded_int
 from mcp.server.fastmcp import FastMCP
 
 from connectomekg.datasets import STORE_DIR, dataset_dir, resolve_dataset
 from connectomekg.module import ConnectomeKG
 from connectomekg.snapshots import SnapshotManager
-from connectomekg.validation import MAX_LIMIT, bounded_int, normalize_node_id
+from connectomekg.validation import MAX_LIMIT, normalize_node_id
 
 _kg: ConnectomeKG | None = None
 _snapshot_mgr: SnapshotManager | None = None

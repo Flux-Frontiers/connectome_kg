@@ -11,6 +11,7 @@ from typing import Any
 from kg_utils.extractor import KGExtractor
 from kg_utils.pipeline import KGModule
 from kg_utils.specs import QueryResult, SnippetPack
+from kg_utils.validation import bounded_int, require_query
 
 from connectomekg.circuits import circuit_specs, is_circuit
 from connectomekg.extractor import DEFAULT_RELS, EDGE_KINDS, NODE_KINDS, ConnectomeExtractor
@@ -21,15 +22,12 @@ from connectomekg.readers.synthetic import synthetic_tables
 from connectomekg.schema import FAFB_783, ConnectomeTables, DatasetInfo
 from connectomekg.validation import (
     MAX_HOP,
-    MAX_K,
     MAX_LIMIT,
-    MAX_MAX_NODES,
     MAX_MIN_SYN,
-    bounded_int,
+    MAX_QUERY_LEN,
     normalize_node_id,
     normalize_spec,
     require_choice,
-    require_query,
 )
 
 _KIND_PRIORITY = {
@@ -66,6 +64,9 @@ class ConnectomeKG(KGModule):
     """
 
     _default_dir = ".connectomekg"
+    #: Tighter than the SDK default, because the MCP server can take queries
+    #: over SSE; the base class applies it in query() and pack().
+    max_query_len = MAX_QUERY_LEN
 
     def __init__(
         self,
@@ -200,7 +201,7 @@ class ConnectomeKG(KGModule):
         :raises ValueError: On an out-of-range argument.
         :raises FileNotFoundError: When the vector index has not been built.
         """
-        q, k, hop = self._check_search(q, k, hop, kw)
+        q = self._check_search(q, k, hop, kw)
         return super().query(q, k=k, hop=hop, rels=rels, **kw)
 
     def pack(
@@ -222,21 +223,19 @@ class ConnectomeKG(KGModule):
         :raises ValueError: On an out-of-range argument.
         :raises FileNotFoundError: When the vector index has not been built.
         """
-        q, k, hop = self._check_search(q, k, hop, kw)
+        q = self._check_search(q, k, hop, kw)
         return super().pack(q, k=k, hop=hop, rels=rels, **kw)
 
-    def _check_search(self, q: str, k: int, hop: int, kw: dict[str, Any]) -> tuple[str, int, int]:
-        q = require_query(q)
-        k = bounded_int("k", k, 1, MAX_K)
-        hop = bounded_int("hop", hop, 0, MAX_HOP)
-        if kw.get("max_nodes") is not None:
-            kw["max_nodes"] = bounded_int("max_nodes", kw["max_nodes"], 1, MAX_MAX_NODES)
+    def _check_search(self, q: str, k: int, hop: int, kw: dict[str, Any]) -> str:
+        # The base class validates again in query()/pack(); checking here
+        # first reports a bad argument before a missing index.
+        q = self._validate_query_args(q, k=k, hop=hop, max_nodes=kw.get("max_nodes"))
         if not Path(self.vectors_path).exists():
             raise FileNotFoundError(
                 f"no vector index at {self.vectors_path}: semantic search needs a build "
                 "without --no-index and the semantic extra"
             )
-        return q, k, hop
+        return q
 
     # --------------------------------------------------------- navigation
     @property
@@ -536,7 +535,7 @@ class ConnectomeKG(KGModule):
         :return: Dicts with ``id``, ``kind``, ``name`` and ``qualname``.
         :raises ValueError: On an out-of-range argument or unknown kind.
         """
-        needle = require_query(name)
+        needle = require_query(name, MAX_QUERY_LEN)
         if kind:
             require_choice("kind", kind, NODE_KINDS)
         limit = bounded_int("limit", limit, 1, MAX_LIMIT)

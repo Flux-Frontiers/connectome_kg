@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **The local copies of `bounded_int` and `require_query` are gone**
+  (`kgrag_priv` sweep item 52). They come from `kg_utils.validation`, whose
+  versions were lifted from this repo's and hardened in kgmodule-utils
+  0.25.0. `query()` and `pack()` validate through the base class's
+  `_validate_query_args`, still before the missing-index check, with the
+  500-character cap set as the `max_query_len` class attribute. The
+  `MAX_K` and `MAX_MAX_NODES` constants, which only those checks used, go
+  with them.
+
+### Changed
+
+- **Fleet dependency floors raised to the latest releases and relocked:**
+  `kgmodule-utils` to `>=0.26.0` and `quiltwright` to `>=0.16.0`.
+
 ## [0.8.0] - 2026-09-23
 
 ### Added

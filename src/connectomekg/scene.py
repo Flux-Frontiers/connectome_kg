@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Final
 
 import numpy as np
 from kg_utils.store import GraphStore
+from kg_utils.validation import bounded_int
 from kg_utils.viz3d import seed_from_key
 
 from connectomekg.colors import REGION_COLOR, SIGN_COLOR, SUPER_CLASS_COLOR, UNKNOWN_COLOR
@@ -58,7 +59,6 @@ from connectomekg.validation import (
     MAX_SCENE_NEURONS,
     MAX_SKELETON_STEP,
     SCENE_POINT_BUDGET,
-    bounded_int,
     require_choice,
 )
 
@@ -1034,7 +1034,7 @@ def build_brain_scene(
         The flow view ignores it and draws the cloud in neutral gray.
     :param skeleton_step: Skeleton simplification stride; ``None`` chooses one
         by neuron count via :func:`auto_skeleton_step`. Bounded to
-        ``[1, MAX_SKELETON_STEP]`` via :func:`~connectomekg.validation.bounded_int`.
+        ``[1, MAX_SKELETON_STEP]`` via :func:`~kg_utils.validation.bounded_int`.
     :param tubes: Draw circuit skeletons as tubes instead of lines.
     :param top: Flow arcs drawn, strongest first, bounded to
         ``[1, MAX_FLOW_PAIRS]``.
