@@ -135,8 +135,8 @@ def graph_stats() -> str:
     """What the loaded graph holds: the dataset, its counts, and nodes and edges by kind.
 
     :return: JSON with dataset_id, dataset_version, n_neurons, n_cell_types,
-        n_neuropils, n_pairs, n_synapses, total_nodes, total_edges, node_counts
-        and edge_counts.
+        n_neuropils, n_pairs, n_synapses, and the fleet stats shape's kind,
+        nodes (total, by_kind) and edges (total, by_rel).
     """
     s = _get_kg().stats()
     keys = (
@@ -147,10 +147,9 @@ def graph_stats() -> str:
         "n_neuropils",
         "n_pairs",
         "n_synapses",
-        "total_nodes",
-        "total_edges",
-        "node_counts",
-        "edge_counts",
+        "kind",
+        "nodes",
+        "edges",
     )
     return _json({k: s[k] for k in keys if k in s})
 

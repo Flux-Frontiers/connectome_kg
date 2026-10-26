@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from kg_utils.stats import stats_problems
 
 from connectomekg import ConnectomeKG
 from connectomekg.cli import cli, cmd_build
@@ -20,13 +21,14 @@ from connectomekg.readers.synthetic import write_codex_dir
 def test_kind_and_stats(kg):
     assert kg.kind() == "connectome"
     s = kg.stats()
-    assert s["total_nodes"] > 600 and s["total_edges"] > 600
+    assert stats_problems(s) == [] and s["kind"] == "connectome"
+    assert s["nodes"]["total"] > 600 and s["edges"]["total"] > 600
     # The graph in its own terms, under the names the snapshots already use.
     assert s["dataset_id"] == "synthetic"
-    assert s["n_neurons"] == s["node_counts"]["neuron"] > 0
-    assert s["n_cell_types"] == s["node_counts"]["cell_type"] > 0
-    assert s["n_neuropils"] == s["node_counts"]["neuropil"] > 0
-    assert s["n_pairs"] == s["edge_counts"]["SYNAPSES_TO"] > 0
+    assert s["n_neurons"] == s["nodes"]["by_kind"]["neuron"] > 0
+    assert s["n_cell_types"] == s["nodes"]["by_kind"]["cell_type"] > 0
+    assert s["n_neuropils"] == s["nodes"]["by_kind"]["neuropil"] > 0
+    assert s["n_pairs"] == s["edges"]["by_rel"]["SYNAPSES_TO"] > 0
     assert s["n_synapses"] >= s["n_pairs"]
     # The SDK's code-graph fields are always zero on a connectome: not reported.
     code_keys = {

@@ -118,8 +118,9 @@ class ConnectomeKG(KGModule):
     def stats(self) -> dict[str, Any]:
         """Node and edge counts, and what they add up to for a connectome.
 
-        The SDK's counts are kept: ``total_nodes``, ``total_edges``,
-        ``node_counts`` by kind, ``edge_counts`` by relation, ``db_path``,
+        The SDK's counts are kept, in the fleet stats shape
+        (:mod:`kg_utils.stats`): ``kind``, ``nodes`` (``total``, ``by_kind``),
+        ``edges`` (``total``, ``by_rel``), plus ``db_path``,
         ``snapshot_count`` and ``vector_backend``. Its code-graph fields
         (module, class, function and method counts, docstring coverage) are
         dropped, and the graph is described in its own terms instead, under
@@ -131,7 +132,7 @@ class ConnectomeKG(KGModule):
             count, as the build recorded it on the dataset node).
         """
         s = {k: v for k, v in super().stats().items() if k not in self._CODE_GRAPH_KEYS}
-        kinds = s["node_counts"]
+        kinds = s["nodes"]["by_kind"]
         row = self.store.con.execute(
             "SELECT qualname, metadata FROM nodes WHERE kind='dataset'"
         ).fetchone()
@@ -142,7 +143,7 @@ class ConnectomeKG(KGModule):
             "n_neurons": kinds.get("neuron", 0),
             "n_cell_types": kinds.get("cell_type", 0),
             "n_neuropils": kinds.get("neuropil", 0),
-            "n_pairs": s["edge_counts"].get("SYNAPSES_TO", 0),
+            "n_pairs": s["edges"]["by_rel"].get("SYNAPSES_TO", 0),
             "n_synapses": meta.get("n_synapses", 0),
         }
         # The dataset first, the store's own housekeeping last.
@@ -574,12 +575,12 @@ class ConnectomeKG(KGModule):
         out.append("")
         out.append("| kind | nodes |")
         out.append("|---|---|")
-        for k, v in sorted(s["node_counts"].items()):
+        for k, v in sorted(s["nodes"]["by_kind"].items()):
             out.append(f"| {k} | {v} |")
         out.append("")
         out.append("| relation | edges |")
         out.append("|---|---|")
-        for k, v in sorted(s["edge_counts"].items()):
+        for k, v in sorted(s["edges"]["by_rel"].items()):
             out.append(f"| {k} | {v} |")
         out.append("")
 
@@ -622,7 +623,7 @@ class ConnectomeKG(KGModule):
             out.append(f"| {name} | {n} | {syn} |")
         out.append("")
 
-        n_neu = s["node_counts"].get("neuron", 0)
+        n_neu = s["nodes"]["by_kind"].get("neuron", 0)
         typed = con.execute(
             "SELECT COUNT(*) FROM nodes WHERE kind='neuron' AND "
             "json_extract(metadata,'$.cell_type') != ''"

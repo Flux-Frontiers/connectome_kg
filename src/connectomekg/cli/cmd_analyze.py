@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import click
+from kg_utils.stats import flat_stats
 
 from connectomekg.cli.group import cli
 from connectomekg.cli.options import open_kg
@@ -13,7 +14,8 @@ from connectomekg.cli.options import open_kg
 def stats(ctx: click.Context) -> None:
     """Node and edge counts for the built graph."""
     with open_kg(ctx.obj["root"], dataset=ctx.obj["dataset"]) as kg:
-        for k, v in kg.stats().items():
+        # Flat keys for people (total_nodes, node_counts, ...), as the docs show.
+        for k, v in flat_stats(kg.stats()).items():
             click.echo(f"{k}: {v}")
 
 
