@@ -19,7 +19,9 @@
       "command": ".venv/bin/connkg-mcp",
       "args": [
         "--root",
-        "."
+        ".",
+        "--dataset",
+        "fafb783"
       ]
     }
   }

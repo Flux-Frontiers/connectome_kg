@@ -8,6 +8,7 @@ from connectomekg.cli import (  # noqa: F401
     cmd_analyze,
     cmd_build,
     cmd_data,
+    cmd_mcp,
     cmd_query,
     cmd_snapshot,
     cmd_viz,

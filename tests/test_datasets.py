@@ -91,13 +91,11 @@ def test_a_pre_dataset_store_gets_a_move_hint(tmp_path):
         resolve_dataset(tmp_path)
 
 
-def test_mcp_server_opens_the_named_dataset(two, monkeypatch):
-    monkeypatch.setattr(mcp_server.mcp, "run", lambda transport: None)
-    try:
-        mcp_server.main(["--root", two, "--dataset", "large"])
-        assert mcp_server._kg.db_path == graph_path(two, "large").resolve()
-        with pytest.raises(SystemExit, match="name one with --dataset"):
-            mcp_server.main(["--root", two])
-    finally:
-        mcp_server._kg = None
-        mcp_server._snapshot_mgr = None
+def test_mcp_server_serves_the_named_dataset(two):
+    home = mcp_server.dataset_home(two, "large")
+    assert home == dataset_dir(two, "large").resolve()
+    assert (home / ".connectomekg" / "graph.sqlite") == graph_path(two, "large").resolve()
+    # A dataset directory is served as it is, with nothing to resolve.
+    assert mcp_server.dataset_home(home) == home
+    with pytest.raises(ValueError, match="name one with --dataset"):
+        mcp_server.dataset_home(two)

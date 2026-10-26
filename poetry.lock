@@ -1505,6 +1505,8 @@ files = [
 ]
 
 [package.dependencies]
+click = {version = ">=8.1.0", optional = true, markers = "extra == \"mcp\""}
+mcp = {version = ">=1.23.0,<2", optional = true, markers = "extra == \"mcp\""}
 numpy = [
     {version = ">=1.24.0", optional = true, markers = "extra == \"semantic\""},
     {version = ">=1.24.0", optional = true, markers = "extra == \"viz3d-qt\" or extra == \"viz3d-render\""},
@@ -5042,4 +5044,4 @@ viz3d = ["kgmodule-utils", "pyvistaqt", "quiltwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "85bddc887424eb8ebe0e40b8ea088b3a47f026cddbe27b3a48595bbb0763fe3f"
+content-hash = "eaf9ff14101ee765e4af0750346ac8cce3b503b801eef461da0246482c045376"

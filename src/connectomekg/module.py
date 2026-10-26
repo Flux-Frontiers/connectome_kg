@@ -432,6 +432,29 @@ class ConnectomeKG(KGModule):
         """
         return self.store.node(normalize_node_id(node_id))
 
+    def neighbors(
+        self,
+        node_id: str,
+        *,
+        rels: tuple[str, ...] | list[str] | None = None,
+        direction: str = "both",
+        limit: int = 50,
+    ) -> dict[str, Any] | None:
+        """A node's one-hop neighborhood, accepting the id forms :meth:`describe` does.
+
+        :meth:`kg_utils.pipeline.KGModule.neighbors`, with the id normalized.
+
+        :param node_id: Node id; surrounding backticks, quotes and whitespace are stripped.
+        :param rels: Relation types to follow, or ``None`` for all of them.
+        :param direction: ``"out"``, ``"in"`` or ``"both"``.
+        :param limit: Most edges, 1-500.
+        :return: ``{"node", "edges", "nodes"}``, or ``None`` if there is no such node.
+        :raises ValueError: If the id is empty or too long, or an option is out of range.
+        """
+        return super().neighbors(
+            normalize_node_id(node_id), rels=rels, direction=direction, limit=limit
+        )
+
     def cell_type_node(self, name: str) -> dict[str, Any]:
         """The node for a cell type, by exact name.
 
