@@ -1,18 +1,31 @@
-# Release Notes -- v0.8.1
+# Release Notes -- v0.9.0
 
-> Released: 2026-09-29
+> Released: 2026-10-26
 
-This is a maintenance release. ConnectomeKG now uses the shared query validators from kgmodule-utils instead of its own copies, and the fleet dependency floors are raised to the latest releases. No commands, options or graph contents change.
+`ConnectomeKG.stats()` now returns the fleet's statistics shape, the one every
+KG module and KGRAG read since kgmodule-utils 0.29.0. Against that release the
+old reads of the flat keys raised, so this version is the one to use with it.
+No commands, options or graph contents change.
 
 ## What changed
 
-**Shared query validation.** The local `bounded_int` and `require_query` helpers are removed. They were the originals that kgmodule-utils lifted and hardened in 0.25.0, so the two copies had started to diverge. `query()` and `pack()` now validate through the base class, still before the missing-index check, and the 500-character query cap is set as a class attribute. The `MAX_K` and `MAX_MAX_NODES` constants, which only those checks used, are gone with them.
+**Statistics in the fleet shape.** `ConnectomeKG.stats()` returns `kind`
+(`connectome`), `nodes` (`total`, `by_kind`) and `edges` (`total`, `by_rel`),
+plus the connectome figures: `dataset_id`, `n_neurons`, `n_cell_types`,
+`n_neuropils`, `n_pairs` and `n_synapses`. The MCP `graph_stats` tool returns
+`kind`, `nodes` and `edges` in place of the four flat count keys.
+`connkg stats` still prints the flat keys, and snapshots record what they did
+before.
 
-**Newer dependency floors.** `kgmodule-utils` is now `>=0.26.0` and `quiltwright` is `>=0.16.0`, and the lock file is refreshed.
+**Newer dependency floor.** `kgmodule-utils` is now `>=0.29.0` for the package
+and every extra, and the lock file is refreshed.
 
 ## Upgrading
 
-Nothing to do. No graph needs a rebuild: the extractor is unchanged, and the FAFB, BANC and MCNS graphs built with 0.8.0 stay valid. Code that imported `bounded_int`, `require_query`, `MAX_K` or `MAX_MAX_NODES` from `connectomekg.validation` should import the validators from `kg_utils.validation` instead.
+Code that read `ConnectomeKG.stats()["node_counts"]` reads
+`["nodes"]["by_kind"]` instead, and `["total_nodes"]` becomes
+`["nodes"]["total"]`. Scripts that parse the MCP `graph_stats` result read the
+same nested keys. Nothing needs rebuilding.
 
 ---
 
