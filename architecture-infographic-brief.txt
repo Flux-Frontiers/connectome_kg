@@ -148,10 +148,10 @@ Four ways in, drawn as four branches from the engine:
      build, verify, files, fixture, datasets, specs, stats, analyze, snapshot,
      query, path, cone, influence, link, skeletons, meshes, viz, viz3d, quilt
 
-  B. MCP SERVER: `connkg-mcp`, 16 tools over stdio or SSE
-     graph_stats, find_nodes, get_node, node_edges, neurons_of, type_partners,
-     influence, strongest_path, cone, neuroglancer_link, query_connectome,
-     pack_connectome, analyze_connectome, snapshot_list/show/diff
+  B. MCP SERVER: `connkg mcp` on kg_utils.mcp, 17 tools over stdio or HTTP
+     stats, query, pack, get_node, neighbors (canonical), then find_nodes,
+     node_edges, neurons_of, type_partners, influence, strongest_path, cone,
+     neuroglancer_link, analyze_connectome, snapshot_list/show/diff
      Caption: this is how an AI agent uses the brain.
 
   C. PYTHON API: `ConnectomeKG`, a KGModule. Also the federation path into

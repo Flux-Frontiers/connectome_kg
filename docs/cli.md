@@ -174,8 +174,8 @@ db_path: /Users/egs/repos/connectome_kg/connectomes/fafb783/.connectomekg/graph.
 ```
 
 `n_pairs` is the `SYNAPSES_TO` edge count and `n_synapses` the synapses those
-pairs carry, as the build recorded them on the dataset node. The `graph_stats`
-MCP tool returns the same figures.
+pairs carry, as the build recorded them on the dataset node. The `stats` MCP
+tool returns the same figures, beside the fleet's `nodes` and `edges` counts.
 
 ### `connkg analyze`
 
@@ -450,18 +450,29 @@ See [Using the viewer](rendering.md#using-the-viewer).
 
 ## The MCP server
 
-### `connkg-mcp`
+### `connkg mcp`
 
-Serves the graph to an AI agent over the Model Context Protocol: the same
-queries as the CLI, as tools. A separate entry point, not a `connkg`
-subcommand.
+Serves one dataset's graph to an AI agent over the Model Context Protocol: the
+same queries as the CLI, as tools. It is built on the fleet's shared server
+base, `kg_utils.mcp`. The dataset is `connkg`'s own `--dataset` (or
+`$CONNKG_DATASET`, or the only built dataset). `connkg-mcp` is the same command
+under its older name, and still takes `--root` and `--dataset` itself.
+
+```bash
+connkg --root /path/to/connectome_kg --dataset fafb783 mcp
+connkg mcp --repo /path/to/connectome_kg/connectomes/fafb783
+connkg mcp --manifest
+```
 
 | option | meaning |
 |---|---|
-| `--root ROOT` | Directory holding `connectomes/<dataset>/`. `--repo` is accepted as an alias for fleet configs |
-| `--dataset DATASET` | Dataset id. Default: the only built dataset under `--root` |
-| `--db DB` | Graph path. Default `<root>/connectomes/<dataset>/.connectomekg/graph.sqlite` |
-| `--transport [stdio\|sse]` | Default `stdio`, which is what an `.mcp.json` entry wants |
+| `--repo DIR` | A root holding `connectomes/<dataset>/`, or a dataset directory itself. Default `connkg`'s `--root` |
+| `--db PATH` | Graph path. Default the dataset's `.connectomekg/graph.sqlite` |
+| `--vectors PATH` | Vector store. Default the one beside the graph |
+| `--model NAME` | Embedding model. Default the build's default |
+| `--transport [stdio\|streamable-http]` | Default `stdio`, which is what an `.mcp.json` entry wants |
+| `--host`, `--port` | Bind address for `streamable-http`. Default `127.0.0.1:8765` |
+| `--manifest` | Print the tools as JSON and exit, without opening a graph |
 
 ```json
 {
@@ -477,18 +488,25 @@ subcommand.
 Put the entry in a project's `.mcp.json`, which holds absolute paths and is
 gitignored. If `connkg-mcp` is not on the client's `PATH`, give the full path,
 for example `/path/to/connectome_kg/.venv/bin/connkg-mcp`. To serve two
-datasets, add two entries.
+datasets, add two entries. Each session opens the graph when it starts and
+closes it when it ends; a dataset with no graph is refused, not served empty.
 
 | tool | answers |
 |---|---|
-| `graph_stats`, `analyze_connectome` | Counts; the Markdown report |
-| `find_nodes`, `get_node`, `node_edges` | Find a node by name; its metadata; its edges (neuropils, columns, nerves, ontology terms) |
+| `stats`, `analyze_connectome` | Counts, by kind and relation and in the connectome's own terms; the Markdown report |
+| `get_node`, `neighbors` | One node's metadata; its edges in either direction and the nodes at their ends |
+| `find_nodes`, `node_edges` | Find a node by name; one relation's edges (neuropils, columns, nerves, ontology terms) |
 | `neurons_of`, `type_partners` | Resolve a spec to neurons; a type's partner types by synapses |
 | `strongest_path`, `cone` | The strongest synaptic route; everything within N hops |
 | `influence` | Effective connectivity: the share of a target's input the source drives, per hop, signed |
 | `neuroglancer_link` | A Neuroglancer URL showing up to seven specs as meshes, one color each |
-| `query_connectome`, `pack_connectome` | Semantic search. Needs a build with the vector index |
+| `query`, `pack` | Semantic search. Needs a build with the vector index |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | Saved metric snapshots |
+
+The first five are the canonical tools every Flux-Frontiers KG server shares
+(`kg_utils.mcp`); `connkg mcp --manifest` prints the full list as JSON without
+opening a graph. In connectome-kg 0.9.0 and earlier, `stats`, `query` and
+`pack` were `graph_stats`, `query_connectome` and `pack_connectome`.
 
 Every argument is bounded and checked inside `ConnectomeKG`, so the CLI and
 the server reject the same bad input with the same message:

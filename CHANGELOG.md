@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: the MCP server is built on `kg_utils.mcp`**, the fleet's shared
+  server base (`kgrag_priv` MCP centralization plan). Tools take the canonical
+  names every fleet KG server shares, with no aliases: `graph_stats` ->
+  `stats`, `query_connectome` -> `query`, `pack_connectome` -> `pack`, plus the
+  new `neighbors`. `get_node` keeps its decoded-metadata answer, now a tool
+  error rather than `null` for a missing node, and `find_nodes`, `node_edges`,
+  `neurons_of`, `type_partners`, `influence`, `strongest_path`, `cone`,
+  `neuroglancer_link`, `analyze_connectome` and the snapshot tools keep their
+  names. 17 tools, the canonical five first.
+- **`connkg mcp`** is the standard command (`--repo`, `--db`, `--vectors`,
+  `--model`, `--transport stdio|streamable-http`, `--host`, `--port`,
+  `--manifest`), with the dataset from `connkg --dataset` (or
+  `$CONNKG_DATASET`, or the only one built); `--repo` may name a root or a
+  dataset directory. `connkg-mcp` stays as the same command and still takes
+  `--root` and `--dataset`, so existing configs keep working. `sse` is gone.
+  The graph is opened per session, and a dataset with no graph is refused.
+- The direct `mcp` pin is replaced by `kgmodule-utils[mcp]>=0.29.0`.
+
+### Added
+
+- `ConnectomeKG.neighbors()` strips backticks and quotes from the id, as
+  `describe()` does.
+
 ## [0.9.0] - 2026-10-26
 
 ### Changed

@@ -266,7 +266,7 @@ with ConnectomeKG("/tmp/kg/connectomes/synthetic1k") as kg:
 
 ### Serve the graph to an AI agent
 
-`connkg-mcp` serves the graph over the Model Context Protocol (MCP), so an agent such as Claude Code can call `strongest_path`, `cone`, `influence` and the other queries as tools. Add an entry to your project's `.mcp.json`:
+`connkg mcp` serves the graph over the Model Context Protocol (MCP), so an agent such as Claude Code can call `strongest_path`, `cone`, `influence` and the other queries as tools, beside the five canonical tools every Flux-Frontiers KG server shares (`stats`, `query`, `pack`, `get_node`, `neighbors`). `connkg-mcp` is the same command. Add an entry to your project's `.mcp.json`:
 
 ```json
 {
@@ -294,7 +294,7 @@ The full documentation is at [flux-frontiers.github.io/connectome_kg](https://fl
 | [Get the data](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/DOWNLOAD.md) | The Codex files for each release, checksums, reproducible snapshots and the build footprint |
 | [Asking the graph a question](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/queries.md) | The spec and answer grammar, path weighting, `path`, `cone`, `influence`, `query` and `link` |
 | [What is in the graph](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/graph.md) | Node and edge kinds, transmitter signs and the one-graph-per-connectome layout |
-| [Command reference](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/cli.md) | Every `connkg` command and `connkg-mcp`, with options and an example each |
+| [Command reference](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/cli.md) | Every `connkg` command, including `connkg mcp`, with options and an example each |
 | [Rendering the connectome in 3-D](https://github.com/Flux-Frontiers/connectome_kg/blob/main/docs/rendering.md) | `connkg quilt` and `connkg viz3d`, how each view is drawn, and Looking Glass quilts |
 | [CHANGELOG.md](https://github.com/Flux-Frontiers/connectome_kg/blob/main/CHANGELOG.md) | Release history |
 

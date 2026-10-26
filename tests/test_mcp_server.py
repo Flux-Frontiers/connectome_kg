@@ -1,27 +1,49 @@
-"""The MCP server, driven over the real protocol.
+"""The MCP server on kg_utils.mcp, driven over the real protocol.
 
 Every tool is called through ``mcp.shared.memory``'s in-process transport, an
-actual ``Server.run()`` and lifespan cycle with a ``ClientSession``, not a call
-into the ``ConnectomeKG`` method underneath. That is the harness FLEET_STANDARDS
-names for MCP servers (genealogy_kg's test_mcp_lifespan.py and test_mcp_tools.py).
+actual ``Server.run()`` and lifespan cycle with a ``ClientSession``, against a
+synthetic connectome built by ``ConnectomeKG`` itself. That is the harness
+FLEET_STANDARDS names for MCP servers. The server opens its own graph per
+session, as it does in production.
+
+Then the surface step 2 of kgrag_priv's MCP centralization plan promises for a
+module: the five canonical tools first, under the names every fleet server
+shares, then ConnectomeKG's own; the manifest answers without a graph;
+``connkg``'s other commands do not import ``mcp``; a dataset is resolved under
+a root; ``connkg-mcp`` keeps ``--root`` and ``--dataset``; and a real stdio
+subprocess serves.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio
 import pytest
+from click.testing import CliRunner
+from kg_utils.mcp import CANONICAL_TOOLS, manifest
+from kg_utils.stats import stats_problems
+from mcp import StdioServerParameters
 from mcp.client.session import ClientSession
+from mcp.client.stdio import stdio_client
 from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import CallToolResult, TextContent
 
-from connectomekg import ConnectomeKG, mcp_server
+import connectomekg
+from connectomekg import ConnectomeKG
+from connectomekg.cli import cli
+from connectomekg.datasets import dataset_dir
+from connectomekg.mcp_server import EXTRA_TOOLS, build_server
 from connectomekg.readers.synthetic import synthetic_tables
 from connectomekg.schema import FAFB_783
-from connectomekg.snapshots import SnapshotManager
+
+_SRC = str(Path(connectomekg.__file__).resolve().parents[1])
 
 pytestmark = pytest.mark.anyio
 
@@ -42,17 +64,9 @@ def graph_root(tables, tmp_path_factory) -> Path:
 
 
 @asynccontextmanager
-async def _session(root: Path) -> AsyncIterator[ClientSession]:
-    mcp_server._kg = ConnectomeKG(root)
-    mcp_server._snapshot_mgr = SnapshotManager(
-        root / ".connectomekg" / "snapshots", db_path=mcp_server._kg.db_path
-    )
-    try:
-        async with create_connected_server_and_client_session(mcp_server.mcp) as session:
-            yield session
-    finally:
-        mcp_server._kg = None
-        mcp_server._snapshot_mgr = None
+async def _session(root: Path, **kwargs) -> AsyncIterator[ClientSession]:
+    async with create_connected_server_and_client_session(build_server(root, **kwargs)) as session:
+        yield session
 
 
 def _text(result: CallToolResult) -> str:
@@ -71,32 +85,17 @@ async def _error(session: ClientSession, tool: str, **args) -> str:
     return _text(result)
 
 
-async def test_every_tool_is_registered(graph_root):
+async def test_canonical_tools_then_the_extras(graph_root):
     async with _session(graph_root) as s:
-        names = {t.name for t in (await s.list_tools()).tools}
-    assert names == {
-        "graph_stats",
-        "find_nodes",
-        "get_node",
-        "node_edges",
-        "neurons_of",
-        "type_partners",
-        "strongest_path",
-        "influence",
-        "cone",
-        "neuroglancer_link",
-        "query_connectome",
-        "pack_connectome",
-        "analyze_connectome",
-        "snapshot_list",
-        "snapshot_show",
-        "snapshot_diff",
-    }
+        names = [t.name for t in (await s.list_tools()).tools]
+    assert names == [*CANONICAL_TOOLS, *(fn.__name__ for fn in EXTRA_TOOLS)]
+    assert not {"graph_stats", "query_connectome", "pack_connectome"} & set(names)
 
 
 async def test_lookup_tools(graph_root):
     async with _session(graph_root) as s:
-        stats = await _call(s, "graph_stats")
+        stats = await _call(s, "stats")
+        assert stats_problems(stats) == [] and stats["kind"] == "connectome"
         assert stats["nodes"]["by_kind"]["neuron"] == 600
         assert stats["n_neurons"] == 600 and stats["dataset_id"] == "synthetic"
         assert "module_count" not in stats
@@ -106,7 +105,12 @@ async def test_lookup_tools(graph_root):
 
         node = await _call(s, "get_node", node_id="`connectome:synthetic:t:LC4`")
         assert node["name"] == "LC4" and node["metadata"]["n_neurons"] == 8
-        assert await _call(s, "get_node", node_id="connectome:synthetic:t:NOPE") is None
+        assert "no node with id" in await _error(
+            s, "get_node", node_id="connectome:synthetic:t:NOPE"
+        )
+
+        near = await _call(s, "neighbors", node_id="`connectome:synthetic:t:LC4`", rels=["MAPS_TO"])
+        assert [n["id"] for n in near["nodes"]] == ["connectome:synthetic:fbbt:FBbt_99000007"]
 
         terms = await _call(s, "node_edges", node_id="connectome:synthetic:t:LC4", rel="MAPS_TO")
         assert [e["node"] for e in terms] == ["connectome:synthetic:fbbt:FBbt_99000007"]
@@ -158,16 +162,16 @@ async def test_report_and_snapshot_tools(graph_root):
 
 async def test_semantic_search_without_an_index_says_why(graph_root):
     async with _session(graph_root) as s:
-        assert "no vector index" in await _error(s, "query_connectome", q="giant fiber")
-        assert "no vector index" in await _error(s, "pack_connectome", q="giant fiber")
+        assert "no vector index" in await _error(s, "query", q="giant fiber")
+        assert "no vector index" in await _error(s, "pack", q="giant fiber")
 
 
 @pytest.mark.parametrize(
     ("tool", "args", "message"),
     [
-        ("query_connectome", {"q": "   "}, "must not be empty"),
-        ("query_connectome", {"q": "x", "k": 0}, "k must be between 1 and 100"),
-        ("pack_connectome", {"q": "x", "max_nodes": 501}, "max_nodes must be between 1 and 500"),
+        ("query", {"q": "   "}, "must not be empty"),
+        ("query", {"q": "x", "k": 0}, "k must be between 1 and 100"),
+        ("pack", {"q": "x", "max_nodes": 501}, "max_nodes must be between 1 and 500"),
         ("cone", {"spec": "LC4", "hops": 6}, "hops must be between 0 and 5"),
         ("cone", {"spec": "LC4", "min_syn": 0}, "min_syn must be between 1 and 10000"),
         ("cone", {"spec": "LC4", "limit": 501}, "limit must be between 1 and 500"),
@@ -177,6 +181,12 @@ async def test_semantic_search_without_an_index_says_why(graph_root):
         ("node_edges", {"node_id": "x", "rel": "DROP TABLE"}, "rel must be one of"),
         ("find_nodes", {"name": "LC", "kind": "nodes; --"}, "kind must be one of"),
         ("get_node", {"node_id": "``"}, "must not be empty"),
+        ("neighbors", {"node_id": "``"}, "must not be empty"),
+        (
+            "neighbors",
+            {"node_id": "connectome:synthetic:t:LC4", "limit": 0},
+            "limit must be between",
+        ),
         ("type_partners", {"cell_type": "LC4", "limit": 0}, "limit must be between 1 and 500"),
         ("snapshot_list", {"limit": 10_000}, "limit must be between 1 and 500"),
     ],
@@ -186,24 +196,20 @@ async def test_out_of_range_arguments_are_rejected_not_clamped(graph_root, tool,
         assert message in await _error(s, tool, **args)
 
 
-async def test_lifespan_closes_the_graph_on_shutdown(graph_root):
-    kg = ConnectomeKG(graph_root)
-    mcp_server._kg = kg
-    try:
-        async with create_connected_server_and_client_session(mcp_server.mcp) as session:
-            result = await session.call_tool("graph_stats", {})
-            assert not result.isError
-        # The server has unwound by here, so the lifespan's finally has run.
-        assert kg._store is not None  # noqa: SLF001 - the tool call opened it
-        assert kg._store._con is None  # noqa: SLF001 - and the lifespan closed it
-    finally:
-        mcp_server._kg = None
+async def test_the_session_opens_the_graph_and_closes_it(graph_root, monkeypatch):
+    closed: list[ConnectomeKG] = []
+    real_close = ConnectomeKG.close
 
+    def counting_close(self: ConnectomeKG) -> None:
+        closed.append(self)
+        real_close(self)
 
-async def test_lifespan_is_a_noop_when_no_graph_was_set():
-    assert mcp_server._kg is None
-    async with create_connected_server_and_client_session(mcp_server.mcp):
-        pass
+    monkeypatch.setattr(ConnectomeKG, "close", counting_close)
+    async with _session(graph_root) as s:
+        assert not (await s.call_tool("stats", {})).isError
+        assert closed == [], "the graph stays open for the whole session"
+    assert len(closed) == 1
+    assert closed[0]._store is not None and closed[0]._store._con is None  # noqa: SLF001
 
 
 async def test_influence_tool(graph_root):
@@ -231,3 +237,120 @@ async def test_influence_rejects_out_of_range_arguments(graph_root):
         assert "limit must be between 1 and 500" in await _error(
             s, "influence", source="GRN_sugar", limit=0
         )
+
+
+# ---------------------------------------------------------------------------
+# Datasets, the command and the old entry point
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def two_dataset_root(tables, tmp_path_factory) -> Path:
+    """A root holding two built datasets, as a machine with fafb783 and banc888 does."""
+    root = tmp_path_factory.mktemp("datasets")
+    for dataset in ("synthetic", "fafb783"):
+        with ConnectomeKG(dataset_dir(root, dataset), tables=tables) as kg:
+            kg.build_graph(wipe=True)
+    return root
+
+
+async def test_a_named_dataset_under_a_root_is_served(two_dataset_root):
+    async with _session(two_dataset_root, dataset="synthetic") as s:
+        assert (await _call(s, "stats"))["dataset_id"] == "synthetic"
+
+
+def test_an_unnamed_dataset_among_several_is_refused(two_dataset_root):
+    async def run() -> None:
+        async with _session(two_dataset_root):
+            pass
+
+    with pytest.raises(BaseException) as info:
+        anyio.run(run)
+    assert "name one with --dataset" in repr(info.value) or any(
+        "name one with --dataset" in str(e) for e in getattr(info.value, "exceptions", ())
+    )
+
+
+def test_a_dataset_with_no_graph_is_refused_not_served_empty(tmp_path):
+    (tmp_path / ".connectomekg").mkdir()
+
+    async def run() -> None:
+        async with _session(tmp_path):
+            pass
+
+    with pytest.raises(BaseException) as info:
+        anyio.run(run)
+    assert "no graph at" in repr(info.value) or any(
+        "no graph at" in str(e) for e in getattr(info.value, "exceptions", ())
+    )
+    assert not (tmp_path / ".connectomekg" / "graph.sqlite").exists()
+
+
+def test_manifest_answers_without_a_graph_and_creates_nothing(tmp_path):
+    result = CliRunner().invoke(cli, ["mcp", "--repo", str(tmp_path), "--manifest"])
+    assert result.exit_code == 0, result.output
+    m = json.loads(result.output)
+    assert m["canonical"] == list(CANONICAL_TOOLS) and m["kind"] == "connectome"
+    assert manifest(build_server(tmp_path))["tools"] == m["tools"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_sse_is_gone(tmp_path):
+    result = CliRunner().invoke(cli, ["mcp", "--repo", str(tmp_path), "--transport", "sse"])
+    assert result.exit_code == 2
+
+
+def test_other_commands_do_not_import_mcp():
+    out = subprocess.run(
+        [sys.executable, "-c", "import sys, connectomekg.cli; print('mcp' in sys.modules)"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert out == "False"
+
+
+_SHIM = ["-c", "from connectomekg.mcp_server import main; main()"]
+_GROUP = ["-m", "connectomekg.cli"]
+
+
+def _stdio(args: list[str], cwd: Path, entry: list[str] = _SHIM):
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[*entry, *args],
+        env={**os.environ, "PYTHONPATH": _SRC},
+        cwd=str(cwd),
+    )
+
+    async def run():
+        with open(cwd / "stderr.log", "w", encoding="utf-8") as errlog:
+            async with stdio_client(params, errlog=errlog) as (read, write):
+                async with ClientSession(read, write) as client:
+                    init = await client.initialize()
+                    tools = await client.list_tools()
+                    stats = await client.call_tool("stats", {})
+                    return init, tools, stats
+
+    return anyio.run(run)
+
+
+def test_connkg_mcp_keeps_root_and_dataset(two_dataset_root):
+    init, tools, stats = _stdio(
+        ["--root", str(two_dataset_root), "--dataset", "fafb783"], two_dataset_root
+    )
+    assert (init.serverInfo.name, init.serverInfo.version) == ("connkg", connectomekg.__version__)
+    assert [t.name for t in tools.tools][: len(CANONICAL_TOOLS)] == list(CANONICAL_TOOLS)
+    assert stats.structuredContent["kind"] == "connectome"
+    assert stats.structuredContent["nodes"]["by_kind"]["neuron"] == 600
+
+
+def test_connkg_group_root_and_dataset_reach_the_server(two_dataset_root):
+    """``connkg --root R --dataset D mcp``: the group's options pick the dataset."""
+    _, _, stats = _stdio(
+        ["--root", str(two_dataset_root), "--dataset", "fafb783", "mcp"],
+        two_dataset_root,
+        entry=_GROUP,
+    )
+    assert stats.structuredContent["kind"] == "connectome"
+    err = (two_dataset_root / "stderr.log").read_text(encoding="utf-8")
+    assert str(dataset_dir(two_dataset_root, "fafb783")) in err

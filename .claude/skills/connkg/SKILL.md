@@ -12,7 +12,7 @@ description: >
   sign, ontology term or labels. Also use for the connkg CLI (build, verify,
   files, fixture, stats, analyze, query, path, cone, snapshot), downloading and
   checking the Codex files, build reports, snapshots, SQL against
-  connectomes/<dataset>/.connectomekg/graph.sqlite, the connkg-mcp server and its tools, the synthetic
+  connectomes/<dataset>/.connectomekg/graph.sqlite, the connkg mcp server and its tools, the synthetic
   fixture, or troubleshooting ConnectomeKG.
 ---
 
@@ -262,17 +262,18 @@ poetry run connkg --root . viz3d --view flow LC4
 
 ## MCP server
 
-`connkg-mcp --root <dir> [--dataset ID]` serves one dataset's graph over stdio (`--transport sse` for
-SSE). When its tools are connected, prefer them to shelling out to the CLI:
+`connkg --root <dir> --dataset ID mcp` (or `connkg-mcp --root <dir> --dataset ID`) serves one
+dataset's graph over stdio (`--transport streamable-http` for HTTP). When its tools are connected,
+prefer them to shelling out to the CLI:
 
 | tool | use for |
 |---|---|
-| `graph_stats`, `analyze_connectome` | orientation, the Markdown report |
+| `stats`, `analyze_connectome` | orientation, the Markdown report |
 | `find_nodes(name, kind, limit)` | a node whose exact name or id is unknown |
-| `get_node(node_id)`, `node_edges(node_id, rel, direction, limit)` | metadata; a neuron's neuropils, a column's neurons, a type's ontology terms |
+| `get_node(node_id)`, `neighbors(node_id, rels, direction, limit)`, `node_edges(node_id, rel, direction, limit)` | metadata; a node's edges both ways; a neuron's neuropils, a column's neurons, a type's ontology terms |
 | `neurons_of(spec)`, `type_partners(cell_type, direction, limit)` | resolve a spec; partner types by synapses |
 | `strongest_path(source, target)`, `cone(spec, hops, min_syn, direction, limit)` | circuits |
-| `query_connectome`, `pack_connectome` | concept search, only with a vector index |
+| `query`, `pack` | concept search, only with a vector index |
 | `snapshot_list`, `snapshot_show`, `snapshot_diff` | metric history |
 
 Arguments outside their bounds come back as tool errors naming the range

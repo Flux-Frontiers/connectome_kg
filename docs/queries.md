@@ -270,7 +270,7 @@ graph that knows where its cell bodies are from one that does not: after
 
 - [Rendering the connectome in 3-D](rendering.md) draws any of these, and the
   viewer takes the same specs and answers interactively.
-- `connkg-mcp` serves `strongest_path`, `cone`, `influence`, `type_partners`,
+- `connkg mcp` serves `strongest_path`, `cone`, `influence`, `type_partners`,
   `neuroglancer_link` and the rest to an AI agent over MCP. The
   [command reference](cli.md#connkg-mcp) has the client configuration and
   the tool list.
