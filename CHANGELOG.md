@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `ConnectomeKG.stats()` returns the fleet stats shape**
+  (kgmodule-utils 0.29.0, unreleased; developed against its local wheel,
+  with the floor and lock left for its release): `{"kind", "nodes": {"total",
+  "by_kind"}, "edges": {"total", "by_rel"}}` plus the connectome figures
+  (`n_neurons`, `n_pairs`, ...). Against 0.29.0 the old reads of
+  `node_counts` raised, failing 12 tests and every `analyze`. The MCP
+  `graph_stats` tool returns `kind`, `nodes` and `edges` in place of the four
+  flat keys; `connkg stats` still prints the flat keys, and snapshots record
+  what they did before.
+
 ## [0.8.1] - 2026-09-29
 
 ### Removed

@@ -97,7 +97,7 @@ async def test_every_tool_is_registered(graph_root):
 async def test_lookup_tools(graph_root):
     async with _session(graph_root) as s:
         stats = await _call(s, "graph_stats")
-        assert stats["node_counts"]["neuron"] == 600
+        assert stats["nodes"]["by_kind"]["neuron"] == 600
         assert stats["n_neurons"] == 600 and stats["dataset_id"] == "synthetic"
         assert "module_count" not in stats
 
