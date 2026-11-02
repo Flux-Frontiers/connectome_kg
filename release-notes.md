@@ -1,38 +1,26 @@
-# Release Notes -- v0.10.0
+# Release Notes -- v0.10.1
 
-> Released: 2026-10-26
+> Released: 2026-11-02
 
-connkg's MCP server now runs on the fleet's shared base, `kg_utils.mcp`, so its
-first five tools have the same names on every Flux-Frontiers KG server:
-`stats`, `query`, `pack`, `get_node` and `neighbors`. Its twelve connectome
-tools (`strongest_path`, `cone`, `influence`, `type_partners`,
-`neuroglancer_link` and the rest) are unchanged, and existing `connkg-mcp`
-configs keep working.
+A security release for the 3-D extra. A pip install of
+`connectome-kg[viz3d]` could resolve an older quiltwright and, through it,
+Pillow 12.3.0 and its 41 advisories, some of them critical. The extra now
+floors quiltwright at 0.17.0, the first release that floors Pillow at
+13.0.0. The graph, the queries and the tools do not change.
 
 ## What changed
 
-**Canonical tool names.** `graph_stats` is `stats`, `query_connectome` is
-`query` and `pack_connectome` is `pack`, with no aliases. The new `neighbors`
-tool returns a node's edges in either direction and the nodes at their ends.
-`get_node` still returns the node's decoded metadata, and a missing node is
-now a tool error rather than `null`. 17 tools in all, the canonical five
-first.
+**quiltwright 0.17.0 is the floor in `viz3d`.** The floor moves from 0.16.0
+to 0.17.0, which carries `pillow>=13.0.0` in its own metadata, so the
+extra always gets the patched Pillow. The lock moves quiltwright to 0.17.0.
 
-**One command, standard flags.** `connkg mcp` takes the fleet's `--repo`,
-`--db`, `--vectors`, `--model`, `--transport stdio|streamable-http`, `--host`,
-`--port` and `--manifest`, with the dataset from connkg's own `--dataset`:
-`connkg --root /path --dataset fafb783 mcp`. `--repo` may also name a dataset
-directory directly. `connkg-mcp` is the same command and still takes `--root`
-and `--dataset`. The graph opens per session and closes after, and a dataset
-with no graph is refused instead of served empty.
+**The lock is refreshed.** Pillow 13.0.0, certifi, filelock, setuptools and
+virtualenv move to patched releases.
 
 ## Upgrading
 
-Rename the tools in agent instructions and scripts (`graph_stats` -> `stats`,
-`query_connectome` -> `query`, `pack_connectome` -> `pack`) and drop
-`--transport sse` from any config. A machine with more than one built dataset
-needs `--dataset` in its MCP entry. connectome-kg now takes the MCP SDK
-through `kgmodule-utils[mcp]>=0.29.0`. Nothing needs rebuilding.
+`pip install -U "connectome-kg[viz3d]"`. No rebuild: the FAFB v783 graph and
+its somas are unchanged.
 
 ---
 
