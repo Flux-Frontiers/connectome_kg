@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **An Art Techno logo.** The neuron: copper dendrites branch into a soma
+  die, and a gold axon fans out to three synaptic boutons, with the tagline
+  EVERY EDGE A SYNAPSE. `scripts/build_logo.py` draws the mark, a 64 px icon
+  and a banner as SVG under `assets/` and writes the PNGs. The README shows
+  the banner above the fly-brain render, by absolute raw URL so PyPI shows it
+  too, and the docs site shows the icon as its header logo and favicon
+  (`docs/assets/`, set in `mkdocs.yml`).
+
 ## [0.10.1] - 2026-11-02
 
 ### Security
